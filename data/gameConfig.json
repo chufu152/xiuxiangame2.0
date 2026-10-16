@@ -1778,7 +1778,7 @@
         "name": "灵田梯田",
         "buildable": true,
         "cost": 60,
-        "requiredDaoKey": "lingtian_ti",
+        "requiredDaoKey": "ling_tian_nong",
         "aiPriority": 12,
         "yields": {
           "food": 4,

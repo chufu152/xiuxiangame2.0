@@ -1502,6 +1502,7 @@
 | 10 | 里程碑归属：`foundSpiritPeak`/`appointBuilder` | — | 本文归 R3（PRD §7 R3 服务端含「灵峰」「改良」） | PRD §7 |
 | 11 | 里程碑归属：`researchDao`/`holdRecruitment`/`queryProjectQueue`/`cancelProject`/`accelerateProject` | — | 本文归 R4（PRD §7 R4 明列），而非 R3 的「城市 18 条」分组标签 | PRD §7 R4 明列优先于分组标签 |
 | 12 | 险地附加移动代价 `map.dangerTileMoveCost` | 1.0 `HexUtils.getMoveCost()` 记「基础 1 + 险地 2」= 进入险地共 2 点 | 2.0 按 PRD §4.1.8 **叠加公式**，该键语义改为「进入险地格的**附加**代价」，取 **1**；`data/gameConfig.json` 由 `2` 改为 `1`（R2 裁决二，R1 无任何规则代码读取该键，改值安全） | PRD §4.1.8；R2 提示词裁决二 |
+| 13 | 灵田梯田改良的道法门控键 `improvement.byType.LING_TIAN_TI_TIAN.requiredDaoKey` | 1.0 改良与道法用同名键 | 2.0 `requiredDaoKey` 约定取**道法 id**（对照 `JU_LING_ZHEN.requiredDaoKey = "ju_ling_zhen"`）；原值 `lingtian_ti` 是道法 `ling_tian_nong` 的 `UNLOCK_IMPROVEMENT` **效果简写 key**，非任何道法 id（悬空，会使灵田梯田永久不可建）。已修正为 `ling_tian_nong`（R3 预生成提示词复核时发现，R3 裁决一登记） | `data/gameConfig.json` `improvement.byType`；R3 提示词裁决一 |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
