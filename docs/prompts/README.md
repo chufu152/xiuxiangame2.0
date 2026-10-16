@@ -34,7 +34,10 @@
 - 2.5D：**正交相机锁定 yaw/pitch=45°，禁止旋转**；缩放/平移/任何操作与 view 刷新后相机不重置。
 - 美术资源独立可替换（逻辑 ID → manifest 映射），缺失只 WARN 不崩。
 - 每任务结束**无残留 godot 进程**，自检 `tools/check.ps1` 全绿。
-- 提交用约定式英文信息；推送失败仅单条命令临时加 `-c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890`，不写全局代理。
+- 提交用约定式英文信息。**远程固定用 HTTPS（不要改成 SSH）**：仓库本地已配代理 7890、凭据走 Windows 凭据管理器（chufu152 已登录）。WorkBuddy 在自己的 worktree 提交后，直接执行 `git push origin HEAD:main` 即可（保持 Clash 代理开启）；主工作区在 main 分支则 `git push origin main`。
+- 新 clone 的仓库没有仓库本地代理时，先执行（仅本仓库，**不是 `--global`**）：`git config http.proxy http://127.0.0.1:7890 && git config https.proxy http://127.0.0.1:7890`；或临时 `git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push origin HEAD:main`。
+- 若报 401/403，加 `-c credential.helper=manager` 强制走凭据管理器；**不要自行生成 SSH key、不要改 remote**（现有公钥未在 GitHub 注册，SSH 会 Permission denied）。
+- 代理只在本机 Clash 开启时有效；推送报连接失败先确认 7890 端口在监听。
 
 ## 里程碑与提示词
 
