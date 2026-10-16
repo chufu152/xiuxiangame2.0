@@ -1,0 +1,25 @@
+; Engine configuration file.
+; 修仙4X·宗门争霸 2.0 —— 服务端工程（权威规则层）
+; 运行：Godot_v4.4.1-stable_win64_console.exe --headless --path <abs>\server
+; 不渲染、不播音、不读输入。详见 docs/REQUIREMENTS_2.0.md §2.1 / §2.3。
+
+config_version=5
+
+[application]
+
+config/name="xiuxian-server"
+config/description="修仙4X·宗门争霸 2.0 权威规则服务端（Godot headless）"
+run/main_scene="res://scenes/ServerMain.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+config/quit_on_go_back=false
+
+[debug]
+
+gdscript/warnings/untyped_declaration=1
+gdscript/warnings/unsafe_property_access=1
+gdscript/warnings/unsafe_method_access=1
+gdscript/warnings/unsafe_cast=1
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

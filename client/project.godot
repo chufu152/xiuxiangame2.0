@@ -1,0 +1,31 @@
+; Engine configuration file.
+; 修仙4X·宗门争霸 2.0 —— 客户端工程（表现层）
+; 运行：Godot_v4.4.1-stable_win64.exe --path <abs>\client
+; 只做渲染 / 输入 / UI / 资源映射，不实现任何玩法规则。详见 docs/REQUIREMENTS_2.0.md §2.1 / §2.3 / §8.4。
+
+config_version=5
+
+[application]
+
+config/name="xiuxian-client"
+config/description="修仙4X·宗门争霸 2.0 客户端（表现层）"
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+
+[debug]
+
+gdscript/warnings/untyped_declaration=1
+gdscript/warnings/unsafe_property_access=1
+gdscript/warnings/unsafe_method_access=1
+gdscript/warnings/unsafe_cast=1
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+textures/canvas_textures/default_texture_filter=1
