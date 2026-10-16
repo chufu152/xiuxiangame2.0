@@ -26,7 +26,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R
   - R1.5 提示词 `3e49c09 docs(r1.5): add pre-r2 fix prompt (worktree mount, protocol contract, art schedule)`
   - R1.5 `8c622b5 docs(r1.5): add protocol_2.0 contract, mount shared in worktree, schedule placeholder art`
   - R2 提示词 `d38e1fa docs(r2): add R2 prompt for turn state machine, BFS movement, vision on move`
-  - R2 `PENDING` `feat(r2): turn state machine, terrain-aware BFS movement, vision on move`
+  - R2 `6c5a232 feat(r2): turn state machine, terrain-aware BFS movement, vision on move`
 
 ### 1.2 已交付并验证的资产
 
