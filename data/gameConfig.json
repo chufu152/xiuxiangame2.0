@@ -1,6 +1,2144 @@
 {
+  "map": {
+    "defaultWidth": 20,
+    "defaultHeight": 15,
+    "dangerTileChance": 0.1,
+    "dangerTileMoveCost": 2,
+    "nodeSpawnChance": {
+      "lingTian": 0.15,
+      "lingMai": 0.08,
+      "jiYuan": 0.06,
+      "miJing": 0.04,
+      "lingQuan": 0.05
+    },
+    "baseTerrainAlgorithm": "equalWeightNoAuthoritativeProbabilities",
+    "baseTerrains": {
+      "LING_FIELDS": {
+        "food": 3,
+        "spiritPower": 1,
+        "spiritStones": 0
+      },
+      "SPIRIT_PLAIN": {
+        "food": 2,
+        "spiritPower": 2,
+        "spiritStones": 0
+      },
+      "BARREN": {
+        "food": 1,
+        "spiritPower": 0,
+        "spiritStones": 2
+      }
+    },
+    "relief": {
+      "FLAT": {
+        "height": 1.0,
+        "ratio": 0.7,
+        "moveCost": 1,
+        "defenseBonus": 0.0,
+        "visionBonus": 0,
+        "passable": true
+      },
+      "HILL": {
+        "height": 1.7,
+        "ratio": 0.22,
+        "moveCost": 2,
+        "defenseBonus": 0.2,
+        "visionBonus": 1,
+        "passable": true
+      },
+      "MOUNTAIN": {
+        "height": 3.0,
+        "ratio": 0.08,
+        "moveCost": 0,
+        "defenseBonus": 0.0,
+        "visionBonus": 0,
+        "passable": false
+      }
+    },
+    "features": {
+      "SPIRIT_FOREST": {
+        "chance": 0.22,
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ],
+        "moveExtra": 1,
+        "defenseBonus": 0.2,
+        "yield": {
+          "ling_mu": 1,
+          "food": 1
+        },
+        "clearYield": {
+          "ling_mu": 2
+        }
+      },
+      "MIRE": {
+        "chance": 0.12,
+        "reliefs": [
+          "FLAT"
+        ],
+        "moveExtra": 1,
+        "defenseBonus": -0.1,
+        "yield": {
+          "food": 1
+        },
+        "clearYield": {}
+      }
+    },
+    "river": {
+      "sourcesMin": 1,
+      "sourcesMax": 2,
+      "edgeRatioMin": 0.1,
+      "edgeRatioMax": 0.2,
+      "sourceEdgesMin": 1,
+      "sourceEdgesMax": 2,
+      "moveExtra": 1,
+      "foodBonus": 1,
+      "crossPenalty": 0.25
+    },
+    "nodeSpawnByTerrain": {
+      "LING_TIAN": {
+        "baseTerrains": [
+          "LING_FIELDS"
+        ],
+        "reliefs": [
+          "FLAT"
+        ],
+        "danger": false
+      },
+      "LING_MAI": {
+        "reliefs": [
+          "HILL",
+          "MOUNTAIN"
+        ],
+        "danger": false
+      },
+      "JI_YUAN": {
+        "danger": true
+      },
+      "MI_JING": {
+        "danger": true
+      },
+      "LING_QUAN": {
+        "riverRequired": true,
+        "danger": false
+      }
+    },
+    "luxuryByTerrain": {
+      "ling_cha": {
+        "baseTerrains": [
+          "LING_FIELDS"
+        ],
+        "features": [
+          "SPIRIT_FOREST"
+        ]
+      },
+      "yun_jin": {
+        "baseTerrains": [
+          "SPIRIT_PLAIN"
+        ]
+      },
+      "ling_yu": {
+        "reliefs": [
+          "HILL"
+        ],
+        "nodeTypes": [
+          "LING_QUAN"
+        ]
+      }
+    },
+    "strategicByTerrain": {
+      "xuan_tie": {
+        "reliefs": [
+          "HILL",
+          "MOUNTAIN"
+        ]
+      },
+      "tian_jing": {
+        "reliefs": [
+          "MOUNTAIN"
+        ],
+        "danger": true
+      },
+      "ling_mu": {
+        "features": [
+          "SPIRIT_FOREST"
+        ]
+      }
+    },
+    "setup": {
+      "source": "REQUIREMENTS_2.0 §4.3; safeRadius / limits 为 R1 安全实现边界，不冒充文档数值",
+      "sectCount": 4,
+      "safeRadius": 1,
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxTiles": 16384,
+      "peakLevel": 1,
+      "peakQiYun": 0,
+      "nodeLevel": 1,
+      "rootGrade": 1,
+      "rootCount": 1,
+      "leaderRealm": "JIN_DAN",
+      "leaderPosition": "ZONG_ZHU",
+      "outerRealm": "LIAN_QI",
+      "outerPosition": "WAI_MEN",
+      "outerCount": 2,
+      "unitClass": "PU_TONG",
+      "rootTypes": [
+        "JIN",
+        "MU",
+        "SHUI",
+        "HUO",
+        "TU",
+        "FENG",
+        "LEI",
+        "ZA"
+      ],
+      "rootMoveBonus": {
+        "JIN": 1,
+        "MU": 1,
+        "SHUI": 1,
+        "HUO": 1,
+        "TU": 1,
+        "FENG": 1,
+        "LEI": 1,
+        "ZA": -1
+      },
+      "aiFactions": [
+        "ZONG_MEN",
+        "JIA_ZU",
+        "GUO_JIA"
+      ],
+      "aiNames": [
+        "青云宗",
+        "长生世家",
+        "天机王朝"
+      ],
+      "generation": 1,
+      "realmMoveBonus": {
+        "LIAN_QI": 0,
+        "ZHU_JI": 0,
+        "JIN_DAN": 1,
+        "YUAN_YING": 2,
+        "HUA_SHEN": 3
+      }
+    }
+  },
+  "disciple": {
+    "baseMovePoints": 2,
+    "recruitmentBaseInterval": 10,
+    "promotionWaitTurns": 5,
+    "injuryRecoveryChance": 0.5,
+    "heartDevil": {
+      "max": 100,
+      "injuryThreshold": 80,
+      "betrayThreshold": 100,
+      "overCapacityPerTurn": 5,
+      "injuryChance": 0.3,
+      "exploreFailBonus": 10,
+      "caveReduce": 5,
+      "jiangDaoReduce": 5,
+      "betrayNeutralChance": 0.5
+    },
+    "cultivation": {
+      "baseSpeed": 10.0,
+      "rootGradeBonusPerGrade": 0.1,
+      "caveBonus": 0.5,
+      "zongMenBonus": 0.3,
+      "heartDevilPenaltyThreshold": 50,
+      "heartDevilPenalty": 0.2,
+      "spiritPowerCostPerTurn": 1,
+      "spiritPowerCostPerRealmLevel": 1,
+      "progressCapPerRealm": {
+        "LIAN_QI": 100,
+        "ZHU_JI": 200,
+        "JIN_DAN": 400,
+        "YUAN_YING": 800,
+        "HUA_SHEN": 1600
+      },
+      "breakthroughChancePerRealm": {
+        "LIAN_QI": 0.8,
+        "ZHU_JI": 0.6,
+        "JIN_DAN": 0.4,
+        "YUAN_YING": 0.2
+      },
+      "breakthroughFailHeartDevil": 10,
+      "breakthroughFailProgressRatio": 0.5,
+      "tribulationSpiritPowerCost": 500,
+      "tribulationMaterialCosts": {
+        "tian_jing": 3,
+        "xuan_tie": 2
+      },
+      "tribulationSpiritStoneCost": 300,
+      "tribulationBaseSuccessChance": 0.3,
+      "tribulationDaoBonusPerUnlocked": 0.05,
+      "tribulationRootGradeBonusPerGrade": 0.05,
+      "tribulationFailHeartDevil": 50,
+      "tribulationFailFallChance": 0.3
+    }
+  },
+  "spiritPeak": {
+    "baseDiscipleCapacity": 10,
+    "capacityPerLevel": 5,
+    "baseQiYunMax": 100,
+    "foundCost": {
+      "zongMen": 500,
+      "jiaZu": 800,
+      "guoJia": 350
+    },
+    "foundTurns": 5,
+    "spreadPenaltyPerPeak": 0.05,
+    "baseMaintenance": 6,
+    "baseSpiritPowerOutput": 12,
+    "subPeakMaintenance": 2,
+    "baseDefense": 10,
+    "maxLevel": 5
+  },
+  "economy": {
+    "lingTianBaseOutput": 5,
+    "lingTianOutputPerLevel": 0.1,
+    "lingMaiBaseOutput": 3,
+    "lingQuanBaseOutput": 15,
+    "lingQuanDecayRate": 0.02,
+    "lingQuanMinOutput": 3,
+    "discipleUpkeepBase": 1,
+    "discipleSpiritPowerOutput": 4,
+    "guoJiaGovernancePerTile": 0.5,
+    "workPowerBasePerPeak": 25,
+    "workPowerPerWorkedTile": 10,
+    "workPowerPerSubPeak": 3,
+    "lingMaiTotalReserveBase": 1000,
+    "lingMaiTotalReservePerLevel": 0,
+    "prestigePerHighRealmDisciple": 1,
+    "prestigePerBattleWin": 3,
+    "prestigePerAscension": 50,
+    "prestigeCultivationBonusPerPoint": 0.002,
+    "prestigeCultivationBonusCap": 0.2,
+    "buildingUpkeepPerLevel": 1,
+    "unitUpkeepPerLevel": 2,
+    "accelerateStonePerTurn": 120,
+    "stabilityDropOnDeficit": 3
+  },
+  "resources": {
+    "initial": {
+      "spiritPower": 400,
+      "spiritStones": 300,
+      "workPower": 120,
+      "prestige": 0,
+      "materials": {
+        "tian_jing": 2,
+        "xuan_tie": 2,
+        "ling_mu": 4
+      },
+      "luxuries": {}
+    },
+    "strategic": {
+      "tian_jing": {
+        "displayName": "天晶"
+      },
+      "xuan_tie": {
+        "displayName": "玄铁"
+      },
+      "ling_mu": {
+        "displayName": "灵木"
+      }
+    },
+    "luxuryTypes": {
+      "ling_cha": {
+        "displayName": "灵茶",
+        "stabilityBonus": 3,
+        "qiYunBonus": 0,
+        "cultivationBonus": 0.05
+      },
+      "yun_jin": {
+        "displayName": "云锦",
+        "stabilityBonus": 3,
+        "qiYunBonus": 1,
+        "cultivationBonus": 0.0
+      },
+      "ling_yu": {
+        "displayName": "灵玉",
+        "stabilityBonus": 4,
+        "qiYunBonus": 2,
+        "cultivationBonus": 0.05
+      }
+    },
+    "luxurySpawnChance": 0.12,
+    "luxuryByTerrain": {
+      "ling_cha": {
+        "baseTerrains": [
+          "LING_FIELDS"
+        ],
+        "features": [
+          "SPIRIT_FOREST"
+        ]
+      },
+      "yun_jin": {
+        "baseTerrains": [
+          "SPIRIT_PLAIN"
+        ]
+      },
+      "ling_yu": {
+        "reliefs": [
+          "HILL"
+        ],
+        "nodeTypes": [
+          "LING_QUAN"
+        ]
+      }
+    },
+    "luxuryYieldPerTurn": 1,
+    "legacyRareMaterialConversion": {
+      "tian_jing": 1
+    }
+  },
+  "combat": {
+    "baseWinChance": 0.5,
+    "powerRatioThreshold": 1.5,
+    "injuryChanceOnLoss": 0.4,
+    "fallChanceOnLoss": 0.2,
+    "captureChanceOnLoss": 0.2,
+    "realmPowerWeight": 10,
+    "rootGradePowerWeight": 5,
+    "injuryPowerPenalty": 0.5,
+    "heartDevilLowThreshold": 50,
+    "heartDevilLowPenalty": 0.1,
+    "heartDevilHighThreshold": 80,
+    "heartDevilHighPenalty": 0.25,
+    "roundsMin": 1,
+    "roundsMax": 3,
+    "roundPowerNoise": 0.2
+  },
+  "building": {
+    "costs": {
+      "SHAN_MEN": 200,
+      "ZONG_ZHU_DA_DIAN": 300,
+      "CANG_JING_GE": 250,
+      "XIU_LIAN_FEN_FENG": 150,
+      "DAN_TANG_FEN_FENG": 150,
+      "QI_TANG_FEN_FENG": 150,
+      "JIANG_DAO_FEN_FENG": 150,
+      "HU_SHAN_JIAN_ZHEN": 280,
+      "ZU_CI": 260,
+      "WANG_CHAO_DI_DU": 320
+    },
+    "turns": {
+      "SHAN_MEN": 3,
+      "ZONG_ZHU_DA_DIAN": 5,
+      "CANG_JING_GE": 4,
+      "XIU_LIAN_FEN_FENG": 3,
+      "DAN_TANG_FEN_FENG": 3,
+      "QI_TANG_FEN_FENG": 3,
+      "JIANG_DAO_FEN_FENG": 3,
+      "HU_SHAN_JIAN_ZHEN": 4,
+      "ZU_CI": 4,
+      "WANG_CHAO_DI_DU": 5
+    },
+    "caveCost": 100,
+    "caveTurns": 2,
+    "fortifyCost": 80,
+    "fortifyTurns": 2,
+    "fortifyDefenseBonus": 10,
+    "recruitmentCost": 200,
+    "recruitmentTurns": 3,
+    "recruitmentBaseCount": 2,
+    "recruitmentPerLevel": 1,
+    "refundRate": 0.5,
+    "materialCosts": {
+      "ZONG_ZHU_DA_DIAN": {
+        "tian_jing": 3
+      },
+      "CANG_JING_GE": {
+        "ling_mu": 4
+      },
+      "HU_SHAN_JIAN_ZHEN": {
+        "xuan_tie": 4
+      },
+      "ZU_CI": {
+        "ling_mu": 4
+      },
+      "WANG_CHAO_DI_DU": {
+        "tian_jing": 4,
+        "xuan_tie": 3
+      }
+    },
+    "factionOnly": {
+      "HU_SHAN_JIAN_ZHEN": "ZONG_MEN",
+      "ZU_CI": "JIA_ZU",
+      "WANG_CHAO_DI_DU": "GUO_JIA"
+    }
+  },
+  "explore": {
+    "jiYuanThresholdPerNodeLevel": 1,
+    "jiYuanBaseSuccessChance": 0.5,
+    "jiYuanRootGradeBonus": 0.05,
+    "jiYuanMaterials": {
+      "tian_jing": 2,
+      "xuan_tie": 1,
+      "ling_mu": 2
+    },
+    "jiYuanMaterialPerGrade": {
+      "tian_jing": 1,
+      "ling_mu": 1
+    },
+    "jiYuanFailInjuryChance": 0.3,
+    "jiYuanFailFallChance": 0.1,
+    "jiYuanCooldownTurns": 5,
+    "jiYuanDaoPointReward": 20,
+    "miJingCost": 200,
+    "miJingMaxParticipants": 4,
+    "miJingCooldownTurns": 8,
+    "miJingBaseRichChance": 0.3,
+    "miJingRootGradeBonus": 0.04,
+    "miJingRealmBonus": 0.04,
+    "miJingDisasterChance": 0.25,
+    "miJingInjuryChance": 0.4,
+    "miJingFallChance": 0.15,
+    "miJingRichMaterials": {
+      "tian_jing": 6,
+      "xuan_tie": 4,
+      "ling_mu": 5
+    },
+    "miJingRichSpiritStones": 300,
+    "miJingRichDaoPoints": 40
+  },
+  "appointment": {
+    "zhangLaoBaseLimit": 2,
+    "zhangLaoPerPowerLevel": 1,
+    "fengZhuQiYunBonus": 5,
+    "fengZhuSpiritPowerBonus": 0.3,
+    "zhangLaoCultivationBonus": 0.1,
+    "zhangLaoResearchSpeedBonus": 0.1,
+    "zongZhuDaDianQiYunBonus": 10,
+    "zongZhuDaDianSpiritPowerBonus": 0.2
+  },
+  "ai": {
+    "actionPoints": 5,
+    "aggression": 0.4,
+    "expansionTendency": 0.5,
+    "exploreTendency": 0.3,
+    "maxGarrisonPerNode": 2,
+    "minDisciplesForGarrison": 3,
+    "recruitPerPeak": 2,
+    "clanMemberTarget": 20,
+    "uniqueUnitTarget": 3,
+    "bloodlineTendency": 0.5,
+    "researchTendency": 0.4,
+    "combatAdvantageThreshold": 1.2,
+    "attackMinWinChance": 0.55,
+    "trainUnitChance": 0.35,
+    "powerPoorThreshold": 150,
+    "expansionNodeBonus": 10,
+    "expansionAdjacentResourceBonus": 8,
+    "expansionOwnBorderBonus": 6,
+    "expansionDangerPenalty": 3,
+    "expansionEnemyBorderPenalty": 4
+  },
+  "faction": {
+    "flavors": {
+      "ZONG_MEN": {
+        "displayName": "宗门流",
+        "tendency": "道统研究与功法见长",
+        "uniqueAbilityName": "道统推演",
+        "uniqueAbilityDesc": "推演道统加速三成, 分峰营造省费, 可解锁更全道法",
+        "uniqueUnit": "JIAN_ZHEN_SHI",
+        "uniqueUnitDesc": "剑阵使: 结阵而战, 防守与反击出众, 阵克骑军",
+        "preferredUnit": "JIAN_XIU",
+        "uniqueBuilding": "HU_SHAN_JIAN_ZHEN",
+        "uniqueBuildingDesc": "护山剑阵: 落成后灵峰防御大增, 守山如铁壁"
+      },
+      "JIA_ZU": {
+        "displayName": "家族流",
+        "tendency": "血脉与繁衍见长",
+        "uniqueAbilityName": "血脉繁衍",
+        "uniqueAbilityDesc": "族人修炼更快, 子嗣高品灵根概率提升, 血脉道法消耗降低",
+        "uniqueUnit": "XUE_MAI_XIU_SHI",
+        "uniqueUnitDesc": "血脉修士: 血脉觉醒的族中精锐, 攻守兼备且机动灵活",
+        "uniqueBuilding": "ZU_CI",
+        "uniqueBuildingDesc": "祖祠: 供奉先祖, 血脉族人修炼加成, 繁衍省费, 安定渐复"
+      },
+      "GUO_JIA": {
+        "displayName": "国家流",
+        "tendency": "扩张与治理见长",
+        "uniqueAbilityName": "王朝扩张",
+        "uniqueAbilityDesc": "开辟灵峰与扩张领地花费大减, 领土与人口权重更高",
+        "uniqueUnit": "JI_GUAN_JUN_TUAN",
+        "uniqueUnitDesc": "机关军团: 重械战团, 攻城拔寨无坚不摧",
+        "uniqueBuilding": "WANG_CHAO_DI_DU",
+        "uniqueBuildingDesc": "王朝帝都: 京畿重地, 住房宽裕, 人口增长加速"
+      }
+    },
+    "bloodline": {
+      "marryCostStones": 50,
+      "reproduceCostStones": 120,
+      "reproduceCostWorkPower": 60,
+      "reproduceCooldownTurns": 5,
+      "gradeJitterChance": 0.25,
+      "gradeMutationUpChance": 0.05,
+      "extraRootChance": 0.15,
+      "highGradeRootThreshold": 4,
+      "bloodlineDeathStabilityPenalty": 5
+    },
+    "zongMen": {
+      "buildSpeedBonus": 0.3,
+      "researchSpeedBonus": 0.3,
+      "exploreSuccessBonus": 0.2,
+      "qiYunBonus": 0.25,
+      "subPeakCostReduction": 0.2,
+      "bloodLinePenalty": 0.5,
+      "uniqueBuildingDefenseBonus": 25
+    },
+    "jiaZu": {
+      "bloodLineSpeedBonus": 0.4,
+      "highGradeRootChanceBonus": 0.15,
+      "bloodDaoCostReduction": 0.2,
+      "peakBuildCostPenalty": 0.5,
+      "foundCostPenalty": 0.6,
+      "zuCiCultivationBonus": 0.25,
+      "zuCiReproduceCostReduction": 0.3,
+      "zuCiStabilityPerTurn": 1
+    },
+    "guoJia": {
+      "foundCostReduction": 0.3,
+      "expansionCostReduction": 0.2,
+      "territoryPowerWeight": 1.5,
+      "rareMaterialPenalty": 0.2,
+      "diDuHousingBonus": 10,
+      "diDuGrowthBonus": 0.5
+    }
+  },
+  "victory": {
+    "maxTurns": 240,
+    "scoreVictoryEnabled": true,
+    "zongMen": {
+      "daoCompletionRatio": 1.0,
+      "coreDaoIds": [
+        "fei_sheng",
+        "hun_yuan"
+      ],
+      "powerLevel": 140,
+      "minPeaks": 10,
+      "expectedMinTurns": 150,
+      "expectedMaxTurns": 210
+    },
+    "jiaZu": {
+      "ascensionCount": 4,
+      "minClanMembers": 12,
+      "minHighRealmMembers": 3,
+      "highRealmLevel": 4,
+      "expectedMinTurns": 115,
+      "expectedMaxTurns": 185
+    },
+    "guoJia": {
+      "claimedTileRatio": 0.2,
+      "minControlledTiles": 24,
+      "requireAllOwnedPeaks": false,
+      "minPeaks": 2,
+      "expectedMinTurns": 130,
+      "expectedMaxTurns": 195
+    },
+    "score": {
+      "powerLevelWeight": 1.0,
+      "ascensionWeight": 12.0,
+      "claimedTileShareWeight": 40.0,
+      "daoCompletionWeight": 30.0,
+      "peakWeight": 3.0
+    }
+  },
+  "qiYun": {
+    "basePerTurn": 3,
+    "highRealmLevel": 3,
+    "qiYunPerRealmLevel": 1,
+    "qiYunPerUnlockedDao": 1,
+    "adjacentNodeBonus": 2
+  },
+  "powerLevel": {
+    "tilesPerLevel": 5,
+    "highRealmDiscipleWeight": 2,
+    "unlockedDaoWeight": 1,
+    "buildingLevelWeight": 1
+  },
+  "daoTree": {
+    "eras": [
+      "炼气篇",
+      "筑基篇",
+      "金丹篇",
+      "元婴篇",
+      "化神篇"
+    ],
+    "cangJingGePointsPerTurn": 2,
+    "nodeOutput": {
+      "lingMaiBase": 1,
+      "lingMaiPerLevel": 1,
+      "jiYuanBase": 1,
+      "jiYuanPerLevel": 1,
+      "miJingBase": 1,
+      "miJingPerLevel": 1
+    },
+    "daos": [
+      {
+        "id": "tu_na",
+        "name": "吐纳炼气诀",
+        "desc": "吐纳天地灵气, 修为日进",
+        "era": "炼气篇",
+        "iconKey": "dao_tu_na",
+        "prerequisiteDaoIds": [],
+        "daoPointCost": 20,
+        "spiritPowerCost": 30,
+        "turns": 3,
+        "effects": [
+          {
+            "type": "CULTIVATION_BONUS",
+            "amount": 0.1
+          }
+        ]
+      },
+      {
+        "id": "ling_tian_nong",
+        "name": "灵田农术",
+        "desc": "精研灵植之术, 灵田产出增加, 可修筑梯田",
+        "era": "炼气篇",
+        "iconKey": "dao_lingtian",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 20,
+        "spiritPowerCost": 30,
+        "turns": 3,
+        "effects": [
+          {
+            "type": "UNLOCK_IMPROVEMENT",
+            "key": "lingtian_ti"
+          },
+          {
+            "type": "ECONOMY_BONUS",
+            "amount": 0.05
+          }
+        ]
+      },
+      {
+        "id": "dan_yao_chu",
+        "name": "丹药初解",
+        "desc": "初通丹道, 可开设丹堂分峰",
+        "era": "炼气篇",
+        "iconKey": "dao_danyao",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 25,
+        "spiritPowerCost": 40,
+        "turns": 3,
+        "effects": [
+          {
+            "type": "UNLOCK_BUILDING",
+            "key": "dan_tang"
+          }
+        ]
+      },
+      {
+        "id": "jian_xiu",
+        "name": "剑修真解",
+        "desc": "御剑之道, 宗门战力大增, 可授剑修兵种",
+        "era": "筑基篇",
+        "iconKey": "dao_jianxiu",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 40,
+        "spiritPowerCost": 60,
+        "turns": 4,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "jian_xiu"
+          },
+          {
+            "type": "COMBAT_BONUS",
+            "amount": 10
+          }
+        ]
+      },
+      {
+        "id": "fa_xiu",
+        "name": "法修玄门",
+        "desc": "术法通玄, 视野开阔, 可授法修兵种",
+        "era": "筑基篇",
+        "iconKey": "dao_faxiu",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 40,
+        "spiritPowerCost": 60,
+        "turns": 4,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "fa_xiu"
+          },
+          {
+            "type": "VISION_BONUS",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "id": "dun_shu",
+        "name": "遁术",
+        "desc": "缩地成寸, 弟子每回合移动力+1",
+        "era": "筑基篇",
+        "iconKey": "dao_dunshu",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 40,
+        "spiritPowerCost": 50,
+        "turns": 4,
+        "effects": [
+          {
+            "type": "MOVE_BONUS",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "id": "ju_ling_zhen",
+        "name": "聚灵阵法",
+        "desc": "布设聚灵大阵, 灵力产出增加",
+        "era": "筑基篇",
+        "iconKey": "dao_juling",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 45,
+        "spiritPowerCost": 70,
+        "turns": 4,
+        "effects": [
+          {
+            "type": "UNLOCK_IMPROVEMENT",
+            "key": "ju_ling_zhen"
+          },
+          {
+            "type": "ECONOMY_BONUS",
+            "amount": 0.1
+          }
+        ]
+      },
+      {
+        "id": "cang_shu",
+        "name": "藏书大典",
+        "desc": "典藏万卷, 推演道统事半功倍",
+        "era": "金丹篇",
+        "iconKey": "dao_cangshu",
+        "prerequisiteDaoIds": [
+          "dan_yao_chu"
+        ],
+        "daoPointCost": 70,
+        "spiritPowerCost": 100,
+        "turns": 5,
+        "effects": [
+          {
+            "type": "RESEARCH_BONUS",
+            "amount": 0.15
+          },
+          {
+            "type": "ECONOMY_BONUS",
+            "amount": 0.05
+          }
+        ]
+      },
+      {
+        "id": "ti_xiu",
+        "name": "体修淬体",
+        "desc": "肉身成圣, 宗门战力大增, 可授体修兵种",
+        "era": "金丹篇",
+        "iconKey": "dao_tixiu",
+        "prerequisiteDaoIds": [
+          "jian_xiu"
+        ],
+        "daoPointCost": 70,
+        "spiritPowerCost": 100,
+        "turns": 5,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "ti_xiu"
+          },
+          {
+            "type": "COMBAT_BONUS",
+            "amount": 10
+          }
+        ]
+      },
+      {
+        "id": "chuan_song",
+        "name": "传送阵道",
+        "desc": "洞开虚空, 弟子可在己方灵峰间传送",
+        "era": "金丹篇",
+        "iconKey": "dao_chuansong",
+        "prerequisiteDaoIds": [
+          "ju_ling_zhen"
+        ],
+        "daoPointCost": 90,
+        "spiritPowerCost": 120,
+        "turns": 5,
+        "effects": [
+          {
+            "type": "UNLOCK_TELEPORT",
+            "key": "chuan_song"
+          }
+        ]
+      },
+      {
+        "id": "qi_ji",
+        "name": "御兽骑乘",
+        "desc": "驯服灵兽代步, 移动力+1, 可授御兽兵种",
+        "era": "金丹篇",
+        "iconKey": "dao_qiji",
+        "prerequisiteDaoIds": [
+          "fa_xiu"
+        ],
+        "daoPointCost": 70,
+        "spiritPowerCost": 100,
+        "turns": 5,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "qi_ji"
+          },
+          {
+            "type": "MOVE_BONUS",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "id": "fu_zhen",
+        "name": "符阵之道",
+        "desc": "符箓阵法大成, 可授符修兵种并兴建法坛区",
+        "era": "元婴篇",
+        "iconKey": "dao_fuzhen",
+        "prerequisiteDaoIds": [
+          "chuan_song"
+        ],
+        "daoPointCost": 120,
+        "spiritPowerCost": 160,
+        "turns": 6,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "fu_xiu"
+          },
+          {
+            "type": "UNLOCK_DISTRICT",
+            "key": "fa_tan"
+          }
+        ]
+      },
+      {
+        "id": "shi_jie",
+        "name": "市坊经营",
+        "desc": "互通有无, 宗产日丰, 可兴建坊市区",
+        "era": "元婴篇",
+        "iconKey": "dao_shijie",
+        "prerequisiteDaoIds": [
+          "ling_tian_nong"
+        ],
+        "daoPointCost": 120,
+        "spiritPowerCost": 160,
+        "turns": 6,
+        "effects": [
+          {
+            "type": "UNLOCK_DISTRICT",
+            "key": "shi_ji"
+          },
+          {
+            "type": "ECONOMY_BONUS",
+            "amount": 0.1
+          }
+        ]
+      },
+      {
+        "id": "tian_ji",
+        "name": "天机推演",
+        "desc": "窥探天机, 视野+1, 推演加速",
+        "era": "元婴篇",
+        "iconKey": "dao_tianji",
+        "prerequisiteDaoIds": [
+          "cang_shu"
+        ],
+        "daoPointCost": 140,
+        "spiritPowerCost": 180,
+        "turns": 6,
+        "effects": [
+          {
+            "type": "VISION_BONUS",
+            "amount": 1
+          },
+          {
+            "type": "RESEARCH_BONUS",
+            "amount": 0.15
+          }
+        ]
+      },
+      {
+        "id": "ji_guan",
+        "name": "机关傀儡",
+        "desc": "巧夺天工, 可造机关傀儡助战",
+        "era": "化神篇",
+        "iconKey": "dao_jiguan",
+        "prerequisiteDaoIds": [
+          "fu_zhen"
+        ],
+        "daoPointCost": 200,
+        "spiritPowerCost": 260,
+        "turns": 8,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "ji_guan"
+          }
+        ]
+      },
+      {
+        "id": "hu_shan_jian_zhen",
+        "name": "护山剑阵",
+        "desc": "以剑为阵, 御敌于山门之外, 可授剑阵使兵种",
+        "era": "金丹篇",
+        "iconKey": "dao_jianzhen",
+        "prerequisiteDaoIds": [
+          "jian_xiu"
+        ],
+        "daoPointCost": 70,
+        "spiritPowerCost": 90,
+        "turns": 4,
+        "factionOnly": "ZONG_MEN",
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "jian_zhen_shi"
+          },
+          {
+            "type": "COMBAT_BONUS",
+            "amount": 10
+          }
+        ]
+      },
+      {
+        "id": "xue_mai_jue_xing",
+        "name": "血脉觉醒",
+        "desc": "唤醒先祖血脉, 可授血脉修士兵种(血脉专属)",
+        "era": "金丹篇",
+        "iconKey": "dao_xuemai",
+        "prerequisiteDaoIds": [
+          "tu_na"
+        ],
+        "daoPointCost": 70,
+        "spiritPowerCost": 90,
+        "turns": 4,
+        "factionOnly": "JIA_ZU",
+        "requiresBloodLine": true,
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "xue_mai_xiu_shi"
+          },
+          {
+            "type": "CULTIVATION_BONUS",
+            "amount": 0.1
+          }
+        ]
+      },
+      {
+        "id": "zu_xian_bi_you",
+        "name": "祖先庇佑",
+        "desc": "列祖列宗英灵庇佑, 战力与修为并进(血脉专属)",
+        "era": "金丹篇",
+        "iconKey": "dao_zuxian",
+        "prerequisiteDaoIds": [
+          "xue_mai_jue_xing"
+        ],
+        "daoPointCost": 90,
+        "spiritPowerCost": 110,
+        "turns": 5,
+        "factionOnly": "JIA_ZU",
+        "requiresBloodLine": true,
+        "effects": [
+          {
+            "type": "COMBAT_BONUS",
+            "amount": 15
+          },
+          {
+            "type": "CULTIVATION_BONUS",
+            "amount": 0.1
+          }
+        ]
+      },
+      {
+        "id": "di_wang_zhu_shu",
+        "name": "帝王铸术",
+        "desc": "集王朝之力锻造重械, 可授机关军团兵种",
+        "era": "元婴篇",
+        "iconKey": "dao_diwang",
+        "prerequisiteDaoIds": [
+          "fu_zhen"
+        ],
+        "daoPointCost": 120,
+        "spiritPowerCost": 150,
+        "turns": 6,
+        "factionOnly": "GUO_JIA",
+        "effects": [
+          {
+            "type": "UNLOCK_UNIT",
+            "key": "ji_guan_jun_tuan"
+          },
+          {
+            "type": "ECONOMY_BONUS",
+            "amount": 0.05
+          }
+        ]
+      },
+      {
+        "id": "hun_yuan",
+        "name": "混元大道",
+        "desc": "万法归一, 战力与修为并进",
+        "era": "化神篇",
+        "iconKey": "dao_hunyuan",
+        "prerequisiteDaoIds": [
+          "ti_xiu",
+          "tian_ji"
+        ],
+        "daoPointCost": 260,
+        "spiritPowerCost": 320,
+        "turns": 8,
+        "effects": [
+          {
+            "type": "COMBAT_BONUS",
+            "amount": 25
+          },
+          {
+            "type": "CULTIVATION_BONUS",
+            "amount": 0.15
+          }
+        ]
+      },
+      {
+        "id": "fei_sheng",
+        "name": "飞升妙法",
+        "desc": "参悟飞升之秘, 化神渡劫多三分把握",
+        "era": "化神篇",
+        "iconKey": "dao_feisheng",
+        "prerequisiteDaoIds": [
+          "hun_yuan"
+        ],
+        "daoPointCost": 320,
+        "spiritPowerCost": 400,
+        "turns": 10,
+        "effects": [
+          {
+            "type": "UNLOCK_POLICY",
+            "key": "fei_sheng"
+          },
+          {
+            "type": "CULTIVATION_BONUS",
+            "amount": 0.1
+          }
+        ]
+      }
+    ],
+    "boosts": [
+      {
+        "id": "boost_first_mijing",
+        "condition": "miJingExplored",
+        "threshold": 1,
+        "points": 30
+      },
+      {
+        "id": "boost_lingmai_3",
+        "condition": "ownLingMai",
+        "threshold": 3,
+        "points": 40
+      },
+      {
+        "id": "boost_recruit_5",
+        "condition": "recruited",
+        "threshold": 5,
+        "points": 30
+      },
+      {
+        "id": "boost_first_win",
+        "condition": "enemyDefeated",
+        "threshold": 1,
+        "points": 30
+      }
+    ]
+  },
+  "vision": {
+    "enabled": true,
+    "peakVision": 3,
+    "nodeVision": 2,
+    "dangerBlocksLineOfSight": false,
+    "snapshotFade": 0.45,
+    "revealAnimationMs": 450,
+    "revealMaxTiles": 40,
+    "discipleVisionByRealm": {
+      "LIAN_QI": 2,
+      "ZHU_JI": 2,
+      "JIN_DAN": 3,
+      "YUAN_YING": 3,
+      "HUA_SHEN": 4
+    }
+  },
+  "warfare": {
+    "attacksPerTurn": 1,
+    "attackMoveCost": 1,
+    "fortificationRatio": 0.5,
+    "siegeRequirement": 1.0,
+    "defenseCutPerTurn": 0.12,
+    "maxDefenseCut": 0.6,
+    "supplyNeighborsRequired": 1,
+    "highGroundBonus": 0.15,
+    "riverCrossPenalty": 0.25,
+    "garrisonDefenseBonus": 0.15,
+    "zocEnabled": true,
+    "zocExtraCost": 2,
+    "retreatBaseChance": 0.5,
+    "retreatMoveCost": 1,
+    "retreatMobileBonus": 0.2,
+    "xpPerVictory": 20,
+    "xpPerDefeat": 8,
+    "xpPerKill": 15,
+    "xpPerObjective": 10,
+    "promotionPointsPerLevel": 1,
+    "levelThresholds": [
+      0,
+      30,
+      80,
+      160,
+      280
+    ],
+    "terrainDefenseBonus": {
+      "平原": 0.0,
+      "险地": 0.25
+    },
+    "unitClasses": {
+      "PU_TONG": {
+        "displayName": "寻常弟子",
+        "kind": "MELEE",
+        "attack": 1.0,
+        "defense": 1.0,
+        "moveBonus": 0,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.3,
+        "visionBonus": 0,
+        "minRealmLevel": 1,
+        "minRootGrade": 1,
+        "reclassSpiritPower": 0,
+        "reclassSpiritStones": 0,
+        "reclassCooldownTurns": 0,
+        "reclassMaterials": {}
+      },
+      "JIAN_XIU": {
+        "displayName": "剑修",
+        "kind": "MELEE",
+        "attack": 1.25,
+        "defense": 1.0,
+        "moveBonus": 0,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.35,
+        "visionBonus": 0,
+        "minRealmLevel": 2,
+        "minRootGrade": 1,
+        "reclassSpiritPower": 200,
+        "reclassSpiritStones": 100,
+        "reclassCooldownTurns": 3,
+        "reclassMaterials": {
+          "xuan_tie": 2
+        }
+      },
+      "FA_XIU": {
+        "displayName": "法修",
+        "kind": "RANGED",
+        "attack": 1.1,
+        "defense": 0.8,
+        "moveBonus": 0,
+        "range": 3,
+        "siegeBonus": 0.0,
+        "retaliation": 0.15,
+        "visionBonus": 1,
+        "minRealmLevel": 2,
+        "minRootGrade": 1,
+        "reclassSpiritPower": 250,
+        "reclassSpiritStones": 120,
+        "reclassCooldownTurns": 3,
+        "reclassMaterials": {
+          "tian_jing": 2
+        }
+      },
+      "TI_XIU": {
+        "displayName": "体修",
+        "kind": "ANTI_CAVALRY",
+        "attack": 0.9,
+        "defense": 1.5,
+        "moveBonus": 0,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.4,
+        "visionBonus": 0,
+        "minRealmLevel": 3,
+        "minRootGrade": 1,
+        "reclassSpiritPower": 300,
+        "reclassSpiritStones": 150,
+        "reclassCooldownTurns": 4,
+        "reclassMaterials": {
+          "ling_mu": 3
+        }
+      },
+      "QI_JI": {
+        "displayName": "御兽骑乘",
+        "kind": "CAVALRY",
+        "attack": 1.15,
+        "defense": 0.9,
+        "moveBonus": 2,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.25,
+        "visionBonus": 1,
+        "minRealmLevel": 3,
+        "minRootGrade": 2,
+        "reclassSpiritPower": 300,
+        "reclassSpiritStones": 180,
+        "reclassCooldownTurns": 4,
+        "reclassMaterials": {
+          "ling_mu": 4
+        }
+      },
+      "FU_XIU": {
+        "displayName": "符修",
+        "kind": "SUPPORT",
+        "attack": 0.8,
+        "defense": 0.9,
+        "moveBonus": 0,
+        "range": 2,
+        "siegeBonus": 1.0,
+        "retaliation": 0.1,
+        "visionBonus": 1,
+        "minRealmLevel": 3,
+        "minRootGrade": 2,
+        "reclassSpiritPower": 350,
+        "reclassSpiritStones": 200,
+        "reclassCooldownTurns": 4,
+        "reclassMaterials": {
+          "tian_jing": 2,
+          "ling_mu": 2
+        }
+      },
+      "JI_GUAN": {
+        "displayName": "机关傀儡",
+        "kind": "SIEGE",
+        "attack": 1.3,
+        "defense": 1.2,
+        "moveBonus": -1,
+        "range": 2,
+        "siegeBonus": 2.0,
+        "retaliation": 0.2,
+        "visionBonus": 0,
+        "minRealmLevel": 4,
+        "minRootGrade": 2,
+        "reclassSpiritPower": 500,
+        "reclassSpiritStones": 300,
+        "reclassCooldownTurns": 5,
+        "reclassMaterials": {
+          "xuan_tie": 5,
+          "tian_jing": 3
+        }
+      },
+      "JIAN_ZHEN_SHI": {
+        "displayName": "剑阵使",
+        "kind": "ANTI_CAVALRY",
+        "attack": 1.2,
+        "defense": 1.35,
+        "moveBonus": 0,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.5,
+        "visionBonus": 0,
+        "minRealmLevel": 3,
+        "minRootGrade": 2,
+        "reclassSpiritPower": 320,
+        "reclassSpiritStones": 180,
+        "reclassCooldownTurns": 4,
+        "reclassMaterials": {
+          "xuan_tie": 3
+        },
+        "factionOnly": "ZONG_MEN"
+      },
+      "XUE_MAI_XIU_SHI": {
+        "displayName": "血脉修士",
+        "kind": "MELEE",
+        "attack": 1.25,
+        "defense": 1.1,
+        "moveBonus": 1,
+        "range": 1,
+        "siegeBonus": 0.0,
+        "retaliation": 0.35,
+        "visionBonus": 1,
+        "minRealmLevel": 3,
+        "minRootGrade": 3,
+        "reclassSpiritPower": 350,
+        "reclassSpiritStones": 200,
+        "reclassCooldownTurns": 4,
+        "reclassMaterials": {
+          "ling_mu": 3
+        },
+        "factionOnly": "JIA_ZU"
+      },
+      "JI_GUAN_JUN_TUAN": {
+        "displayName": "机关军团",
+        "kind": "SIEGE",
+        "attack": 1.35,
+        "defense": 1.3,
+        "moveBonus": -1,
+        "range": 2,
+        "siegeBonus": 2.2,
+        "retaliation": 0.25,
+        "visionBonus": 0,
+        "minRealmLevel": 4,
+        "minRootGrade": 2,
+        "reclassSpiritPower": 550,
+        "reclassSpiritStones": 350,
+        "reclassCooldownTurns": 5,
+        "reclassMaterials": {
+          "xuan_tie": 6,
+          "tian_jing": 4
+        },
+        "factionOnly": "GUO_JIA"
+      }
+    },
+    "counters": {
+      "JIAN_XIU": {
+        "FA_XIU": 1.35,
+        "TI_XIU": 0.9
+      },
+      "QI_JI": {
+        "FA_XIU": 1.4,
+        "FU_XIU": 1.3,
+        "JI_GUAN": 1.3
+      },
+      "TI_XIU": {
+        "QI_JI": 1.5,
+        "JI_GUAN": 1.2
+      },
+      "FA_XIU": {
+        "TI_XIU": 0.85
+      },
+      "FU_XIU": {
+        "JI_GUAN": 1.15
+      },
+      "JIAN_ZHEN_SHI": {
+        "QI_JI": 1.3,
+        "XUE_MAI_XIU_SHI": 1.15
+      },
+      "XUE_MAI_XIU_SHI": {
+        "JIAN_XIU": 1.15,
+        "PU_TONG": 1.2
+      },
+      "JI_GUAN_JUN_TUAN": {
+        "FU_XIU": 1.25,
+        "JIAN_ZHEN_SHI": 1.15
+      }
+    },
+    "promotions": [
+      {
+        "id": "pro_sword_essence",
+        "name": "剑意通明",
+        "description": "输出+15%",
+        "minLevel": 1,
+        "requiresUnitClass": "JIAN_XIU",
+        "bonuses": {
+          "attack": 0.15
+        }
+      },
+      {
+        "id": "pro_flying_sword",
+        "name": "御剑千里",
+        "description": "射程+1 机动+1",
+        "minLevel": 2,
+        "requiresUnitClass": "JIAN_XIU",
+        "bonuses": {
+          "range": 1,
+          "move": 1
+        }
+      },
+      {
+        "id": "pro_iron_body",
+        "name": "铁身不坏",
+        "description": "承伤-20%",
+        "minLevel": 1,
+        "requiresUnitClass": "TI_XIU",
+        "bonuses": {
+          "defense": 0.25
+        }
+      },
+      {
+        "id": "pro_swift_hoof",
+        "name": "疾风兽步",
+        "description": "机动+1 撤退更稳",
+        "minLevel": 1,
+        "requiresUnitClass": "QI_JI",
+        "bonuses": {
+          "move": 1,
+          "retreat": 0.15
+        }
+      },
+      {
+        "id": "pro_break_form",
+        "name": "破阵真符",
+        "description": "攻城能力+0.5",
+        "minLevel": 1,
+        "requiresUnitClass": "FU_XIU",
+        "bonuses": {
+          "siege": 0.5
+        }
+      },
+      {
+        "id": "pro_heavy_core",
+        "name": "重械核心",
+        "description": "攻城与输出双升",
+        "minLevel": 2,
+        "requiresUnitClass": "JI_GUAN",
+        "bonuses": {
+          "siege": 0.5,
+          "attack": 0.2
+        }
+      },
+      {
+        "id": "pro_killer_instinct",
+        "name": "杀伐果断",
+        "description": "任意兵种: 输出+8%",
+        "minLevel": 1,
+        "requiresUnitClass": null,
+        "bonuses": {
+          "attack": 0.08
+        }
+      },
+      {
+        "id": "pro_calm_mind",
+        "name": "定心如磐",
+        "description": "任意兵种: 承伤-8%",
+        "minLevel": 1,
+        "requiresUnitClass": null,
+        "bonuses": {
+          "defense": 0.08
+        }
+      },
+      {
+        "id": "pro_spirit_sight",
+        "name": "神游太虚",
+        "description": "任意兵种: 视野+1",
+        "minLevel": 2,
+        "requiresUnitClass": null,
+        "bonuses": {
+          "vision": 1
+        }
+      }
+    ]
+  },
+  "city": {
+    "startPopulation": 3,
+    "workRadius": 2,
+    "growthFoodThreshold": 8,
+    "growthFoodCost": 8,
+    "foodPerPopulation": 1,
+    "housingBase": 6,
+    "housingPerPeakLevel": 2,
+    "housingPerCave": 1,
+    "housingPerDistrict": 2,
+    "housingPerBuilding": 1,
+    "stabilityBase": 70,
+    "stabilityMax": 100,
+    "growthStabilityMin": 45,
+    "overcrowdingPenalty": 12,
+    "foodShortagePenalty": 15,
+    "qiYunStabilityBonus": 10,
+    "luxuryStabilityBonus": 5,
+    "housingOverflowOutputPenalty": 0.05,
+    "stabilityOutputFactor": 0.006,
+    "workYieldByTerrain": {
+      "LING_FIELDS": {
+        "food": 3,
+        "spiritPower": 1,
+        "spiritStones": 0
+      },
+      "SPIRIT_PLAIN": {
+        "food": 2,
+        "spiritPower": 2,
+        "spiritStones": 0
+      },
+      "BARREN": {
+        "food": 1,
+        "spiritPower": 0,
+        "spiritStones": 2
+      }
+    },
+    "workYieldByNode": {
+      "LING_TIAN": {
+        "food": 5,
+        "spiritPower": 1,
+        "spiritStones": 0,
+        "daoPoints": 0,
+        "qiYun": 0
+      },
+      "LING_MAI": {
+        "food": 0,
+        "spiritPower": 0,
+        "spiritStones": 4,
+        "daoPoints": 1,
+        "qiYun": 0
+      },
+      "LING_QUAN": {
+        "food": 1,
+        "spiritPower": 6,
+        "spiritStones": 0,
+        "daoPoints": 0,
+        "qiYun": 0
+      },
+      "JI_YUAN": {
+        "food": 0,
+        "spiritPower": 1,
+        "spiritStones": 0,
+        "daoPoints": 2,
+        "qiYun": 0
+      },
+      "MI_JING": {
+        "food": 0,
+        "spiritPower": 0,
+        "spiritStones": 1,
+        "daoPoints": 3,
+        "qiYun": 0
+      }
+    },
+    "district": {
+      "maxDistrictsPerPeak": 4,
+      "costs": {
+        "XIU_LIAN_QU": 220,
+        "DAN_QI_QU": 200,
+        "CANG_JING_QU": 260,
+        "FA_TAN_QU": 180,
+        "SHI_JI_QU": 240
+      },
+      "turns": {
+        "XIU_LIAN_QU": 4,
+        "DAN_QI_QU": 4,
+        "CANG_JING_QU": 5,
+        "FA_TAN_QU": 3,
+        "SHI_JI_QU": 4
+      },
+      "yields": {
+        "XIU_LIAN_QU": {
+          "food": 0,
+          "spiritPower": 8,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 1
+        },
+        "DAN_QI_QU": {
+          "food": 0,
+          "spiritPower": 3,
+          "spiritStones": 5,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "CANG_JING_QU": {
+          "food": 0,
+          "spiritPower": 2,
+          "spiritStones": 0,
+          "daoPoints": 3,
+          "qiYun": 0
+        },
+        "FA_TAN_QU": {
+          "food": 0,
+          "spiritPower": 2,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 4
+        },
+        "SHI_JI_QU": {
+          "food": 4,
+          "spiritPower": 0,
+          "spiritStones": 6,
+          "daoPoints": 0,
+          "qiYun": 0
+        }
+      },
+      "stabilityByType": {
+        "SHI_JI_QU": 6,
+        "FA_TAN_QU": 4
+      },
+      "defenseByType": {
+        "FA_TAN_QU": 8,
+        "XIU_LIAN_QU": 4
+      },
+      "adjacency": [
+        {
+          "districtType": "XIU_LIAN_QU",
+          "neighbor": "NODE_LING_QUAN",
+          "resource": "spiritPower",
+          "flat": 4,
+          "ratio": 0.0,
+          "description": "灵泉旁宜修炼: 灵力+4"
+        },
+        {
+          "districtType": "XIU_LIAN_QU",
+          "neighbor": "NODE_LING_MAI",
+          "resource": "spiritPower",
+          "flat": 0,
+          "ratio": 0.25,
+          "description": "灵脉旁宜修炼: 灵力+25%"
+        },
+        {
+          "districtType": "DAN_QI_QU",
+          "neighbor": "NODE_LING_TIAN",
+          "resource": "spiritStones",
+          "flat": 3,
+          "ratio": 0.0,
+          "description": "灵田供药材: 灵石+3"
+        },
+        {
+          "districtType": "DAN_QI_QU",
+          "neighbor": "NODE_LING_MAI",
+          "resource": "spiritStones",
+          "flat": 4,
+          "ratio": 0.0,
+          "description": "灵脉供矿材: 灵石+4"
+        },
+        {
+          "districtType": "CANG_JING_QU",
+          "neighbor": "DISTRICT",
+          "resource": "daoPoints",
+          "flat": 2,
+          "ratio": 0.0,
+          "description": "相邻每处区域: 道统点+2"
+        },
+        {
+          "districtType": "FA_TAN_QU",
+          "neighbor": "DANGER",
+          "resource": "qiYun",
+          "flat": 3,
+          "ratio": 0.0,
+          "description": "邻险地镇煞: 气运+3"
+        },
+        {
+          "districtType": "SHI_JI_QU",
+          "neighbor": "NODE_LING_TIAN",
+          "resource": "food",
+          "flat": 4,
+          "ratio": 0.0,
+          "description": "邻灵田易售: 灵粮+4"
+        },
+        {
+          "districtType": "SHI_JI_QU",
+          "neighbor": "DISTRICT",
+          "resource": "spiritStones",
+          "flat": 0,
+          "ratio": 0.2,
+          "description": "相邻每处区域: 灵石+20%"
+        },
+        {
+          "districtType": "CANG_JING_QU",
+          "neighbor": "MOUNTAIN",
+          "resource": "daoPoints",
+          "flat": 2,
+          "ratio": 0.0
+        },
+        {
+          "districtType": "FA_TAN_QU",
+          "neighbor": "MOUNTAIN",
+          "resource": "qiYun",
+          "flat": 2,
+          "ratio": 0.0
+        }
+      ]
+    }
+  },
+  "improvement": {
+    "builderCharges": 3,
+    "builderMaxRealmLevel": 2,
+    "repairCost": 40,
+    "pillageChanceOnMove": 0.35,
+    "pillageChanceOnAttack": 1.0,
+    "roadMoveBonus": 1,
+    "juLingCultivationBonus": 0.15,
+    "juLingVisionRadius": 1,
+    "dongFuHousing": 1,
+    "lingQuanRestorePerTurn": 0.05,
+    "byType": {
+      "LING_TIAN_TI_TIAN": {
+        "name": "灵田梯田",
+        "buildable": true,
+        "cost": 60,
+        "requiredDaoKey": "lingtian_ti",
+        "aiPriority": 12,
+        "yields": {
+          "food": 4,
+          "spiritPower": 2,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "FLAT"
+        ],
+        "baseTerrains": [
+          "LING_FIELDS"
+        ]
+      },
+      "LING_KUANG": {
+        "name": "灵矿",
+        "buildable": true,
+        "cost": 90,
+        "aiPriority": 8,
+        "yields": {
+          "food": 0,
+          "spiritPower": 1,
+          "spiritStones": 5,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "HILL"
+        ]
+      },
+      "CAI_SHI_CHANG": {
+        "name": "采石场",
+        "buildable": true,
+        "cost": 70,
+        "aiPriority": 5,
+        "yields": {
+          "food": 0,
+          "spiritPower": 0,
+          "spiritStones": 4,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "HILL"
+        ]
+      },
+      "YAO_YUAN": {
+        "name": "灵植药园",
+        "buildable": true,
+        "cost": 80,
+        "requiredDistrictType": "DAN_QI_QU",
+        "aiPriority": 9,
+        "yields": {
+          "food": 2,
+          "spiritPower": 0,
+          "spiritStones": 3,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ]
+      },
+      "JU_LING_ZHEN": {
+        "name": "聚灵阵",
+        "buildable": true,
+        "cost": 120,
+        "requiredDaoKey": "ju_ling_zhen",
+        "aiPriority": 10,
+        "yields": {
+          "food": 0,
+          "spiritPower": 3,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 1
+        },
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ]
+      },
+      "QING_SHI_DAO_LU": {
+        "name": "青石道路",
+        "buildable": true,
+        "cost": 30,
+        "aiPriority": 4,
+        "yields": {
+          "food": 0,
+          "spiritPower": 0,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ]
+      },
+      "DONG_FU": {
+        "name": "洞府",
+        "buildable": true,
+        "cost": 100,
+        "aiPriority": 7,
+        "yields": {
+          "food": 0,
+          "spiritPower": 0,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ]
+      },
+      "LING_QUAN_XIU_SHAN": {
+        "name": "灵泉修缮",
+        "buildable": false,
+        "cost": 150,
+        "yields": {
+          "food": 0,
+          "spiritPower": 0,
+          "spiritStones": 0,
+          "daoPoints": 0,
+          "qiYun": 0
+        },
+        "reliefs": [
+          "FLAT",
+          "HILL"
+        ],
+        "nodeTypes": [
+          "LING_QUAN"
+        ]
+      }
+    }
+  },
+  "policy": {
+    "enabled": true,
+    "switchCooldownTurns": 8,
+    "governments": [
+      {
+        "id": "zong_fa",
+        "name": "宗门共治",
+        "description": "长老共议, 内外兼修, 各项政令皆可施行。",
+        "slots": {
+          "economy": 1,
+          "military": 1,
+          "governance": 1
+        },
+        "effects": {
+          "stabilityPerTurn": 0.5
+        }
+      },
+      {
+        "id": "jun_quan",
+        "name": "君主集权",
+        "description": "集权于一人, 兵威更盛, 但人心稍疏。",
+        "unlockEra": "元婴篇",
+        "slots": {
+          "economy": 1,
+          "military": 2,
+          "governance": 1
+        },
+        "effects": {
+          "combatBonus": 0.1,
+          "stabilityPerTurn": -0.5
+        }
+      },
+      {
+        "id": "men_fa",
+        "name": "世家门阀",
+        "description": "以世家共治, 财势并重, 声望日隆。",
+        "unlockEra": "金丹篇",
+        "slots": {
+          "economy": 2,
+          "governance": 2
+        },
+        "effects": {
+          "prestigePerTurn": 0.5,
+          "stabilityPerTurn": 0.5
+        }
+      }
+    ],
+    "cards": [
+      {
+        "id": "ling_tian_zhi",
+        "name": "灵田制",
+        "category": "economy",
+        "description": "灵田归公统一调配, 产出增一成半。",
+        "effects": {
+          "outputBonus": 0.15
+        }
+      },
+      {
+        "id": "shang_dao",
+        "name": "商道通衢",
+        "category": "economy",
+        "unlockEra": "筑基篇",
+        "description": "开商路通八方, 灵材其来如流。",
+        "effects": {
+          "spiritPowerBonus": 0.1,
+          "prestigePerTurn": 0.3
+        }
+      },
+      {
+        "id": "tie_lv_jun_gui",
+        "name": "铁律军规",
+        "category": "military",
+        "description": "军纪如铁, 攻伐愈利。",
+        "effects": {
+          "combatBonus": 0.1
+        }
+      },
+      {
+        "id": "yi_zhan_yang_zhan",
+        "name": "以战养战",
+        "category": "military",
+        "unlockEra": "金丹篇",
+        "description": "取资于敌, 战意不息。",
+        "effects": {
+          "combatBonus": 0.05,
+          "prestigePerTurn": 0.2
+        }
+      },
+      {
+        "id": "jing_xin_dao_chang",
+        "name": "静心道场",
+        "category": "governance",
+        "description": "道场清修, 弟子修行事半功倍。",
+        "effects": {
+          "cultivationBonus": 0.1
+        }
+      },
+      {
+        "id": "yan_ming_shang_fa",
+        "name": "严明赏罚",
+        "category": "governance",
+        "description": "赏罚分明, 人心安定, 怨气渐消。",
+        "effects": {
+          "stabilityPerTurn": 0.5
+        }
+      },
+      {
+        "id": "guang_na_men_tu",
+        "name": "广纳门徒",
+        "category": "governance",
+        "unlockEra": "筑基篇",
+        "description": "大开山门纳四方英才, 声望与收益俱增。",
+        "effects": {
+          "outputBonus": 0.05,
+          "prestigePerTurn": 0.2
+        }
+      },
+      {
+        "id": "xian_tu_zhao_ling",
+        "name": "仙途诏令",
+        "category": "governance",
+        "unlockDaoKey": "fei_sheng",
+        "description": "得飞升妙法者方可颁行, 举宗同修大道。",
+        "effects": {
+          "cultivationBonus": 0.15,
+          "stabilityPerTurn": 0.5
+        }
+      }
+    ]
+  },
+  "road": {
+    "enabled": true,
+    "stepCostReduction": 1,
+    "minStepCost": 1,
+    "networkMinChainTiles": 2,
+    "tierPeakBonus": 1,
+    "tierHubBonus": 2,
+    "hubPeakCount": 2,
+    "cityAutoBuild": true,
+    "cityAutoBuildPerPeak": 1,
+    "autoBuildStoneCost": 15
+  },
+  "teleport": {
+    "enabled": true,
+    "requiredDaoKey": "chuan_song",
+    "baseStones": 30,
+    "stonesPerHex": 5,
+    "capacityBase": 1,
+    "capacityPerOwnLingMaiNode": 1,
+    "capacityMax": 4
+  },
+  "automation": {
+    "enabled": true,
+    "defaultAutoImprove": true,
+    "defaultAutoRepair": true,
+    "defaultAutoRoad": false,
+    "defaultAutoProject": false,
+    "defaultAutoExplore": false,
+    "builderChargeCost": 1,
+    "maxActionsPerTurn": 6,
+    "rallyMaxDisciples": 8,
+    "autoExploreMaxDisciples": 3,
+    "projectPreference": {
+      "ZONG_MEN": [
+        "SHAN_MEN",
+        "CANG_JING_GE",
+        "XIU_LIAN_FEN_FENG",
+        "JIANG_DAO_FEN_FENG",
+        "HU_SHAN_JIAN_ZHEN"
+      ],
+      "JIA_ZU": [
+        "SHAN_MEN",
+        "DAN_TANG_FEN_FENG",
+        "XIU_LIAN_FEN_FENG",
+        "ZU_CI"
+      ],
+      "GUO_JIA": [
+        "SHAN_MEN",
+        "ZONG_ZHU_DA_DIAN",
+        "QI_TANG_FEN_FENG",
+        "WANG_CHAO_DI_DU"
+      ]
+    }
+  },
+  "speed": {
+    "animationScale": 1.0,
+    "autoPlayIntervalMs": 1200,
+    "fastSettlementDefault": false,
+    "batchMoveMaxTargets": 8
+  },
+  "difficulty": {
+    "defaultLevel": "normal",
+    "levels": {
+      "easy": {
+        "name": "初入仙途",
+        "aiActionPoints": 4,
+        "aiStartStonesBonus": 0,
+        "aiStartWorkPowerBonus": 0,
+        "aiAggressionMultiplier": 0.7,
+        "aiExpansionMultiplier": 0.7,
+        "playerStartStonesBonus": 500
+      },
+      "normal": {
+        "name": "正道争锋",
+        "aiActionPoints": 5,
+        "aiStartStonesBonus": 0,
+        "aiStartWorkPowerBonus": 0,
+        "aiAggressionMultiplier": 1.0,
+        "aiExpansionMultiplier": 1.0,
+        "playerStartStonesBonus": 0
+      },
+      "hard": {
+        "name": "群雄噬血",
+        "aiActionPoints": 6,
+        "aiStartStonesBonus": 600,
+        "aiStartWorkPowerBonus": 300,
+        "aiAggressionMultiplier": 1.3,
+        "aiExpansionMultiplier": 1.2,
+        "playerStartStonesBonus": 0
+      }
+    }
+  },
   "schemaVersion": "3.0",
-  "meta": {
-    "note": "R0 placeholder, full config migrated in R1"
-  }
+  "saveVersion": "3.0"
 }

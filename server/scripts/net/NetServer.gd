@@ -77,6 +77,9 @@ func _accept_new_connections() -> void:
 		if stream == null:
 			continue
 		var peer: WebSocketPeer = WebSocketPeer.new()
+		# 缓冲上限必须在 accept_stream 之前设置，否则 view 快照帧会被静默丢弃。
+		peer.inbound_buffer_size = Msg.FRAME_BUFFER_BYTES
+		peer.outbound_buffer_size = Msg.FRAME_BUFFER_BYTES
 		var error: Error = peer.accept_stream(stream)
 		if error != OK:
 			push_warning("[Server] websocket accept_stream failed: %s" % error_string(error))

@@ -14,6 +14,13 @@ const BACKEND: String = "xiuxian-godot-headless"
 const DEFAULT_HOST: String = "127.0.0.1"
 const DEFAULT_PORT: int = 9527
 
+## WebSocketPeer 单帧收发缓冲上限（字节）。
+## view 快照随地图规模线性增长：默认 20×15 = 300 格约 70 KB，安全上限 128×128 = 16384 格约 4 MB。
+## WebSocketPeer 默认仅 64 KiB，会在**默认地图**上就让 newGame/getState 的响应帧发不出去
+## （`_send` 报 ERR_OUT_OF_MEMORY），因此两端必须在 accept_stream / connect_to_url **之前**
+## 设为同一个值。两端口径必须一致，故放在共享协议常量里。
+const FRAME_BUFFER_BYTES: int = 16 * 1024 * 1024
+
 # --- 主动消息类型（服务端 -> 客户端）---
 const TYPE_HELLO: String = "hello"
 

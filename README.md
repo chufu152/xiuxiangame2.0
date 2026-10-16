@@ -18,9 +18,9 @@
 ```
 xiuxiangame2.0/
 ├── client/          # Godot 客户端工程（表现层：渲染/输入/UI/相机/资源映射）
-│   ├── scenes/      # 场景（主菜单、地图、HUD、各类面板）
+│   ├── scenes/      # 场景（MainMenu 主菜单、World 地图/侧栏；HUD、各类面板在 R8）
 │   └── scripts/
-│       ├── net/     # WebSocket 客户端、消息收发、服务端子进程拉起
+│       ├── net/     # WebSocket 客户端（NetClient）、会话状态与信号（Session autoload）
 │       ├── world/   # 六边形地图、相机、地块/单位/建筑渲染
 │       ├── ui/      # HUD 与各功能面板
 │       └── art/     # AssetLibrary：按逻辑资源 ID 加载美术
@@ -54,8 +54,8 @@ xiuxiangame2.0/
 
 ## 快速开始
 
-> **进度**：R0 工程骨架 ✅ 已完成（`d4c5bf7`）；R1 地图与开局 🚧 实现中（见 `docs/prompts/README.md` §3）。
-> 里程碑进度、提示词与已知坑见 [`docs/prompts/README.md`](docs/prompts/README.md)。
+> **进度**：R0 工程骨架 ✅ 已完成（`d4c5bf7`）；R1 地图与开局 ✅ 已完成并通过验收（服务端 `R1_PASS checks=79455`、客户端端到端全绿、`tools/check.ps1` 50/50）。
+> 里程碑进度、提示词与已知坑见 [`docs/prompts/README.md`](docs/prompts/README.md) §3。
 
 1. 安装 Godot 4.4.x（标准 GDScript 版即可，无需 .NET 版）；路径 `C:\Users\Administrator\godot\`。
 2. 首次拉取后运行 `tools/setup_shared.ps1`，把顶层 `shared/` 以目录联接（junction）挂到 `client/` 与 `server/`。

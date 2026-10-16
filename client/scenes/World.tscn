@@ -1,0 +1,22 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/World.gd" id="1_world"]
+[ext_resource type="Script" path="res://scripts/world/HexMap.gd" id="2_hexmap"]
+[ext_resource type="Script" path="res://scripts/world/Fog.gd" id="3_fog"]
+[ext_resource type="Script" path="res://scripts/world/UnitView.gd" id="4_units"]
+[ext_resource type="Script" path="res://scripts/world/SectView.gd" id="5_sects"]
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_world")
+
+[node name="HexMap" type="Node3D" parent="."]
+script = ExtResource("2_hexmap")
+
+[node name="Fog" type="Node" parent="."]
+script = ExtResource("3_fog")
+
+[node name="UnitView" type="Node3D" parent="."]
+script = ExtResource("4_units")
+
+[node name="SectView" type="Node3D" parent="."]
+script = ExtResource("5_sects")

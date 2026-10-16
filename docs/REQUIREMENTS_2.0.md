@@ -590,6 +590,7 @@ power = power × (1 + 政令战力%)
    "saveVersion":"3.0","implementedCommands":["newGame","..."]}
   ```
 - 客户端据 `implementedCommands` 置灰不支持按钮；单会话顺序处理，事件顺序 == 结算顺序。
+- **帧缓冲**：`WebSocketPeer` 默认单帧收发缓冲仅 **64 KiB**，而 `view` 快照随地图规模线性增长（默认 20×15=300 格约 70 KB，128×128≈4 MB）。两端必须在**建连前**（服务端 `accept_stream` / 客户端 `connect_to_url` 之前）统一设 `inbound/outbound_buffer_size` 为共享常量 `Msg.FRAME_BUFFER_BYTES`（当前 16 MiB），否则大帧静默发送失败（`_send ERR_OUT_OF_MEMORY`）。
 
 ### 6.2 请求与响应
 
@@ -724,7 +725,7 @@ eventLog[ ]
 
 - **前置**：两个工程各跑一次 `--headless --path <proj> --import`（生成 `.godot/global_script_class_cache.cfg`），否则 `class_name` 全局类报 `not declared`。
 - **R0**：`shared/` 目录联接幂等与内容贯通（临时文件双向可见）、配置缺失负向用例（非零退出）、headless 监听就绪（TCP 轮询）、`SmokeTest`（hello/ping/`UNKNOWN_COMMAND`/`NO_ID`）、无残留进程、零 `.java`。
-- **R1**：固定种子双跑导出 tiles 全字段**逐字一致**；MOUNTAIN≈8% / HILL≈22%（±3%）；河流边成对且连续、由高至边界；≥1 条连绵 ≥3 格山脉；出生点中心与三方向安全且可走通；节点只落偏好地形；4 宗 × (1 主峰 + 1 金丹宗主 + 2 炼气外门)、初始资源 400/300/120/0 与 晶2/铁2/木4；玩家 `visibleTiles`/`exploredTiles` 与视野半径一致且不下发未见敌方单位。
+- **R1**：固定种子双跑导出 tiles 全字段**逐字一致**（`outputs/r1_authority_a|b.json` SHA256 相同）；MOUNTAIN≈8% / HILL≈22%（±3%）；河流边成对且连续、由高至边界；≥1 条连绵 ≥3 格山脉；出生点中心与三方向安全且可走通；节点只落偏好地形；4 宗 × (1 主峰 + 1 金丹宗主 + 2 炼气外门)、初始资源 400/300/120/0 与 晶2/铁2/木4；玩家 `visibleTiles`/`exploredTiles` 与视野半径一致且不下发未见敌方单位。**客户端**：无头验收（侧栏对未探索格不泄露地形、相机锁 45° 无旋转输入、占位缺失只 WARN 一次）与**端到端**（客户端拉起 headless 服务端 → `newGame` 收到 300 格 view + 四宗公开信息 → `getState` 往返 → view 刷新保持相机 transform/size）。当前 `check.ps1` 为 **10 阶段**（`[0/9]`–`[9/9]`），共 **50** 项断言。
 - **R2 起**：启动 headless 服务端，固定种子跑 N 回合（30/60），导出事件流；断言地图/资源/阶段/胜负、地形移动成本、战斗预览==实战（含高地/跨河）、关键经济产出。
 - **通用**：配置校验（缺字段/非法枚举/引用已删模块即失败）；同种子双跑逐字一致（含地形生成）；结束后**无残留 godot 进程**。
 

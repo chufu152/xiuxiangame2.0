@@ -101,7 +101,7 @@ func _shutdown() -> void:
 
 ## 新连接进入 OPEN 后的第一帧：hello 握手（§6.1）。
 func _on_client_connected(peer: WebSocketPeer) -> void:
-	_server.send_json(peer, Dto.hello([Commands.PING]))
+	_server.send_json(peer, Dto.hello(_dispatcher.implemented_commands()))
 
 
 func _on_client_disconnected(_peer: WebSocketPeer, _code: int, _reason: String) -> void:

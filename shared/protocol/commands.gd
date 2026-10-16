@@ -8,3 +8,5 @@ extends RefCounted
 ## R0 只登记 ping；后续里程碑在此追加（每追加一条，同步更新 hello.implementedCommands）。
 
 const PING: String = "ping"
+const NEW_GAME: String = "newGame"
+const GET_STATE: String = "getState"

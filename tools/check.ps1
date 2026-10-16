@@ -1,18 +1,22 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    R0 自检（对应 docs/prompts/R0_工程骨架.md「自动验收」）。
+    里程碑自检：R0 工程骨架 + R1 地图开局（对应 docs/prompts/R0_工程骨架.md / R1_地图开局.md「自动验收」）。
 
 .DESCRIPTION
     依次执行：
-      [0/7] 环境与 R0 交付物清单
-      [1/7] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
-      [2/7] 两个工程 --import 无解析错误并生成 class_name 缓存
-      [3/7] 配置缺失时服务端非零退出（负向用例）
-      [4/7] console 版 --headless 启动服务端并监听 127.0.0.1:9527
-      [5/7] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0
-      [6/7] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
-      [7/7] 扫描仓库确认无 .java 文件（零 Java 约束）
+      [0/9] 环境与交付物清单（R0 + R1）
+      [1/9] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
+      [2/9] 两个工程 --import 无解析错误并生成 class_name 缓存
+      [3/9] 配置缺失时服务端非零退出（负向用例）
+      [4/9] console 版 --headless 启动服务端并监听 127.0.0.1:9527
+      [5/9] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
+      [6/9] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
+      [7/9] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
+            且同种子双跑导出的权威地图 outputs/r1_authority_a|b.json 逐字一致（SHA256 相同）
+      [8/9] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
+            再加 --integration 端到端（真实拉起 headless 服务端 + newGame 300 格 view + getState 往返）
+      [9/9] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
 
     退出码：0 = 全绿；1 = 存在失败项。
 
@@ -20,9 +24,11 @@
     HTTP_PROXY 与 http_proxy，Start-Process 重建环境字典时会抛「已添加项。字典中的
     关键字…」，导致子进程根本无法启动。.NET Process 继承父进程环境块，规避该问题。
     服务端就绪改用 TCP 端口轮询判定（Godot 对 stdout 重定向的行为不稳定，不依赖日志匹配）。
+    读取子进程输出使用「有界等待」：客户端 --integration 会拉起服务端子进程并继承 stdout
+    管道，若子进程未及时回收，无限等待会挂死自检，故超时后放弃读取并让断言显式失败。
 
 .PARAMETER Port
-    自检使用的端口，默认 9527。
+    自检使用的端口，默认 9527（客户端端到端验收自带 19537，不冲突）。
 
 .PARAMETER SkipImport
     跳过工程导入（缓存已存在时可加速）。
@@ -44,7 +50,7 @@ $ErrorActionPreference = 'Stop'
 # 显式按 UTF-8 解码（见 New-GodotStartInfo），不依赖控制台编码。
 
 # ---------------------------------------------------------------------------
-# 公共函数（与 run_dev.ps1 保持一致；R0 不引入额外公共脚本，避免超出文件清单）
+# 公共函数（与 run_dev.ps1 保持一致；不引入额外公共脚本，避免超出文件清单）
 # ---------------------------------------------------------------------------
 
 # 按 docs/prompts/README.md 的顺序定位 Godot 控制台版可执行文件。
@@ -90,12 +96,15 @@ function New-GodotStartInfo {
     return $info
 }
 
-# 同步运行并捕获输出，返回 @{ StdOut; StdErr; ExitCode }
+# 同步运行并捕获输出，返回 @{ StdOut; StdErr; ExitCode }。
+# 读流用有界等待：--integration 拉起的服务端子进程会继承 stdout 管道，
+# 无界 GetResult() 在子进程未回收时会永久阻塞，宁可放弃读取让断言失败。
 function Invoke-GodotCapture {
     param(
         [Parameter(Mandatory)][string]$Executable,
         [Parameter(Mandatory)][string[]]$Arguments,
-        [int]$TimeoutMs = 180000
+        [int]$TimeoutMs = 180000,
+        [int]$DrainMs = 20000
     )
     $info = New-GodotStartInfo -Executable $Executable -Arguments $Arguments -CaptureOutput
     $process = [System.Diagnostics.Process]::Start($info)
@@ -107,8 +116,8 @@ function Invoke-GodotCapture {
     }
     $stdout = ''
     $stderr = ''
-    try { $stdout = $outTask.GetAwaiter().GetResult() } catch { }
-    try { $stderr = $errTask.GetAwaiter().GetResult() } catch { }
+    if ($outTask.Wait($DrainMs)) { try { $stdout = $outTask.Result } catch { } }
+    if ($errTask.Wait($DrainMs)) { try { $stderr = $errTask.Result } catch { } }
     return @{ StdOut = $stdout; StdErr = $stderr; ExitCode = $process.ExitCode }
 }
 
@@ -140,6 +149,22 @@ function Get-ProjectGodotProcesses {
     return $result
 }
 
+# 强制回收指定工程目录下的全部 Godot 进程（返回被回收的进程对象）。
+function Stop-ProjectGodotProcesses {
+    param([Parameter(Mandatory)][string[]]$ProjectPaths)
+    $killed = @()
+    foreach ($path in $ProjectPaths) {
+        foreach ($item in (Get-ProjectGodotProcesses -ProjectPath $path)) {
+            try {
+                Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue
+                $killed += $item
+            }
+            catch { }
+        }
+    }
+    return $killed
+}
+
 # ---------------------------------------------------------------------------
 # 断言
 # ---------------------------------------------------------------------------
@@ -168,6 +193,16 @@ function Assert-Check {
     }
 }
 
+# 从 Godot 输出里摘出失败/错误行，便于失败时定位。
+function Select-GodotProblems {
+    param([string]$Text)
+    $result = @()
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match 'R1_FAIL|R1_CLIENT_FAIL|SMOKE_FAIL|Parse Error|SCRIPT ERROR') { $result += $line.Trim() }
+    }
+    return $result
+}
+
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
@@ -178,7 +213,7 @@ $clientPath = Join-Path $root 'client'
 $sharedPath = Join-Path $root 'shared'
 $dataPath = Join-Path $root 'data\gameConfig.json'
 
-$workDir = Join-Path ([IO.Path]::GetTempPath()) ('xiuxian-r0-check-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$workDir = Join-Path ([IO.Path]::GetTempPath()) ('xiuxian-check-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $workDir -Force | Out-Null
 
 $serverProcess = $null
@@ -186,19 +221,19 @@ $serverOutTask = $null
 $serverErrTask = $null
 
 try {
-    Write-Host "=== 修仙4X·宗门争霸 2.0 —— R0 自检 ===" -ForegroundColor Cyan
+    Write-Host "=== 修仙4X·宗门争霸 2.0 —— 里程碑自检（R0 + R1）===" -ForegroundColor Cyan
     Write-Host "仓库根：$root"
     Write-Host "临时目录：$workDir"
 
     # ---------------------------------------------------------------- 0. 环境
-    Write-Host "`n[0/7] 环境与交付物清单" -ForegroundColor Cyan
+    Write-Host "`n[0/9] 环境与交付物清单（R0 + R1）" -ForegroundColor Cyan
     $godotExe = $null
     try { $godotExe = Resolve-GodotConsole }
     catch { Assert-Check $false '定位 Godot 控制台版可执行文件' $_.Exception.Message }
     Assert-Check ([bool]$godotExe) '定位 Godot 控制台版可执行文件' "路径：$godotExe"
     if ($godotExe) { Write-Host "  Godot: $godotExe" }
 
-    $expectedFiles = @(
+    $r0Files = @(
         'shared\protocol\commands.gd', 'shared\protocol\msg.gd', 'shared\protocol\enums.gd',
         'shared\protocol\dto.gd', 'shared\geo\hex.gd',
         'server\project.godot', 'server\scenes\ServerMain.tscn', 'server\scenes\ServerMain.gd',
@@ -210,17 +245,34 @@ try {
         'client\scripts\net\NetClient.gd', 'client\scripts\net\Launcher.gd',
         'tools\setup_shared.ps1', 'tools\run_dev.ps1', 'tools\check.ps1'
     )
+    $r1Files = @(
+        'server\scripts\rng\RngService.gd',
+        'server\scripts\model\HexTile.gd', 'server\scripts\model\GameNode.gd',
+        'server\scripts\model\Sect.gd', 'server\scripts\model\Disciple.gd',
+        'server\scripts\model\SpiritPeak.gd', 'server\scripts\model\GameState.gd',
+        'server\scripts\rules\MapGenerator.gd', 'server\scripts\rules\SetupInitializer.gd',
+        'server\scripts\rules\VisionCalculator.gd', 'server\scripts\net\StateView.gd',
+        'server\tests\R1Test.gd', 'server\tests\R1Test.tscn',
+        'client\scripts\art\AssetLibrary.gd', 'client\scripts\net\Session.gd',
+        'client\scripts\world\HexMap.gd', 'client\scripts\world\Fog.gd',
+        'client\scripts\world\CameraRig.gd', 'client\scripts\world\UnitView.gd',
+        'client\scripts\world\SectView.gd', 'client\scripts\ui\MainMenu.gd',
+        'client\scenes\World.gd', 'client\scenes\World.tscn', 'client\scenes\MainMenu.tscn',
+        'client\tests\R1ClientTest.gd', 'client\tests\R1ClientTest.tscn'
+    )
+    $expectedFiles = $r0Files + $r1Files
     $missing = @()
     foreach ($rel in $expectedFiles) {
         if (-not (Test-Path (Join-Path $root $rel))) { $missing += $rel }
     }
-    Assert-Check ($missing.Count -eq 0) "R0 交付物清单齐全（$($expectedFiles.Count) 个文件）" `
+    Assert-Check ($missing.Count -eq 0) `
+        "R0+R1 交付物清单齐全（R0 $($r0Files.Count) + R1 $($r1Files.Count) 个文件）" `
         ("缺失：`n" + ($missing -join "`n"))
 
     if (-not $godotExe) { throw '未定位到 Godot 可执行文件，后续步骤无法进行。' }
 
     # ------------------------------------------- 1. shared 目录联接（幂等 + 贯通）
-    Write-Host "`n[1/7] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
+    Write-Host "`n[1/9] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
     $setupScript = Join-Path $PSScriptRoot 'setup_shared.ps1'
 
     $firstOk = $true; $firstErr = ''
@@ -246,7 +298,7 @@ try {
     $probeTop = Join-Path $sharedPath $probeName
     $roundTripOk = $false
     try {
-        Set-Content -Path $probeClient -Value 'r0-junction-probe' -Encoding ASCII -ErrorAction Stop
+        Set-Content -Path $probeClient -Value 'junction-probe' -Encoding ASCII -ErrorAction Stop
         $roundTripOk = (Test-Path $probeServer) -and (Test-Path $probeTop)
     }
     catch { $roundTripOk = $false }
@@ -259,7 +311,7 @@ try {
     Assert-Check (-not (Test-Path $probeTop)) '临时探测文件已清理'
 
     # --------------------------------------------------------- 2. 工程导入
-    Write-Host "`n[2/7] 工程导入与 GDScript 解析" -ForegroundColor Cyan
+    Write-Host "`n[2/9] 工程导入与 GDScript 解析" -ForegroundColor Cyan
     if ($SkipImport) {
         Write-Host '  （-SkipImport：跳过导入步骤）' -ForegroundColor DarkGray
     }
@@ -280,7 +332,7 @@ try {
     }
 
     # --------------------------------------------- 3. 配置失败路径（负向用例）
-    Write-Host "`n[3/7] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
+    Write-Host "`n[3/9] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
     $missingConfig = Join-Path $workDir 'not-exists.json'
     $badResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$missingConfig") `
@@ -290,7 +342,7 @@ try {
     Assert-Check ($badCombined -match 'config_load_failed|配置加载失败') '配置缺失时输出可诊断的失败原因' $badCombined.Trim()
 
     # ------------------------------------------------- 4. 启动 headless 服务端
-    Write-Host "`n[4/7] headless 服务端启动并监听" -ForegroundColor Cyan
+    Write-Host "`n[4/9] headless 服务端启动并监听" -ForegroundColor Cyan
     $serverInfo = New-GodotStartInfo -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$dataPath") -CaptureOutput
     $serverProcess = [System.Diagnostics.Process]::Start($serverInfo)
@@ -308,7 +360,7 @@ try {
     Assert-Check (-not $serverProcess.HasExited) '服务端进程持续运行（未提前退出）'
 
     # ------------------------------------------------ 5. 无头自测（SmokeTest）
-    Write-Host "`n[5/7] 无头自测（res://tests/SmokeTest.tscn）" -ForegroundColor Cyan
+    Write-Host "`n[5/9] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
     if ($ready) {
         $smokeResult = Invoke-GodotCapture -Executable $godotExe `
             -Arguments @('--headless', '--path', $serverPath, 'res://tests/SmokeTest.tscn', '--', "--port=$Port") `
@@ -333,7 +385,7 @@ catch {
 }
 finally {
     # ------------------------------------------------------- 6. 清理与残留
-    Write-Host "`n[6/7] 进程清理" -ForegroundColor Cyan
+    Write-Host "`n[6/9] 进程清理（R0 服务端）" -ForegroundColor Cyan
 
     if ($serverProcess) {
         try { $serverProcess.Refresh() } catch { }
@@ -343,7 +395,7 @@ finally {
         }
         # 进程结束后管道关闭，可读取累积的服务端启动日志并校验。
         $serverStdout = ''
-        try { $serverStdout = $serverOutTask.GetAwaiter().GetResult() } catch { }
+        try { if ($serverOutTask.Wait(10000)) { $serverStdout = $serverOutTask.Result } } catch { }
         if ($serverStdout) {
             Assert-Check ($serverStdout -match 'server listening on 127\.0\.0\.1') `
                 '服务端启动打印「server listening on 127.0.0.1」' $serverStdout.Trim()
@@ -352,11 +404,7 @@ finally {
     }
 
     Start-Sleep -Milliseconds 800
-    foreach ($path in @($serverPath, $clientPath)) {
-        foreach ($item in (Get-ProjectGodotProcesses -ProjectPath $path)) {
-            try { Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue } catch { }
-        }
-    }
+    [void](Stop-ProjectGodotProcesses -ProjectPaths @($serverPath, $clientPath))
     Start-Sleep -Milliseconds 500
 
     $residualServer = Get-ProjectGodotProcesses -ProjectPath $serverPath
@@ -367,8 +415,77 @@ finally {
         (($residualClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 }
 
-# ------------------------------------------------------ 7. 仓库扫描：零 Java
-Write-Host "`n[7/7] 仓库扫描：零 Java" -ForegroundColor Cyan
+# ------------------------------------------- 7. 服务端 R1 验收（R1Test）
+Write-Host "`n[7/9] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $r1Result = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $serverPath, 'res://tests/R1Test.tscn') `
+        -TimeoutMs 300000
+    $r1Combined = ($r1Result.StdOut + "`n" + $r1Result.StdErr)
+    Assert-Check ($r1Combined -match 'R1_PASS checks=\d+') '服务端 R1 验收打印 R1_PASS checks=N' $r1Combined.Trim()
+    Assert-Check ($r1Result.ExitCode -eq 0) '服务端 R1 验收退出码为 0' "退出码：$($r1Result.ExitCode)"
+    Assert-Check ($r1Combined -notmatch 'R1_FAIL') '服务端 R1 验收未出现 R1_FAIL' `
+        ((Select-GodotProblems -Text $r1Combined) -join "`n")
+
+    # 同种子双跑导出的权威地图必须逐字一致（R1 验收第 1 条）。
+    $authorityA = Join-Path $root 'outputs\r1_authority_a.json'
+    $authorityB = Join-Path $root 'outputs\r1_authority_b.json'
+    $hasAuthority = (Test-Path -PathType Leaf $authorityA) -and (Test-Path -PathType Leaf $authorityB)
+    Assert-Check $hasAuthority '导出两份权威地图（outputs/r1_authority_a|b.json）' `
+        "缺失：$authorityA / $authorityB"
+    if ($hasAuthority) {
+        $hashA = (Get-FileHash -Algorithm SHA256 -Path $authorityA).Hash
+        $hashB = (Get-FileHash -Algorithm SHA256 -Path $authorityB).Hash
+        $bytesA = (Get-Item $authorityA).Length
+        Assert-Check ($hashA -eq $hashB) '同种子双跑权威地图逐字一致（SHA256 相同）' `
+            "a=$hashA ($bytesA 字节)`nb=$hashB"
+        Assert-Check ($bytesA -gt 1000) '权威地图导出非空' "$bytesA 字节"
+    }
+}
+else {
+    Assert-Check $false '运行服务端 R1 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------------------- 8. 客户端 R1 验收（无头 + 端到端）
+Write-Host "`n[8/9] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $clientResult = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn') `
+        -TimeoutMs 120000
+    $clientCombined = ($clientResult.StdOut + "`n" + $clientResult.StdErr)
+    Assert-Check ($clientCombined -match 'R1_CLIENT_RESULT=OK') '客户端无头验收全绿（R1_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $clientCombined) -join "`n")
+    Assert-Check ($clientResult.ExitCode -eq 0) '客户端无头验收退出码为 0' "退出码：$($clientResult.ExitCode)"
+    Assert-Check ($clientCombined -notmatch 'R1_CLIENT_FAIL') '客户端无头验收未出现 R1_CLIENT_FAIL'
+    Assert-Check ($clientCombined -match '未探索侧栏不泄露地形') '侧栏对未探索格不泄露地形'
+    Assert-Check ($clientCombined -match 'Godot 相机锁 yaw45 pitch-45 俯看') '相机锁 45° 且无旋转输入'
+    Assert-Check ($clientCombined -match '同一缺失 logicalID 只 WARN 一次') '占位资源缺失只 WARN 一次不崩溃'
+
+    $integrationResult = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn', '--', '--integration') `
+        -TimeoutMs 240000
+    $integrationCombined = ($integrationResult.StdOut + "`n" + $integrationResult.StdErr)
+    Assert-Check ($integrationCombined -match '实际 Launcher/NetClient 收到 newGame hello') `
+        '端到端：客户端拉起 headless 服务端并收到 newGame hello' `
+        ((Select-GodotProblems -Text $integrationCombined) -join "`n")
+    Assert-Check ($integrationCombined -match '实际 newGame 返回300格 view') '端到端：newGame 返回 300 格 view'
+    Assert-Check ($integrationCombined -match '实际 newGame 返回四宗公开信息') '端到端：newGame 返回四宗公开信息'
+    Assert-Check ($integrationCombined -match '实际 getState 往返成功') '端到端：getState 往返成功'
+    Assert-Check ($integrationCombined -match '实际服务端刷新保持相机') '端到端：view 刷新保持相机 transform/size'
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_RESULT=OK') '端到端集成验收全绿（R1_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $integrationCombined) -join "`n")
+
+    # 端到端验收会拉起自己的服务端子进程，必须确认已回收。
+    Start-Sleep -Milliseconds 800
+    [void](Stop-ProjectGodotProcesses -ProjectPaths @($serverPath, $clientPath))
+    Start-Sleep -Milliseconds 500
+}
+else {
+    Assert-Check $false '运行客户端 R1 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------------------------------ 9. 仓库扫描与最终残留
+Write-Host "`n[9/9] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
 $javaFiles = @()
 try {
     $javaFiles = Get-ChildItem -Path $root -Recurse -File -Filter '*.java' -ErrorAction SilentlyContinue |
@@ -377,6 +494,13 @@ try {
 catch { }
 Assert-Check ($javaFiles.Count -eq 0) '全仓库无 .java 文件（零 Java 约束）' `
     (($javaFiles | ForEach-Object { $_.FullName }) -join "`n")
+
+$finalServer = Get-ProjectGodotProcesses -ProjectPath $serverPath
+$finalClient = Get-ProjectGodotProcesses -ProjectPath $clientPath
+Assert-Check ($finalServer.Count -eq 0) 'R1 验收结束后无残留 godot 服务端进程' `
+    (($finalServer | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
+Assert-Check ($finalClient.Count -eq 0) 'R1 验收结束后无残留 godot 客户端进程' `
+    (($finalClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 
 Write-Host ''
 Write-Host "=== 自检结果：$($script:checkCount - $script:failCount) / $($script:checkCount) 项通过 ===" -ForegroundColor Cyan

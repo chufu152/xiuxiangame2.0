@@ -130,6 +130,9 @@ func _process(delta: float) -> void:
 
 func _start_attempt() -> void:
 	_peer = WebSocketPeer.new()
+	# 缓冲上限必须在 connect_to_url 之前设置，否则收不下 view 快照帧。
+	_peer.inbound_buffer_size = Msg.FRAME_BUFFER_BYTES
+	_peer.outbound_buffer_size = Msg.FRAME_BUFFER_BYTES
 	var url: String = "ws://%s:%d" % [_host, _port]
 	var error: Error = _peer.connect_to_url(url)
 	if error != OK:

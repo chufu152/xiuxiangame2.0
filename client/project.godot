@@ -9,8 +9,12 @@ config_version=5
 
 config/name="xiuxian-client"
 config/description="修仙4X·宗门争霸 2.0 客户端（表现层）"
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.4", "Forward Plus")
+
+[autoload]
+
+Session="*res://scripts/net/Session.gd"
 
 [display]
 
