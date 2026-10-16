@@ -49,3 +49,6 @@ node_modules/
 
 # ===== 本地 Godot 可执行文件路径（机器相关，不入库；见 docs/prompts/README.md）=====
 /tools/godot_path.txt
+
+# ===== 验收产物（确定性双跑导出，可由自测重新生成，不入库）=====
+/outputs/

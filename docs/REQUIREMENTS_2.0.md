@@ -12,6 +12,10 @@
 | 蓝本来源 | 1.0 源码 `gameConfig.json`、`GameEngine`、`TurnProcessor`、`CombatResolver`、`UnitRules`、`EconomyCalculator`、`PROTOCOL.md`、`COMMAND_MAP.md`（只读，不进 2.0） |
 
 > **使用方式**：本文是 2.0 唯一权威需求，每章可直接拆成 WorkBuddy 任务。标 **【默认·待确认】** 的是已给推荐默认、允许评审修改的少数决策；标 **【2.0新增·设计初值】** 的是本次新设计、数值可调的部分；其余为冻结需求。
+>
+> **文档权威层级（冲突裁决顺序，高者优先）**：
+> ① `data/gameConfig.json`（已落地的实际数值）＞ ② **本文**（需求与口径）＞ ③ `docs/prompts/*.md`（可执行任务切片）＞ ④ `README.md` / `data/README.md` / `assets/README.md`（导读）。
+> 低层级与高层级冲突时**以高层级为准并回改低层级**。任何里程碑完成后必须**回写本文与对应提示词**（状态、实际交付、偏差），禁止只改代码不改文档。
 
 ---
 
@@ -268,7 +272,7 @@ HexTile {
 | SPIRIT_FOREST 灵林 | +1 | +20% | 灵木+1、粮+1 | 可"清林"，一次性产灵木 2 |
 | MIRE 雾泽 | +1 | −10% | 粮+1 | 可"排淤"清除 |
 
-- 灵林可覆盖平地/丘陵；雾泽仅平地（生成率设计初值 15% / 8%）。
+- 灵林可覆盖平地/丘陵；雾泽仅平地。**生成率设计初值：灵林 22% / 雾泽 12%**（最终以 `data/gameConfig.json` 的 `map.features.*.chance` 为准；R1 已按 22% / 12% 落地）。
 
 #### 4.1.5 河流 river（地块边，非地块）
 
@@ -651,6 +655,9 @@ eventLog[ ]
 
 **会话（13）**：`newGame`、`getState`、`finishTurn`、`beginPlayerTurn`、`nextTurn`、`listSaves`、`saveGame`、`loadGame`、`queryVictoryProgress`、`checkVictory`、`checkDefeat`、`chooseVictory`、`queryGameOver`
 - `newGame params`：`{playerFaction, sectName, mapWidth, mapHeight, randomSeed, difficultyId}`
+  - **字段名以本行为准**。为兼容早期提示词，服务端额外接受别名：`factionType`→`playerFaction`、`difficulty`→`difficultyId`；同一语义同时出现且取值不一致时回 `BAD_PARAMS`。
+  - `mapWidth`/`mapHeight` 缺省取 `map.defaultWidth`/`map.defaultHeight`（20×15）；`randomSeed` 可为空（空则由服务端集中随机源生成，须为 64 位整数语义）；`difficultyId` 缺省 `normal`（`easy`/`normal`/`hard`）。
+  - `getState` 在未开局时回 `NO_GAME`。
 
 **单位（22）**：`moveDisciple`、`queryMoveRange`、`batchMove`、`attack`、`queryAttackPreview`、`queryAttackable`、`retreat`、`teleport`、`queryTeleportOptions`、`assignGarrison`、`withdrawGarrison`、`reclass`、`promote`、`tribulate`、`rally`、`returnToDefense`、`foundSpiritPeak`、`appointBuilder`、`appointFengZhu`、`appointZhangLao`、`appointZongZhu`、`queryDiscipleDetail`
 
@@ -696,10 +703,13 @@ eventLog[ ]
   ```
   git add -A
   git commit -m "feat(r5-combat): 实现十兵种战力与胜率结算"
-  git push
+  git push origin HEAD:main
   ```
-- 约定式提交 `feat/fix/docs/refactor/test/perf/chore`，建议带模块范围。
-- 代理仅对单条命令临时生效：`git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push`，不写全局。
+- 约定式提交 `feat/fix/docs/refactor/test/perf/chore`，建议带模块范围。提交信息用**英文**。
+- **worktree 说明**：WorkBuddy 在独立 worktree（分支 `workbuddy/main-*`）工作，`main` 可能同时被主检出占用，故统一推 `HEAD:main` 而非 `push origin main`。
+- **远程固定 HTTPS，禁止改成 SSH、禁止自行生成 SSH key**。仓库本地（**仅本仓库，不写 `--global`**）已配 `http.proxy`/`https.proxy = http://127.0.0.1:7890`，凭据走 Windows 凭据管理器；worktree 内提交后直接 `git push origin HEAD:main`。
+- 新 clone 的仓库没有仓库本地代理时：`git config http.proxy http://127.0.0.1:7890 && git config https.proxy http://127.0.0.1:7890`；或仅对单条命令临时加 `-c http.proxy=... -c https.proxy=...`，不写全局。
+- 报 401/403 时改用 `git -c credential.helper=manager push origin HEAD:main`。本机默认继承的 `credential.helper=helper-selector` 在受限/无交互环境会卡死并报 `could not read Username ... terminal prompts disabled`，此时需显式重置助手链（见 `docs/prompts/README.md`）。
 
 ### 8.2 GDScript 规范
 
@@ -710,11 +720,13 @@ eventLog[ ]
 
 ### 8.3 自检（`tools/check.ps1`）
 
-- 启动 headless 服务端，固定种子跑 N 回合（30/60），导出事件流。
-- 断言：地图/资源/阶段/胜负、地形移动成本、战斗预览==实战（含高地/跨河）、关键经济产出。
-- 确定性：同种子双跑逐字一致；地形生成（海拔/河流/节点）双跑一致。
-- 配置校验：缺字段/非法枚举/引用已删模块即失败。
-- 结束后**无残留 godot 进程**。
+自检**随里程碑扩展**：每个里程碑只**增加**该阶段可机检的断言，既有断言不得为通过而删减。退出码全绿 0，否则非 0（打印 `CHECK_RESULT=OK` / `FAIL`）。
+
+- **前置**：两个工程各跑一次 `--headless --path <proj> --import`（生成 `.godot/global_script_class_cache.cfg`），否则 `class_name` 全局类报 `not declared`。
+- **R0**：`shared/` 目录联接幂等与内容贯通（临时文件双向可见）、配置缺失负向用例（非零退出）、headless 监听就绪（TCP 轮询）、`SmokeTest`（hello/ping/`UNKNOWN_COMMAND`/`NO_ID`）、无残留进程、零 `.java`。
+- **R1**：固定种子双跑导出 tiles 全字段**逐字一致**；MOUNTAIN≈8% / HILL≈22%（±3%）；河流边成对且连续、由高至边界；≥1 条连绵 ≥3 格山脉；出生点中心与三方向安全且可走通；节点只落偏好地形；4 宗 × (1 主峰 + 1 金丹宗主 + 2 炼气外门)、初始资源 400/300/120/0 与 晶2/铁2/木4；玩家 `visibleTiles`/`exploredTiles` 与视野半径一致且不下发未见敌方单位。
+- **R2 起**：启动 headless 服务端，固定种子跑 N 回合（30/60），导出事件流；断言地图/资源/阶段/胜负、地形移动成本、战斗预览==实战（含高地/跨河）、关键经济产出。
+- **通用**：配置校验（缺字段/非法枚举/引用已删模块即失败）；同种子双跑逐字一致（含地形生成）；结束后**无残留 godot 进程**。
 
 ### 8.4 客户端相机与 UI 硬性要求（针对 1.0 反馈）
 

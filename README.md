@@ -26,14 +26,17 @@ xiuxiangame2.0/
 │       └── art/     # AssetLibrary：按逻辑资源 ID 加载美术
 ├── server/          # Godot headless 服务端工程（权威规则层，不渲染）
 │   ├── scenes/      # ServerMain 主场景（--headless）
+│   ├── tests/       # 无头自测（SmokeTest / R1Test：打印 PASS/FAIL 标记 + 退出码）
 │   └── scripts/
-│       ├── net/     # WebSocket 服务端、会话、命令分发
+│       ├── net/     # WebSocket 服务端、命令分发、StateView（view 快照构造）
 │       ├── model/   # 实体与 GameState（纯数据）
-│       ├── rules/   # 全部规则：移动/战斗/经济/城市/道统/探索/胜利/AI
+│       ├── rules/   # 全部规则：地形生成/移动/战斗/经济/城市/道统/探索/胜利/AI
+│       ├── rng/     # 集中随机源（按 种子+序号 派生，保证可复现）
 │       ├── config/  # gameConfig.json 加载与校验
 │       └── save/    # 存档读写
 ├── shared/          # 两端共享（协议常量/枚举/DTO/六边形几何），通过目录联接挂载
-│   └── protocol/
+│   ├── protocol/    # commands / msg / enums / dto
+│   └── geo/         # hex.gd：轴向坐标、邻接、世界坐标（服务端与客户端共用同一换算）
 ├── assets/          # ★ 独立、可整体替换的美术资源包（水墨风 2.5D，皮肤包机制）
 │   ├── art/default/ # 默认皮肤（terrain 材质；units/buildings/districts/features 模型；materials/particles；ui/icons）
 │   ├── audio/       # bgm / sfx
@@ -51,12 +54,21 @@ xiuxiangame2.0/
 
 ## 快速开始
 
-> R0 里程碑完成后此处给出可直接运行的命令。当前仓库为骨架 + 需求文档阶段。
+> **进度**：R0 工程骨架 ✅ 已完成（`d4c5bf7`）；R1 地图与开局 🚧 实现中（见 `docs/prompts/README.md` §3）。
+> 里程碑进度、提示词与已知坑见 [`docs/prompts/README.md`](docs/prompts/README.md)。
 
-1. 安装 Godot 4.x（使用标准 GDScript 版即可，无需 .NET 版）。
+1. 安装 Godot 4.4.x（标准 GDScript 版即可，无需 .NET 版）；路径 `C:\Users\Administrator\godot\`。
 2. 首次拉取后运行 `tools/setup_shared.ps1`，把顶层 `shared/` 以目录联接（junction）挂到 `client/` 与 `server/`。
-3. 开发：`tools/run_dev.ps1` 一键拉起 headless 服务端 + 客户端。
-4. 自检：`tools/check.ps1`（服务端无头固定种子跑 N 回合，校验确定性与关键规则）。
+3. **导入（新增脚本/场景后必须先做）**：
+   ```
+   powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
+   ```
+   `check.ps1` 已内置 `--import`；也可手动：
+   `Godot_v4.4.1-stable_win64_console.exe --headless --path server --import`
+4. 开发：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_dev.ps1`（一键拉起 headless 服务端 + 客户端）。
+5. 自检：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`（服务端无头跑断言，校验确定性、地形比例与关键规则）。
+
+> 本机 PowerShell 执行策略为 Restricted，因此统一用 `-ExecutionPolicy Bypass` 调用 `.ps1`；仓库**不提供** `.cmd` 包装脚本。
 
 ---
 
@@ -65,7 +77,7 @@ xiuxiangame2.0/
 - 每个里程碑 / 任务完成并通过自检后，**立即提交并推送到 `main`**：
   `git add -A && git commit -m "feat(模块): 简述" && git push`。
 - 提交信息使用约定式提交：`feat / fix / docs / refactor / test / chore / perf`。
-- 网络走本机代理时，仅对单条命令临时加 `-c http.proxy=http://127.0.0.1:7890`，**不要**写进全局配置。
+- **远程固定 HTTPS，禁止改成 SSH、禁止自行生成 SSH key**。仓库本地（仅本仓库，不写 `--global`）已配 `http.proxy`/`https.proxy = http://127.0.0.1:7890`，凭据走 Windows 凭据管理器；直接 `git push origin HEAD:main`。报 401/403 时用 `git -c credential.helper=manager push origin HEAD:main`。
 - 规则、数值的唯一权威是 `data/gameConfig.json` 与服务端 `rules/`；客户端不实现任何玩法规则。
 
 ## 2.0 首版范围（速览）

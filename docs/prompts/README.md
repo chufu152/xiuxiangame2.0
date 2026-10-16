@@ -1,58 +1,188 @@
 # WorkBuddy 开工提示词（R0–R9）
 
-本目录是**给 WorkBuddy 逐里程碑执行的任务提示词**。每个提示词都是一份独立、可直接复制粘贴的指令，内含：必读文件锚点、硬约束、文件清单、可执行自动验收、完成后提交。
+本目录是**给 WorkBuddy 逐里程碑执行的任务提示词**。每份提示词都是一条独立、可直接复制粘贴的指令，内含：必读文件锚点、硬约束、文件清单、可执行自动验收、完成后提交。
 
-## 用法
+> **本文件是提示词目录的索引与规则总纲**；具体任务在 `R*_*.md`。
 
-1. 按里程碑顺序，一次只派发一个提示词（R0 通过后再派 R1，不得跳步）。
+---
+
+## 0. 文档权威层级（冲突裁决顺序，高者优先）
+
+| 层级 | 文件 | 定位 |
+|---|---|---|
+| ① | `data/gameConfig.json` | 已落地的实际数值（唯一数值真相） |
+| ② | `docs/REQUIREMENTS_2.0.md` | 需求与口径（唯一权威需求） |
+| ③ | `docs/prompts/*.md`（本目录） | 需求的可执行任务切片 |
+| ④ | `README.md` / `data/README.md` / `assets/README.md` | 导读与迁移说明 |
+
+**低层级与高层级冲突时，以高层级为准并回改低层级。** 任何里程碑完成后，必须回写 ② 与 ③（状态、实际交付、偏差），禁止只改代码不改文档。
+
+---
+
+## 1. 用法
+
+1. **一次只派发一个提示词**（R0 通过后再派 R1，不得跳步）。
 2. WorkBuddy 专家统一选 **Godot 游戏脚本工程师（Godot 4.4 / GDScript）**。
-3. 把对应 `R*_*.md` 的**全文**复制给 WorkBuddy；要求它**先只读引用的文档、不自创规则/数值**，完成后跑自检并自行提交。
-4. 每个里程碑结束，检查自检是否全绿、有无残留进程、是否已 push，再进入下一个。
+3. 把对应 `R*_*.md` 的**全文**复制给 WorkBuddy；要求它**先只读引用文档、不自创规则/数值**，完成后跑自检并自行提交。
+4. 每个里程碑结束，检查：自检全绿、无残留进程、已 push，再进入下一个。
+5. 若执行中发现提示词与 `data/gameConfig.json` 或 PRD 冲突，**停下报告，不要自行发明数值**。
 
-## 环境（已确认）
+---
+
+## 2. 环境（已确认，照用）
 
 - 引擎：**Godot 4.4.1 stable（标准 GDScript 版，非 .NET）**
 - GUI 版：`C:\Users\Administrator\godot\Godot_v4.4.1-stable_win64.exe`
-- 控制台/headless 版：`C:\Users\Administrator\godot\Godot_v4.4.1-stable_win64_console.exe`
+- 控制台 / headless 版：`C:\Users\Administrator\godot\Godot_v4.4.1-stable_win64_console.exe`
 - 服务端：`--headless --path server`，监听 `127.0.0.1:9527`
 - 客户端：`--path client`
-- 若 Godot 路径变动，放 `tools/godot_path.txt`（不入库）或设环境变量 `GODOT_CONSOLE_EXE`。
+- 若 Godot 路径变动：写 `tools/godot_path.txt`（不入库）或设环境变量 `GODOT_CONSOLE_EXE`。
 
-## Windows 环境已知坑（R0 实证，务必遵守）
+---
 
-1. **先 `--import` 再运行**：新克隆或新增 `class_name` 全局类后，第一次跑工程要先生成全局类缓存，否则所有全局类报 "not declared"：
-   - `Godot_v4.4.1-stable_win64_console.exe --headless --path server --import`
-   - `Godot_v4.4.1-stable_win64.exe --headless --path client --import`
-   - `tools/check.ps1` 已内置；新增脚本/场景后若报类未声明，重跑 import。
-2. **拉子进程不要用 `Start-Process`**：本机同时存在大小写两份 `HTTP_PROXY`/`http_proxy`，`Start-Process` 重建环境块会抛"已添加项"。工具脚本统一用 .NET `System.Diagnostics.Process`；**等待服务端就绪用 TCP 端口轮询**，不要依赖匹配控制台日志。
-3. **脚本不要设 `[Console]::OutputEncoding`**：CP936 控制台强行切 UTF-8 会导致中文乱码；日志输出用英文，或交给 Godot 自身处理。
+## 3. 里程碑状态与提示词
 
-## 通用硬约束（每个里程碑都适用）
-
-- 完全 Godot 4.4 + GDScript 静态类型，**零 Java、零 JVM**，全仓库无 `.java`。
-- 服务端权威、客户端零规则；规则/数值唯一权威是 `data/gameConfig.json` 与服务端 `rules/`。
-- 2.5D：**正交相机锁定 yaw/pitch=45°，禁止旋转**；缩放/平移/任何操作与 view 刷新后相机不重置。
-- 美术资源独立可替换（逻辑 ID → manifest 映射），缺失只 WARN 不崩。
-- 每任务结束**无残留 godot 进程**，自检 `tools/check.ps1` 全绿。
-- 提交用约定式英文信息。**远程固定用 HTTPS（不要改成 SSH）**：仓库本地已配代理 7890、凭据走 Windows 凭据管理器（chufu152 已登录）。WorkBuddy 在自己的 worktree 提交后，直接执行 `git push origin HEAD:main` 即可（保持 Clash 代理开启）；主工作区在 main 分支则 `git push origin main`。
-- 新 clone 的仓库没有仓库本地代理时，先执行（仅本仓库，**不是 `--global`**）：`git config http.proxy http://127.0.0.1:7890 && git config https.proxy http://127.0.0.1:7890`；或临时 `git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push origin HEAD:main`。
-- 若报 401/403，加 `-c credential.helper=manager` 强制走凭据管理器；**不要自行生成 SSH key、不要改 remote**（现有公钥未在 GitHub 注册，SSH 会 Permission denied）。
-- 代理只在本机 Clash 开启时有效；推送报连接失败先确认 7890 端口在监听。
-
-## 里程碑与提示词
-
-| 里程碑 | 内容 | 服务端 | 客户端 | 提示词 |
+| 里程碑 | 状态 | 服务端 | 客户端 | 提示词 |
 |---|---|---|---|---|
-| **R0** | 双 Godot 工程 + shared 联接 + WebSocket 握手 + config 加载 + 启动器 | ping/hello、错误码框架 | 连接、hello、Ping、拉起子进程 | ✅ `R0_工程骨架.md` |
-| **R1** | 分层地形生成、newGame/getState、view 快照、视野 | 地图/初始化/视野（无回合） | 起伏 2.5D、连绵山体、河流、锁定相机、三态迷雾、主菜单 | ✅ `R1_地图开局.md` |
-| R2 | 回合推进、单位移动/驻防、ZOC、道路、路径 | endTurn、move、garrison、go 等 | 移动动画、路径预览、选中 | 待生成 |
-| R3 | 灵峰城市、区域、改良、道路、弟子槽 | found/build/repair/... | 建造面板、区域/改良渲染 | 待生成 |
-| R4 | 经济产出、道统科技树、政令、任命位 | 结算/产出/boost/政令 | 经济栏、科技树、政令卡、任命 UI | 待生成 |
-| R5 | 修炼突破、战斗、十种单位、战术 | 战斗/伤亡/经验/捕获 | 战斗面板、战报、战斗动画 | 待生成 |
-| R6 | 探索/机缘/秘境/灵泉、飞升 | explore、秘境、tribulation | 探索事件 UI、抉择弹窗 | 待生成 |
-| R7 | 三流派胜利、反应式 AI、存档/读档 | 胜利判定、AI、save | 胜利/失败屏、存档菜单 | 待生成 |
-| R8 | 表现与 UI 打磨、小地图、设置、引导 | 仅协议补字段 | 正式 HUD/面板/框选/泼墨转场/昼夜粒子 | 待生成 |
-| R9 | 皮肤化、平衡、默认水墨皮肤、Win 导出 | 平衡微调 | 皮肤切换、导出 | 待生成 |
+| **R0** 工程骨架 | ✅ **已完成**（`d4c5bf7`，已推送） | 双 Godot 工程、shared 联接、WebSocket 互通、config 加载/校验、hello | 连接/握手/启动器拉起子进程 | `R0_工程骨架.md` |
+| **R1** 地图与开局 | 🚧 **实现已落盘、未通过验收、未提交**（阻塞项见 §7） | 分层地形生成（基底/海拔/地貌/河流/险地/资源/节点，种子确定）、实体初始化、三流派、出生点、view 快照、迷雾（可见/已探索） | 主菜单/开局、起伏六边形+连绵山体+河流渲染、相机锁 45° 正交、三层迷雾静态材质 | `R1_地图开局.md` |
+| R2 回合/移动/视野 | ⬜ 待生成 | 6 阶段状态机、地形移动力叠加/BFS、视野（含丘陵 +1） | 点选/移动/高亮/范围预览/TopBar | 待生成 |
+| R3 经济与城市 | ⬜ 待生成 | 经济结算、地形产出、人口/住房/安定、灵峰、建筑、区域（含地形邻接）、劳力、改良、道路 | 城市面板/建造/区域选址/劳力指派/改良、资源栏 | 待生成 |
+| R4 道统与修炼 | ⬜ 待生成 | 修炼/突破/渡劫、21 道法树/道点/成就 boost、项目队列、收徒 | 道统树、研究队列、弟子详情 | 待生成 |
+| R5 兵种与战斗 | ⬜ 待生成 | 十兵种、转职/晋升、战力/胜率/相克/丘陵高地/跨河/地貌防御/城防、野战/夺峰/夺点、撤退、传送、驻守 | 攻击预览/攻击范围/战斗动画/伤亡反馈/转职晋升面板 | 待生成 |
+| R6 探索/政令/自动化 | ⬜ 待生成 | 机缘/秘境、政令（8 卡/3 政体）、自动化、集结/回防 | 探索/政令/自动化面板 | 待生成 |
+| R7 任命/渡劫/AI/胜负/存档 | ⬜ 待生成 | 任命、血脉、渡劫飞升、基础 AI、胜负、分数、存档 | 胜利进度/结局/存档/AI 回放 | 待生成 |
+| R8 表现与 UI 打磨 | ⬜ 待生成 | —（仅协议补字段） | 正式 HUD、全面板、框选、动画、音效、小地图、设置、引导、泼墨迷雾转场、昼夜/草木飞鸟/灵气粒子、轮廓描边、网格开关与宗门色边框 | 待生成 |
+| R9 皮肤化/平衡/导出 | ⬜ 待生成 | 数值平衡微调（不改架构） | 皮肤包切换、默认水墨风 2.5D 皮肤、Win 导出 | 待生成 |
 
-> 命令清单（69 条）、view 字段、数值口径、裁剪范围见 `docs/REQUIREMENTS_2.0.md`。
-> 后续里程碑提示词在进入该里程碑时再生成，保持与当时代码/文档一致。
+### 各里程碑命令与验收（与 PRD §7 一致，供生成提示词时直接引用）
+
+| 里程碑 | 协议命令 | 关键验收 |
+|---|---|---|
+| R0 | `ping` | 客户端连上 headless 并显示 hello；`setup_shared` 可重复执行；无残留进程 |
+| R1 | `newGame` `getState` | 固定种子地图逐字一致；海拔/河流比例正确；300 格/4 宗/初始资源与弟子正确；三态迷雾与 §4.2 下发规则一致；不可旋转、缩放平移不重置 |
+| R2 | `finishTurn` `nextTurn` `beginPlayerTurn` `moveDisciple` `queryMoveRange` | 高亮即可达；山岳不可达；丘陵/灵林/雾泽/跨河扣力与预览一致；迷雾随移动更新 |
+| R3 | 城市 18 条 | 产出与 config 一致；山岳不可建城、丘陵/灵林限制生效；区域邻接与上限生效；安定惩罚生效 |
+| R4 | `researchDao` `holdRecruitment` `queryProjectQueue` `cancelProject` `accelerateProject` | 21 道法前置/时代/流派专属门控正确；进度/突破/渡劫正确；成就 boost 触发正确 |
+| R5 | 单位 22 条（战斗相关） | 预览胜率 == 实战口径；高地/跨河/丘陵/灵林加成正确；夺峰/夺点易主与视野重算；远程零反击；ZOC/围城生效 |
+| R6 | 探索 4 + 政令 4 + 自动化 6 | 成功率/冷却/伤亡与 config 一致；政策槽位/冷却 8 正确；loyalty 效果落安定；自动化按阈值触发 |
+| R7 | 会话剩余命令、`tribulate`/任命、`saveGame`/`loadGame`/`listSaves`、胜利待择 | 三流派胜利可达成；240 回合分数正确；同种子双跑逐字一致；读档继续与待决重建 |
+| R8 | —（仅协议补字段） | 全部 69 命令有 UI 入口；信息直观；视角/缩放操作后不重置；全局缩到最远设施仍可辨 |
+| R9 | — | 换皮肤零代码；默认皮肤完整；导出可独立运行；自检全绿 |
+
+> 命令清单（69 条 + `ping`）、view 字段、数值口径、裁剪范围以 `docs/REQUIREMENTS_2.0.md` §5–§6 为准。
+
+---
+
+## 4. 通用硬约束（每个里程碑都适用）
+
+- 完全 Godot 4.4 + GDScript **静态类型**，**零 Java、零 JVM**，全仓库无 `.java`。
+- **服务端权威、客户端零规则**；规则/数值唯一权威是 `data/gameConfig.json` 与服务端 `rules/`。
+- 2.5D：**正交相机锁定 yaw/pitch=45°，禁止旋转**；缩放/平移/任何操作与 view 刷新后相机不重置。
+- 美术资源独立可替换（逻辑 ID → `assets/manifest.json` 映射），缺失只 WARN 不崩。
+- 确定性：同种子、同宽高、同命令序列 → 逐字一致；随机只经服务端集中随机源。
+- 每任务结束**无残留 godot 进程**，自检 `tools/check.ps1` 全绿。
+
+---
+
+## 5. Windows 环境已知坑（R0/R1 实证，务必遵守）
+
+1. **先 `--import` 再运行**：新克隆、或新增 `class_name` 全局类后，必须先跑一次导入生成全局类缓存，否则所有全局类报 `not declared`：
+   - `Godot_v4.4.1-stable_win64_console.exe --headless --path server --import`
+   - `Godot_v4.4.1-stable_win64_console.exe --headless --path client --import`
+   - `tools/check.ps1` 已内置该步骤；新增脚本/场景后若报类未声明，重跑 import。
+2. **拉子进程不要用 `Start-Process`**：本机同时存在大小写两份 `HTTP_PROXY`/`http_proxy`，`Start-Process` 重建环境块会抛「已添加项」。工具脚本统一用 .NET `System.Diagnostics.Process`；**等待服务端就绪用 TCP 端口轮询**，不要依赖匹配控制台日志。
+3. **脚本不要设 `[Console]::OutputEncoding`**：CP936 控制台强行切 UTF-8 会导致中文乱码；Godot 输出统一用 .NET Process 显式按 UTF-8 解码。
+4. **含中文的 `.ps1` 必须带 UTF-8 BOM**，否则 Windows PowerShell 5.1 按 ANSI 读取会报「字符串缺少终止符」。
+5. **执行策略为 Restricted**：跑脚本用 `powershell -NoProfile -ExecutionPolicy Bypass -File <脚本>`；不要假设双击可用（本仓库**不提供** `.cmd` 包装，直接调用 `.ps1`）。
+6. **`shared/` 用目录联接（junction）挂载**：`tools/setup_shared.ps1` 幂等创建；联接本体在 `.gitignore` 中，顶层 `shared/` 真实目录入库。
+7. **`*.uid` 不入库**：Godot 4.4 为每个脚本生成的 `.uid` 属引擎元数据，已在 `.gitignore` 忽略。
+
+---
+
+## 6. Git 与推送规范
+
+- 远程 `https://github.com/chufu152/xiuxiangame2.0.git`，主分支 `main`。
+- 每个里程碑完成并通过自检后**立即提交并推送**：
+  ```
+  git add -A
+  git commit -m "feat(rX): <英文简述>"
+  git push origin HEAD:main
+  ```
+- **远程固定 HTTPS，禁止改成 SSH、禁止自行生成 SSH key。** 仓库本地（**仅本仓库，不写 `--global`**）已配 `http.proxy`/`https.proxy = http://127.0.0.1:7890`，凭据走 Windows 凭据管理器；保持 Clash 代理开启即可免参推送。
+- 新 clone 的仓库没有仓库本地代理时：
+  `git config http.proxy http://127.0.0.1:7890 && git config https.proxy http://127.0.0.1:7890`；
+  或仅对单条命令临时加 `-c http.proxy=... -c https.proxy=...`。
+- **报 401/403 或 `could not read Username ... terminal prompts disabled`** 时，改用：
+  `git -c credential.helper=manager push origin HEAD:main`。
+  若仍失败（本机默认继承的 `credential.helper=helper-selector` 在受限环境会卡死），在**仓库本地**重置助手链：
+  ```
+  git config --local credential.helper ""
+  git config --local --add credential.helper manager
+  ```
+- 代理只在本机 Clash 开启时有效；推送报连接失败先确认 `7890` 端口在监听。
+- **worktree 说明**：WorkBuddy 在 `WorkBuddy/Worktrees/...` 的独立 worktree 工作（分支 `workbuddy/main-*`），`main` 可能同时被主检出 `IdeaProjects/xiuxiangame2.0` 占用；因此统一推 `HEAD:main` 而不是 `push origin main`。
+
+---
+
+## 7. 已知阻塞项 / 待办
+
+| # | 项 | 影响 | 处理 |
+|---|---|---|---|
+| 1 | `shared/geo/hex.gd` 仅有 R0 常量占位，**未实现** `id/coords/neighbors/distance/to_world/opposite/edge_vertices` | R1 服务端与客户端全部脚本解析失败（`Static function "id()" not found in base "Hex"`），R1 无法运行 | R1 提示词已把该接口写成**显式契约**，需先补齐再验收 |
+| 2 | R1 交付物（配置/服务端/客户端/测试）已落盘但**未提交** | 工作区不干净 | R1 通过验收后再提交推送 |
+
+---
+
+## 8. 提示词写作模板（生成 R2–R9 时套用）
+
+每份 `R*_*.md` 至少包含以下小节，缺一不可：
+
+```markdown
+# RX 任务提示词：<一句话主题>
+
+> 建议专家：Godot 游戏脚本工程师（Godot 4.4 / GDScript / 3D）
+> 前置：<上一里程碑> 必须已完成且 tools/check.ps1 全绿。
+> 本里程碑产出：<端到端可玩切片的一句话>；**不做**：<明确非目标>。
+
+## 开工前必读（只读，禁止自创规则/数值）
+<按 § 列出 PRD / 美术 / manifest / data/README 的精确章节>
+
+## 硬约束（违反即返工）
+<引用 §4 通用约束 + 本里程碑特有约束，数值全部写死>
+
+## 配置迁移/新增（如涉及）
+<字段名 + 数值，标注来源章节>
+
+## 服务端任务（server/scripts/…）
+<文件 → 职责 → 接口签名>
+
+## 客户端任务（client/…）
+<文件 → 职责 → 交互与表现>
+
+## 自动验收（扩展 tools/check.ps1，全部通过）
+<编号断言清单，每条可机检>
+
+## 完成后
+git add -A
+git commit -m "feat(rX): <英文简述>"
+git push origin HEAD:main
+
+## 非目标（RX 不做）
+<逐条列出越界项>
+```
+
+**写作要求**：
+- 数值一律**照抄** PRD/config，不写「合理值」「自行调参」。
+- 跨里程碑接口（如 `Hex.*`、`Dto.*`、命令名）**必须写成显式签名**，避免下游猜。
+- 验收项必须**可机检**（打印固定标记 + 退出码，或导出可比对文件）。
+- 非目标必须显式，防止越界实现后续里程碑。
+
+---
+
+## 9. 文档维护规则
+
+1. 里程碑完成后，回写本文件 §3 状态列 + 对应 `R*_*.md` 的「实际交付 / 偏差」小节。
+2. 新增/修改配置字段，同步更新 `data/README.md` 与 PRD 附录 A。
+3. 发现冲突时按 §0 层级裁决，**同一次提交内**把高低层一起改齐。
+4. 后续里程碑提示词在进入该里程碑时生成，生成时须先核对当时代码与 config 实际状态。

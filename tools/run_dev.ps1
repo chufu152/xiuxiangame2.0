@@ -24,7 +24,7 @@
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_dev.ps1
-    或直接双击 tools\run_dev.cmd
+    （本机执行策略为 Restricted，必须用 -ExecutionPolicy Bypass；仓库不提供 .cmd 包装）
 #>
 [CmdletBinding()]
 param(
