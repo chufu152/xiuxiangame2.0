@@ -1,0 +1,46 @@
+# ===== Godot 4 运行时缓存 =====
+.godot/
+/android/
+*.translation~
+
+# ===== 导出产物（保留目录，不提交产物）=====
+/exports/*
+!/exports/.gitkeep
+/export_presets.cfg.bak
+
+# ===== 本地存档（服务端运行时生成，不提交）=====
+/saves/*
+!/saves/.gitkeep
+*.save
+*.sav
+
+# ===== 日志 / 临时 =====
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# ===== 操作系统垃圾 =====
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.code-workspace
+
+# ===== WorkBuddy 本地笔记（不入库）=====
+.workbuddy-ai/
+
+# ===== 环境与密钥 =====
+.env
+*.secret
+
+# ===== 依赖 / 构建中间件 =====
+node_modules/
+
+# ===== shared 目录联接（由 tools/setup_shared.ps1 本地生成，勿入库；真正的源在顶层 shared/）=====
+/client/shared/
+/server/shared/

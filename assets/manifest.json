@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "activePack": "default",
+  "filter": "Nearest",
+  "note": "客户端只按逻辑资源 id 取图；换皮肤时替换 art/<pack>/ 文件并把 activePack 指向新包。path 相对 assets/ 根。缺失资源由 AssetLibrary 回退占位并告警。",
+  "resources": [
+    { "id": "terrain.PLAIN",         "type": "texture", "path": "art/default/terrain/plain.png",         "billboard": false },
+    { "id": "terrain.DANGER",        "type": "texture", "path": "art/default/terrain/danger.png",        "billboard": false },
+    { "id": "terrain.FOREST",        "type": "texture", "path": "art/default/terrain/forest.png",        "billboard": false },
+    { "id": "terrain.MOUNTAIN",      "type": "texture", "path": "art/default/terrain/mountain.png",      "billboard": false },
+    { "id": "terrain.SPIRIT_VEIN",   "type": "texture", "path": "art/default/terrain/spirit_vein.png",   "billboard": false },
+    { "id": "terrain.SPIRIT_SPRING", "type": "texture", "path": "art/default/terrain/spirit_spring.png", "billboard": false },
+    { "id": "terrain.RIVER",         "type": "texture", "path": "art/default/terrain/river.png",         "billboard": false },
+
+    { "id": "unit.PU_TONG",          "type": "texture", "path": "art/default/units/pu_tong.png",         "billboard": true, "anchor": "bottom" },
+    { "id": "unit.JIAN_XIU",         "type": "texture", "path": "art/default/units/jian_xiu.png",        "billboard": true, "anchor": "bottom" },
+    { "id": "unit.FA_XIU",           "type": "texture", "path": "art/default/units/fa_xiu.png",          "billboard": true, "anchor": "bottom" },
+    { "id": "unit.TI_XIU",           "type": "texture", "path": "art/default/units/ti_xiu.png",          "billboard": true, "anchor": "bottom" },
+    { "id": "unit.SHOU_LING",        "type": "texture", "path": "art/default/units/shou_ling.png",       "billboard": true, "anchor": "bottom" },
+    { "id": "unit.FU_XIU",           "type": "texture", "path": "art/default/units/fu_xiu.png",          "billboard": true, "anchor": "bottom" },
+    { "id": "unit.JI_GUAN",          "type": "texture", "path": "art/default/units/ji_guan.png",         "billboard": true, "anchor": "bottom" },
+    { "id": "unit.JIAN_ZHEN",        "type": "texture", "path": "art/default/units/jian_zhen.png",       "billboard": true, "anchor": "bottom" },
+    { "id": "unit.XUE_MAI",          "type": "texture", "path": "art/default/units/xue_mai.png",         "billboard": true, "anchor": "bottom" },
+    { "id": "unit.JIGUAN_BINGTUAN",  "type": "texture", "path": "art/default/units/jiguan_bingtuan.png", "billboard": true, "anchor": "bottom" },
+
+    { "id": "building.MOUNTAIN_GATE",     "type": "texture", "path": "art/default/buildings/mountain_gate.png",     "billboard": true, "anchor": "bottom" },
+    { "id": "building.HALL",              "type": "texture", "path": "art/default/buildings/hall.png",              "billboard": true, "anchor": "bottom" },
+    { "id": "building.CLASSICS",          "type": "texture", "path": "art/default/buildings/classics.png",          "billboard": true, "anchor": "bottom" },
+    { "id": "building.SWORD_FORMATION",   "type": "texture", "path": "art/default/buildings/sword_formation.png",   "billboard": true, "anchor": "bottom" },
+    { "id": "building.ANCESTRAL_HALL",    "type": "texture", "path": "art/default/buildings/ancestral_hall.png",    "billboard": true, "anchor": "bottom" },
+    { "id": "building.DYNASTY_CAPITAL",   "type": "texture", "path": "art/default/buildings/dynasty_capital.png",   "billboard": true, "anchor": "bottom" },
+
+    { "id": "resource.spiritPower",  "type": "texture", "path": "art/default/icons/resource_spirit_power.png" },
+    { "id": "resource.spiritStones", "type": "texture", "path": "art/default/icons/resource_spirit_stones.png" },
+    { "id": "resource.workPower",    "type": "texture", "path": "art/default/icons/resource_work_power.png" },
+    { "id": "resource.prestige",     "type": "texture", "path": "art/default/icons/resource_prestige.png" },
+    { "id": "resource.qiYun",        "type": "texture", "path": "art/default/icons/resource_qi_yun.png" },
+    { "id": "resource.food",         "type": "texture", "path": "art/default/icons/resource_food.png" },
+    { "id": "resource.daoPoints",    "type": "texture", "path": "art/default/icons/resource_dao_points.png" },
+
+    { "id": "faction.ZONG_MEN", "type": "texture", "path": "art/default/icons/faction_zong_men.png" },
+    { "id": "faction.FAMILY",  "type": "texture", "path": "art/default/icons/faction_family.png" },
+    { "id": "faction.DYNASTY", "type": "texture", "path": "art/default/icons/faction_dynasty.png" }
+  ],
+  "audio": [
+    { "id": "bgm.main", "type": "audio", "path": "audio/bgm/main.ogg", "loop": true, "volume": 0.6 }
+  ],
+  "fonts": [
+    { "id": "font.body",  "type": "font", "path": "fonts/body.ttf" },
+    { "id": "font.title", "type": "font", "path": "fonts/title.ttf" }
+  ]
+}

@@ -1,0 +1,22 @@
+# 文本统一 LF（PowerShell 脚本除外，用 CRLF）
+*.gd    text eol=lf
+*.tscn  text eol=lf
+*.tres  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.cfg   text eol=lf
+*.ps1   text eol=crlf
+
+# 二进制美术与音频资源
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.wav   binary
+*.ogg   binary
+*.mp3   binary
+*.ttf   binary
+*.otf   binary
+*.otf.import text
+*.import text
