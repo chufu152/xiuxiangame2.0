@@ -1,35 +1,75 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "activePack": "default",
-  "filter": "Nearest",
-  "note": "客户端只按逻辑资源 id 取图；换皮肤时替换 art/<pack>/ 文件并把 activePack 指向新包。path 相对 assets/ 根。缺失资源由 AssetLibrary 回退占位并告警。",
+  "filter": "Linear",
+  "renderStyle": "hand-painted ink-wash 2.5D (low-poly 3D assets + locked orthographic 45° isometric camera, no free rotation)",
+  "note": "客户端只按逻辑资源 id 取资源；换皮肤时替换 art/<pack>/ 文件并把 activePack 指向新包。2.5D 等距：单位/建筑/区域/地貌/节点/改良用 3D 模型 .glb，地形顶面/侧面/河流/迷雾/UI 图标用 .png/.tres 材质。地形按 基底顶面/海拔侧面/地貌叠加/河流/险地 分层。缺失资源由 AssetLibrary 回退占位（模型=水墨灰阶几何体+文字标签，贴图=色块）并告警。",
+  "terrain": [
+    { "id": "terrain.base.LING_FIELDS",   "type": "texture", "path": "art/default/terrain/top_ling_fields.png" },
+    { "id": "terrain.base.SPIRIT_PLAIN",  "type": "texture", "path": "art/default/terrain/top_spirit_plain.png" },
+    { "id": "terrain.base.BARREN",        "type": "texture", "path": "art/default/terrain/top_barren.png" },
+    { "id": "terrain.relief.FLAT_SIDE",     "type": "texture", "path": "art/default/terrain/side_flat.png" },
+    { "id": "terrain.relief.HILL_SIDE",     "type": "texture", "path": "art/default/terrain/side_hill.png" },
+    { "id": "terrain.relief.MOUNTAIN_SIDE", "type": "texture", "path": "art/default/terrain/side_mountain.png" },
+    { "id": "terrain.relief.MOUNTAIN_TOP",  "type": "texture", "path": "art/default/terrain/mountain_peak.png" },
+    { "id": "terrain.river",  "type": "texture", "path": "art/default/terrain/river.png" },
+    { "id": "terrain.danger", "type": "texture", "path": "art/default/terrain/danger.png" },
+    { "id": "terrain.fog.RICE_PAPER", "type": "texture", "path": "art/default/terrain/fog_rice_paper.png" },
+    { "id": "terrain.fog.INK_MAP",    "type": "texture", "path": "art/default/terrain/fog_ink_map.png" }
+  ],
+  "features": [
+    { "id": "terrain.feature.SPIRIT_FOREST", "type": "model", "path": "art/default/features/feature_spirit_forest.glb", "anchor": "ground" },
+    { "id": "terrain.feature.MIRE",          "type": "model", "path": "art/default/features/feature_mire.glb",          "anchor": "ground" },
+    { "id": "node.LING_TIAN", "type": "model", "path": "art/default/features/node_ling_tian.glb", "anchor": "ground" },
+    { "id": "node.LING_MAI",  "type": "model", "path": "art/default/features/node_ling_mai.glb",  "anchor": "ground" },
+    { "id": "node.JI_YUAN",   "type": "model", "path": "art/default/features/node_ji_yuan.glb",   "anchor": "ground" },
+    { "id": "node.MI_JING",   "type": "model", "path": "art/default/features/node_mi_jing.glb",   "anchor": "ground" },
+    { "id": "node.LING_QUAN", "type": "model", "path": "art/default/features/node_ling_quan.glb", "anchor": "ground" },
+    { "id": "node.LING_FENG", "type": "model", "path": "art/default/features/node_ling_feng.glb", "anchor": "ground" }
+  ],
+  "units": [
+    { "id": "unit.PU_TONG",          "type": "model", "path": "art/default/units/pu_tong.glb",          "anchor": "ground" },
+    { "id": "unit.JIAN_XIU",         "type": "model", "path": "art/default/units/jian_xiu.glb",         "anchor": "ground" },
+    { "id": "unit.FA_XIU",           "type": "model", "path": "art/default/units/fa_xiu.glb",           "anchor": "ground" },
+    { "id": "unit.TI_XIU",           "type": "model", "path": "art/default/units/ti_xiu.glb",           "anchor": "ground" },
+    { "id": "unit.QI_JI",            "type": "model", "path": "art/default/units/qi_ji.glb",            "anchor": "ground" },
+    { "id": "unit.FU_XIU",           "type": "model", "path": "art/default/units/fu_xiu.glb",           "anchor": "ground" },
+    { "id": "unit.JI_GUAN",          "type": "model", "path": "art/default/units/ji_guan.glb",          "anchor": "ground" },
+    { "id": "unit.JIAN_ZHEN_SHI",    "type": "model", "path": "art/default/units/jian_zhen_shi.glb",    "anchor": "ground" },
+    { "id": "unit.XUE_MAI_XIU_SHI",  "type": "model", "path": "art/default/units/xue_mai_xiu_shi.glb",  "anchor": "ground" },
+    { "id": "unit.JI_GUAN_JUN_TUAN", "type": "model", "path": "art/default/units/ji_guan_jun_tuan.glb", "anchor": "ground" }
+  ],
+  "buildings": [
+    { "id": "building.SHAN_MEN",           "type": "model", "path": "art/default/buildings/shan_men.glb",           "anchor": "ground" },
+    { "id": "building.ZONG_ZHU_DA_DIAN",   "type": "model", "path": "art/default/buildings/zong_zhu_da_dian.glb",   "anchor": "ground" },
+    { "id": "building.CANG_JING_GE",       "type": "model", "path": "art/default/buildings/cang_jing_ge.glb",       "anchor": "ground" },
+    { "id": "building.XIU_LIAN_FEN_FENG",  "type": "model", "path": "art/default/buildings/xiu_lian_fen_feng.glb",  "anchor": "ground" },
+    { "id": "building.DAN_TANG_FEN_FENG",  "type": "model", "path": "art/default/buildings/dan_tang_fen_feng.glb",  "anchor": "ground" },
+    { "id": "building.QI_TANG_FEN_FENG",   "type": "model", "path": "art/default/buildings/qi_tang_fen_feng.glb",   "anchor": "ground" },
+    { "id": "building.JIANG_DAO_FEN_FENG", "type": "model", "path": "art/default/buildings/jiang_dao_fen_feng.glb",  "anchor": "ground" },
+    { "id": "building.HU_SHAN_JIAN_ZHEN",  "type": "model", "path": "art/default/buildings/hu_shan_jian_zhen.glb",  "anchor": "ground" },
+    { "id": "building.ZU_CI",              "type": "model", "path": "art/default/buildings/zu_ci.glb",              "anchor": "ground" },
+    { "id": "building.WANG_CHAO_DI_DU",    "type": "model", "path": "art/default/buildings/wang_chao_di_du.glb",    "anchor": "ground" }
+  ],
+  "districts": [
+    { "id": "district.SHOU_FU_QU",   "type": "model", "path": "art/default/districts/shou_fu_qu.glb",   "anchor": "ground" },
+    { "id": "district.XIU_LIAN_QU",  "type": "model", "path": "art/default/districts/xiu_lian_qu.glb",  "anchor": "ground" },
+    { "id": "district.DAN_QI_QU",    "type": "model", "path": "art/default/districts/dan_qi_qu.glb",    "anchor": "ground" },
+    { "id": "district.CANG_JING_QU", "type": "model", "path": "art/default/districts/cang_jing_qu.glb", "anchor": "ground" },
+    { "id": "district.FA_TAN_QU",    "type": "model", "path": "art/default/districts/fa_tan_qu.glb",    "anchor": "ground" },
+    { "id": "district.SHI_JI_QU",    "type": "model", "path": "art/default/districts/shi_ji_qu.glb",    "anchor": "ground" }
+  ],
+  "improvements": [
+    { "id": "improvement.LING_TIAN_TI_TIAN", "type": "model", "path": "art/default/features/imp_ling_tian_ti_tian.glb", "anchor": "ground" },
+    { "id": "improvement.LING_KUANG",        "type": "model", "path": "art/default/features/imp_ling_kuang.glb",        "anchor": "ground" },
+    { "id": "improvement.CAI_SHI_CHANG",     "type": "model", "path": "art/default/features/imp_cai_shi_chang.glb",     "anchor": "ground" },
+    { "id": "improvement.YAO_YUAN",          "type": "model", "path": "art/default/features/imp_yao_yuan.glb",          "anchor": "ground" },
+    { "id": "improvement.JU_LING_ZHEN",      "type": "model", "path": "art/default/features/imp_ju_ling_zhen.glb",      "anchor": "ground" },
+    { "id": "improvement.QING_SHI_DAO_LU",   "type": "model", "path": "art/default/features/imp_qing_shi_dao_lu.glb",   "anchor": "ground" },
+    { "id": "improvement.DONG_FU",           "type": "model", "path": "art/default/features/imp_dong_fu.glb",           "anchor": "ground" },
+    { "id": "improvement.LING_QUAN_XIU_SHAN","type": "model", "path": "art/default/features/imp_ling_quan_xiu_shan.glb","anchor": "ground" }
+  ],
   "resources": [
-    { "id": "terrain.PLAIN",         "type": "texture", "path": "art/default/terrain/plain.png",         "billboard": false },
-    { "id": "terrain.DANGER",        "type": "texture", "path": "art/default/terrain/danger.png",        "billboard": false },
-    { "id": "terrain.FOREST",        "type": "texture", "path": "art/default/terrain/forest.png",        "billboard": false },
-    { "id": "terrain.MOUNTAIN",      "type": "texture", "path": "art/default/terrain/mountain.png",      "billboard": false },
-    { "id": "terrain.SPIRIT_VEIN",   "type": "texture", "path": "art/default/terrain/spirit_vein.png",   "billboard": false },
-    { "id": "terrain.SPIRIT_SPRING", "type": "texture", "path": "art/default/terrain/spirit_spring.png", "billboard": false },
-    { "id": "terrain.RIVER",         "type": "texture", "path": "art/default/terrain/river.png",         "billboard": false },
-
-    { "id": "unit.PU_TONG",          "type": "texture", "path": "art/default/units/pu_tong.png",         "billboard": true, "anchor": "bottom" },
-    { "id": "unit.JIAN_XIU",         "type": "texture", "path": "art/default/units/jian_xiu.png",        "billboard": true, "anchor": "bottom" },
-    { "id": "unit.FA_XIU",           "type": "texture", "path": "art/default/units/fa_xiu.png",          "billboard": true, "anchor": "bottom" },
-    { "id": "unit.TI_XIU",           "type": "texture", "path": "art/default/units/ti_xiu.png",          "billboard": true, "anchor": "bottom" },
-    { "id": "unit.SHOU_LING",        "type": "texture", "path": "art/default/units/shou_ling.png",       "billboard": true, "anchor": "bottom" },
-    { "id": "unit.FU_XIU",           "type": "texture", "path": "art/default/units/fu_xiu.png",          "billboard": true, "anchor": "bottom" },
-    { "id": "unit.JI_GUAN",          "type": "texture", "path": "art/default/units/ji_guan.png",         "billboard": true, "anchor": "bottom" },
-    { "id": "unit.JIAN_ZHEN",        "type": "texture", "path": "art/default/units/jian_zhen.png",       "billboard": true, "anchor": "bottom" },
-    { "id": "unit.XUE_MAI",          "type": "texture", "path": "art/default/units/xue_mai.png",         "billboard": true, "anchor": "bottom" },
-    { "id": "unit.JIGUAN_BINGTUAN",  "type": "texture", "path": "art/default/units/jiguan_bingtuan.png", "billboard": true, "anchor": "bottom" },
-
-    { "id": "building.MOUNTAIN_GATE",     "type": "texture", "path": "art/default/buildings/mountain_gate.png",     "billboard": true, "anchor": "bottom" },
-    { "id": "building.HALL",              "type": "texture", "path": "art/default/buildings/hall.png",              "billboard": true, "anchor": "bottom" },
-    { "id": "building.CLASSICS",          "type": "texture", "path": "art/default/buildings/classics.png",          "billboard": true, "anchor": "bottom" },
-    { "id": "building.SWORD_FORMATION",   "type": "texture", "path": "art/default/buildings/sword_formation.png",   "billboard": true, "anchor": "bottom" },
-    { "id": "building.ANCESTRAL_HALL",    "type": "texture", "path": "art/default/buildings/ancestral_hall.png",    "billboard": true, "anchor": "bottom" },
-    { "id": "building.DYNASTY_CAPITAL",   "type": "texture", "path": "art/default/buildings/dynasty_capital.png",   "billboard": true, "anchor": "bottom" },
-
     { "id": "resource.spiritPower",  "type": "texture", "path": "art/default/icons/resource_spirit_power.png" },
     { "id": "resource.spiritStones", "type": "texture", "path": "art/default/icons/resource_spirit_stones.png" },
     { "id": "resource.workPower",    "type": "texture", "path": "art/default/icons/resource_work_power.png" },
@@ -37,10 +77,24 @@
     { "id": "resource.qiYun",        "type": "texture", "path": "art/default/icons/resource_qi_yun.png" },
     { "id": "resource.food",         "type": "texture", "path": "art/default/icons/resource_food.png" },
     { "id": "resource.daoPoints",    "type": "texture", "path": "art/default/icons/resource_dao_points.png" },
-
+    { "id": "resource.tian_jing",    "type": "texture", "path": "art/default/icons/resource_tian_jing.png" },
+    { "id": "resource.xuan_tie",     "type": "texture", "path": "art/default/icons/resource_xuan_tie.png" },
+    { "id": "resource.ling_mu",      "type": "texture", "path": "art/default/icons/resource_ling_mu.png" },
+    { "id": "resource.ling_cha",     "type": "texture", "path": "art/default/icons/resource_ling_cha.png" },
+    { "id": "resource.yun_jin",      "type": "texture", "path": "art/default/icons/resource_yun_jin.png" },
+    { "id": "resource.ling_yu",      "type": "texture", "path": "art/default/icons/resource_ling_yu.png" }
+  ],
+  "realms": [
+    { "id": "realm.LIAN_QI",  "type": "texture", "path": "art/default/icons/realm_lian_qi.png" },
+    { "id": "realm.ZHU_JI",   "type": "texture", "path": "art/default/icons/realm_zhu_ji.png" },
+    { "id": "realm.JIN_DAN",  "type": "texture", "path": "art/default/icons/realm_jin_dan.png" },
+    { "id": "realm.YUAN_YING","type": "texture", "path": "art/default/icons/realm_yuan_ying.png" },
+    { "id": "realm.HUA_SHEN", "type": "texture", "path": "art/default/icons/realm_hua_shen.png" }
+  ],
+  "factions": [
     { "id": "faction.ZONG_MEN", "type": "texture", "path": "art/default/icons/faction_zong_men.png" },
-    { "id": "faction.FAMILY",  "type": "texture", "path": "art/default/icons/faction_family.png" },
-    { "id": "faction.DYNASTY", "type": "texture", "path": "art/default/icons/faction_dynasty.png" }
+    { "id": "faction.JIA_ZU",  "type": "texture", "path": "art/default/icons/faction_jia_zu.png" },
+    { "id": "faction.GUO_JIA", "type": "texture", "path": "art/default/icons/faction_guo_jia.png" }
   ],
   "audio": [
     { "id": "bgm.main", "type": "audio", "path": "audio/bgm/main.ogg", "loop": true, "volume": 0.6 }
