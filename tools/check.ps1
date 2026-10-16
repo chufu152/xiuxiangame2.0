@@ -1,22 +1,23 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    里程碑自检：R0 工程骨架 + R1 地图开局（对应 docs/prompts/R0_工程骨架.md / R1_地图开局.md「自动验收」）。
+    里程碑自检：R0 工程骨架 + R1 地图开局 + R1.5 协议契约（对应 docs/prompts/*.md「自动验收」）。
 
 .DESCRIPTION
     依次执行：
-      [0/9] 环境与交付物清单（R0 + R1）
-      [1/9] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
-      [2/9] 两个工程 --import 无解析错误并生成 class_name 缓存
-      [3/9] 配置缺失时服务端非零退出（负向用例）
-      [4/9] console 版 --headless 启动服务端并监听 127.0.0.1:9527
-      [5/9] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
-      [6/9] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
-      [7/9] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
+      [0/10] 环境与交付物清单（R0 + R1）
+      [1/10] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
+      [2/10] 两个工程 --import 无解析错误并生成 class_name 缓存
+      [3/10] 配置缺失时服务端非零退出（负向用例）
+      [4/10] console 版 --headless 启动服务端并监听 127.0.0.1:9527
+      [5/10] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
+      [6/10] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
+      [7/10] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
             且同种子双跑导出的权威地图 outputs/r1_authority_a|b.json 逐字一致（SHA256 相同）
-      [8/9] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
+      [8/10] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
             再加 --integration 端到端（真实拉起 headless 服务端 + newGame 300 格 view + getState 往返）
-      [9/9] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
+      [9/10] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
+      [10/10] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
 
     退出码：0 = 全绿；1 = 存在失败项。
 
@@ -226,7 +227,7 @@ try {
     Write-Host "临时目录：$workDir"
 
     # ---------------------------------------------------------------- 0. 环境
-    Write-Host "`n[0/9] 环境与交付物清单（R0 + R1）" -ForegroundColor Cyan
+    Write-Host "`n[0/10] 环境与交付物清单（R0 + R1）" -ForegroundColor Cyan
     $godotExe = $null
     try { $godotExe = Resolve-GodotConsole }
     catch { Assert-Check $false '定位 Godot 控制台版可执行文件' $_.Exception.Message }
@@ -272,7 +273,7 @@ try {
     if (-not $godotExe) { throw '未定位到 Godot 可执行文件，后续步骤无法进行。' }
 
     # ------------------------------------------- 1. shared 目录联接（幂等 + 贯通）
-    Write-Host "`n[1/9] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
+    Write-Host "`n[1/10] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
     $setupScript = Join-Path $PSScriptRoot 'setup_shared.ps1'
 
     $firstOk = $true; $firstErr = ''
@@ -321,7 +322,7 @@ try {
     Assert-Check (-not (Test-Path $probeTop)) '临时探测文件已清理'
 
     # --------------------------------------------------------- 2. 工程导入
-    Write-Host "`n[2/9] 工程导入与 GDScript 解析" -ForegroundColor Cyan
+    Write-Host "`n[2/10] 工程导入与 GDScript 解析" -ForegroundColor Cyan
     if ($SkipImport) {
         Write-Host '  （-SkipImport：跳过导入步骤）' -ForegroundColor DarkGray
     }
@@ -342,7 +343,7 @@ try {
     }
 
     # --------------------------------------------- 3. 配置失败路径（负向用例）
-    Write-Host "`n[3/9] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
+    Write-Host "`n[3/10] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
     $missingConfig = Join-Path $workDir 'not-exists.json'
     $badResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$missingConfig") `
@@ -352,7 +353,7 @@ try {
     Assert-Check ($badCombined -match 'config_load_failed|配置加载失败') '配置缺失时输出可诊断的失败原因' $badCombined.Trim()
 
     # ------------------------------------------------- 4. 启动 headless 服务端
-    Write-Host "`n[4/9] headless 服务端启动并监听" -ForegroundColor Cyan
+    Write-Host "`n[4/10] headless 服务端启动并监听" -ForegroundColor Cyan
     $serverInfo = New-GodotStartInfo -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$dataPath") -CaptureOutput
     $serverProcess = [System.Diagnostics.Process]::Start($serverInfo)
@@ -370,7 +371,7 @@ try {
     Assert-Check (-not $serverProcess.HasExited) '服务端进程持续运行（未提前退出）'
 
     # ------------------------------------------------ 5. 无头自测（SmokeTest）
-    Write-Host "`n[5/9] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
+    Write-Host "`n[5/10] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
     if ($ready) {
         $smokeResult = Invoke-GodotCapture -Executable $godotExe `
             -Arguments @('--headless', '--path', $serverPath, 'res://tests/SmokeTest.tscn', '--', "--port=$Port") `
@@ -395,7 +396,7 @@ catch {
 }
 finally {
     # ------------------------------------------------------- 6. 清理与残留
-    Write-Host "`n[6/9] 进程清理（R0 服务端）" -ForegroundColor Cyan
+    Write-Host "`n[6/10] 进程清理（R0 服务端）" -ForegroundColor Cyan
 
     if ($serverProcess) {
         try { $serverProcess.Refresh() } catch { }
@@ -426,7 +427,7 @@ finally {
 }
 
 # ------------------------------------------- 7. 服务端 R1 验收（R1Test）
-Write-Host "`n[7/9] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[7/10] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r1Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R1Test.tscn') `
@@ -457,7 +458,7 @@ else {
 }
 
 # ------------------------------------------- 8. 客户端 R1 验收（无头 + 端到端）
-Write-Host "`n[8/9] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[8/10] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $clientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn') `
@@ -495,7 +496,7 @@ else {
 }
 
 # ------------------------------------------------------ 9. 仓库扫描与最终残留
-Write-Host "`n[9/9] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
+Write-Host "`n[9/10] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
 $javaFiles = @()
 try {
     $javaFiles = Get-ChildItem -Path $root -Recurse -File -Filter '*.java' -ErrorAction SilentlyContinue |
@@ -511,6 +512,44 @@ Assert-Check ($finalServer.Count -eq 0) 'R1 验收结束后无残留 godot 服�
     (($finalServer | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 Assert-Check ($finalClient.Count -eq 0) 'R1 验收结束后无残留 godot 客户端进程' `
     (($finalClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
+
+# ---------------------------------------------- 10. 协议契约（PROTOCOL_2.0）
+Write-Host "`n[10/10] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
+$protocolScript = Join-Path $PSScriptRoot 'check_protocol.ps1'
+if (Test-Path -PathType Leaf $protocolScript) {
+    # 必须放到子进程执行：脚本内的 exit 会终止当前会话，直接 & 调用会把自检一起带走。
+    $protocolInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $protocolInfo.FileName = 'powershell.exe'
+    $protocolInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$protocolScript`""
+    $protocolInfo.UseShellExecute = $false
+    $protocolInfo.CreateNoWindow = $true
+    $protocolInfo.RedirectStandardOutput = $true
+    $protocolInfo.RedirectStandardError = $true
+    # 注意：这里**不设** StandardOutputEncoding。子进程是 powershell.exe，它按控制台输出编码
+    # （本机 CP936）写管道；若强行按 UTF-8 解码会把中文变成「?」。不设则 .NET 用与控制台一致的
+    # 默认编码解码，中文可读。（Godot 子进程相反——它输出 UTF-8，故 New-GodotStartInfo 显式设 UTF-8。）
+    $protocolProcess = [System.Diagnostics.Process]::Start($protocolInfo)
+    $protocolOutTask = $protocolProcess.StandardOutput.ReadToEndAsync()
+    $protocolErrTask = $protocolProcess.StandardError.ReadToEndAsync()
+    if (-not $protocolProcess.WaitForExit(120000)) {
+        try { $protocolProcess.Kill() } catch { }
+        [void]$protocolProcess.WaitForExit(5000)
+    }
+    $protocolOut = ''
+    $protocolErr = ''
+    if ($protocolOutTask.Wait(15000)) { try { $protocolOut = $protocolOutTask.Result } catch { } }
+    if ($protocolErrTask.Wait(15000)) { try { $protocolErr = $protocolErrTask.Result } catch { } }
+    foreach ($line in (($protocolOut + "`n" + $protocolErr) -split "`r?`n")) {
+        if ($line.Trim()) { Write-Host "  $($line.TrimEnd())" -ForegroundColor DarkGray }
+    }
+    Assert-Check ($protocolProcess.ExitCode -eq 0) `
+        '协议契约校验全绿（tools/check_protocol.ps1）' "退出码：$($protocolProcess.ExitCode)"
+    Assert-Check (($protocolOut + $protocolErr) -match 'CHECK_PROTOCOL_RESULT=OK') `
+        '协议校验打印 CHECK_PROTOCOL_RESULT=OK' (($protocolOut + "`n" + $protocolErr).Trim())
+}
+else {
+    Assert-Check $false '找到 tools/check_protocol.ps1' "缺失：$protocolScript"
+}
 
 Write-Host ''
 Write-Host "=== 自检结果：$($script:checkCount - $script:failCount) / $($script:checkCount) 项通过 ===" -ForegroundColor Cyan
