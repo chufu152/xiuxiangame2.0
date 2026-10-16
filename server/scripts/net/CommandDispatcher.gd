@@ -31,6 +31,22 @@ func _init(config: Dictionary = {}) -> void:
 	_handlers[Commands.NEXT_TURN] = Callable(self, "_handle_next_turn")
 	_handlers[Commands.MOVE_DISCIPLE] = Callable(self, "_handle_move_disciple")
 	_handlers[Commands.QUERY_MOVE_RANGE] = Callable(self, "_handle_query_move_range")
+	# R3：经济与城市
+	_handlers[Commands.FOUND_SPIRIT_PEAK] = Callable(self, "_handle_found_spirit_peak")
+	_handlers[Commands.APPOINT_BUILDER] = Callable(self, "_handle_appoint_builder")
+	_handlers[Commands.CONSTRUCT_BUILDING] = Callable(self, "_handle_construct_building")
+	_handlers[Commands.QUERY_BUILD_OPTIONS] = Callable(self, "_handle_query_build_options")
+	_handlers[Commands.OPEN_CAVE] = Callable(self, "_handle_open_cave")
+	_handlers[Commands.FORTIFY_PEAK] = Callable(self, "_handle_fortify_peak")
+	_handlers[Commands.FOUND_DISTRICT] = Callable(self, "_handle_found_district")
+	_handlers[Commands.QUERY_DISTRICT_SITES] = Callable(self, "_handle_query_district_sites")
+	_handlers[Commands.ASSIGN_WORKER] = Callable(self, "_handle_assign_worker")
+	_handlers[Commands.UNASSIGN_WORKER] = Callable(self, "_handle_unassign_worker")
+	_handlers[Commands.QUERY_ASSIGNABLE_TILES] = Callable(self, "_handle_query_assignable_tiles")
+	_handlers[Commands.QUERY_CITY_DETAIL] = Callable(self, "_handle_query_city_detail")
+	_handlers[Commands.BUILD_IMPROVEMENT] = Callable(self, "_handle_build_improvement")
+	_handlers[Commands.REPAIR_IMPROVEMENT] = Callable(self, "_handle_repair_improvement")
+	_handlers[Commands.QUERY_IMPROVEMENT_OPTIONS] = Callable(self, "_handle_query_improvement_options")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -184,3 +200,221 @@ static func _safe_integer(value: Variant) -> bool:
 	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT: return false
 	var number: float = float(value)
 	return is_finite(number) and number == floor(number) and absf(number) <= SAFE_JSON_INTEGER
+
+
+# ---------------------------------------------------------------------------
+# 处理器（R3：经济结算 + 灵峰/城市 + 建筑/区域/劳力/改良/道路）
+# ---------------------------------------------------------------------------
+# 只读命令（query*）→ Dto.ok_response(id, [], null, result)（view=null）；
+# 写命令 → Dto.ok_response(id, events, StateView.build(...), result)，events = 本命令期间新增日志。
+# 未开局 → NO_GAME；参数缺失/类型错/枚举非法 → BAD_PARAMS；业务不允许 → ok:true + result.success:false。
+
+func _handle_found_spirit_peak(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.found_spirit_peak(state, _config, str(disciple_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_appoint_builder(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = ImprovementAction.appoint_builder(state, _config, str(sect_check["value"]), str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_construct_building(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var type_check: Dictionary = _require_enum(params, "buildingType", Enums.Building.ALL)
+	if not bool(type_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(type_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.construct_building(state, _config, str(peak_check["value"]), str(type_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_build_options(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null, CityAction.query_build_options(state, _config, str(sect_check["value"])))
+
+
+func _handle_open_cave(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.open_cave(state, _config, str(peak_check["value"]), str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_fortify_peak(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.fortify_peak(state, _config, str(peak_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_found_district(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var type_check: Dictionary = _require_enum(params, "districtTypeId", Enums.DistrictType.ALL)
+	if not bool(type_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(type_check["message"]))
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.found_district(state, _config, str(sect_check["value"]), str(peak_check["value"]), str(type_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_district_sites(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var type_check: Dictionary = _require_enum(params, "districtTypeId", Enums.DistrictType.ALL)
+	if not bool(type_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(type_check["message"]))
+	return Dto.ok_response(request_id, [], null, CityAction.query_district_sites(state, _config, str(sect_check["value"]), str(peak_check["value"]), str(type_check["value"])))
+
+
+func _handle_assign_worker(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.assign_worker(state, _config, str(peak_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_unassign_worker(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CityAction.unassign_worker(state, _config, str(peak_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_assignable_tiles(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	return Dto.ok_response(request_id, [], null, CityAction.query_assignable_tiles(state, _config, str(peak_check["value"])))
+
+
+func _handle_query_city_detail(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	return Dto.ok_response(request_id, [], null, CityAction.query_city_detail(state, _config, str(peak_check["value"])))
+
+
+func _handle_build_improvement(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var type_check: Dictionary = _require_enum(params, "improvementType", Enums.ImprovementType.ALL)
+	if not bool(type_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(type_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = ImprovementAction.build_improvement(state, _config, str(sect_check["value"]), str(disciple_check["value"]), str(tile_check["value"]), str(type_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_repair_improvement(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = ImprovementAction.repair_improvement(state, _config, str(sect_check["value"]), str(disciple_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_improvement_options(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "tileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	return Dto.ok_response(request_id, [], null, ImprovementAction.query_improvement_options(state, _config, str(sect_check["value"]), str(tile_check["value"])))
+
+
+# ---------------------------------------------------------------------------
+# 参数校验辅助
+# ---------------------------------------------------------------------------
+
+func _require_nonempty(params: Dictionary, key: String) -> Dictionary:
+	var value: Variant = params.get(key)
+	if typeof(value) != TYPE_STRING or String(value).is_empty():
+		return {"ok": false, "message": "%s 必须是非空字符串" % key}
+	return {"ok": true, "value": String(value)}
+
+
+func _require_enum(params: Dictionary, key: String, allowed: Array) -> Dictionary:
+	var check: Dictionary = _require_nonempty(params, key)
+	if not bool(check["ok"]): return check
+	if not allowed.has(check["value"]):
+		return {"ok": false, "message": "%s 非法枚举值：%s" % [key, str(check["value"])]}
+	return check
+
+
+## 校验 `sectId` 存在且为己方宗门；返回 {ok, value, response}。
+func _require_player_sect(request_id: String, params: Dictionary) -> Dictionary:
+	var check: Dictionary = _require_nonempty(params, "sectId")
+	if not bool(check["ok"]): return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(check["message"]))}
+	if str(check["value"]) != state.playerSectId:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能操作己方宗门")}
+	return {"ok": true, "value": str(check["value"])}
+
+
+## 校验 `peakId` 存在且属己方宗门；返回 {ok, value, response}。
+func _require_player_peak(request_id: String, params: Dictionary) -> Dictionary:
+	var check: Dictionary = _require_nonempty(params, "peakId")
+	if not bool(check["ok"]): return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(check["message"]))}
+	var peak: SpiritPeak = CityAction.find_peak(state, str(check["value"]))
+	if peak == null:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "灵峰不存在：" + str(check["value"]))}
+	if peak.sectId != state.playerSectId:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能操作己方灵峰")}
+	return {"ok": true, "value": peak.id}
+
+
+## 校验 `discipleId` 存在且属己方宗门；返回 {ok, value, response}。
+func _require_own_disciple(request_id: String, params: Dictionary) -> Dictionary:
+	var check: Dictionary = _require_nonempty(params, "discipleId")
+	if not bool(check["ok"]): return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(check["message"]))}
+	var disciple: Disciple = MoveAction.find_disciple(state, str(check["value"]))
+	if disciple == null:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "弟子不存在：" + str(check["value"]))}
+	if disciple.sectId != state.playerSectId:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能操作己方弟子")}
+	return {"ok": true, "value": disciple.id}

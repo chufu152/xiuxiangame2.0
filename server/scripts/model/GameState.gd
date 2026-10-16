@@ -17,3 +17,6 @@ var rng: RngService = null
 var riverPaths: Array[Array] = []
 var gameOver: bool = false
 var eventLog: Array[String] = []
+## R3 新增（内部记账，不入 view）：项目 / 改良 id 的单调序号，随每局新建归零，保证同种子逐字一致。
+var projectSeq: int = 0
+var improvementSeq: int = 0

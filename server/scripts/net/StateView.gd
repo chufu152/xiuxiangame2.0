@@ -35,6 +35,19 @@ static func build(state: GameState, config: Dictionary) -> Dictionary:
 				# 资源储量、产出、冷却是敌方/中立内部信息，不是固定地图地形。
 				for field: String in ["reserve", "output", "cooldown"]: snapshot.erase(field)
 			nodes[node_id] = snapshot
+	# 改良（R3）：与节点/灵峰同一套迷雾规则——己方/可见格实时，explored-but-not-visible 冻结为最后可见快照。
+	# 先清理已不存在于世界的旧快照（被掠夺/拆除后不留幽灵改良），再对可见格实时刷新。
+	for remembered_id: String in player.improvementSnapshots.keys():
+		if _improvement_by_id(state, remembered_id) == null: player.improvementSnapshots.erase(remembered_id)
+	for tile: HexTile in state.tiles.values():
+		if (player.visibleTiles.has(tile.id) or self_owned.has(tile.id)) and not tile.improvementId.is_empty():
+			var live: Improvement = _improvement_by_id(state, tile.improvementId)
+			if live != null: player.improvementSnapshots[live.id] = live.to_dict()
+	var improvements: Dictionary = {}
+	for tile_data: Dictionary in tiles.values():
+		if tile_data["improvementId"] != null and player.improvementSnapshots.has(tile_data["improvementId"]):
+			var imp_id: String = tile_data["improvementId"]
+			improvements[imp_id] = player.improvementSnapshots[imp_id].duplicate(true)
 	var sects: Array[Dictionary] = []
 	for sect: Sect in state.sects:
 		var public: Dictionary = sect.public_info()
@@ -60,4 +73,14 @@ static func build(state: GameState, config: Dictionary) -> Dictionary:
 		sects.append(public)
 	var heights: Dictionary = {}
 	for relief: String in Enums.Relief.ALL: heights[relief] = config["map"]["relief"][relief]["height"]
-	return {"metadata": {"turn": state.turn, "phase": state.phase, "mapWidth": state.width, "mapHeight": state.height, "playerSectId": state.playerSectId, "randomSeed": str(state.seed), "difficultyId": state.difficulty}, "turn": state.turn, "phase": state.phase, "mapWidth": state.width, "mapHeight": state.height, "playerSectId": state.playerSectId, "randomSeed": str(state.seed), "difficultyId": state.difficulty, "gameOver": state.gameOver, "winType": "", "winnerSectId": "", "pendingVictoryChoices": [], "tiles": tiles, "nodes": nodes, "improvements": {}, "sects": sects, "visibleTiles": player.visibleTiles.duplicate(), "exploredTiles": player.exploredTiles.duplicate(), "eventLog": state.eventLog.duplicate(), "renderHints": {"reliefHeight": heights}}
+	return {"metadata": {"turn": state.turn, "phase": state.phase, "mapWidth": state.width, "mapHeight": state.height, "playerSectId": state.playerSectId, "randomSeed": str(state.seed), "difficultyId": state.difficulty}, "turn": state.turn, "phase": state.phase, "mapWidth": state.width, "mapHeight": state.height, "playerSectId": state.playerSectId, "randomSeed": str(state.seed), "difficultyId": state.difficulty, "gameOver": state.gameOver, "winType": "", "winnerSectId": "", "pendingVictoryChoices": [], "tiles": tiles, "nodes": nodes, "improvements": improvements, "sects": sects, "visibleTiles": player.visibleTiles.duplicate(), "exploredTiles": player.exploredTiles.duplicate(), "eventLog": state.eventLog.duplicate(), "renderHints": {"reliefHeight": heights}}
+
+
+static func _improvement_by_id(state: GameState, improvement_id: String) -> Improvement:
+	if improvement_id.is_empty():
+		return null
+	for sect: Sect in state.sects:
+		for improvement: Improvement in sect.improvements:
+			if improvement.id == improvement_id:
+				return improvement
+	return null

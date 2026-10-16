@@ -26,11 +26,21 @@ static func initialize(state: GameState, params: Dictionary, config: Dictionary,
 		peak.qiYunMax = int(config["spiritPeak"]["baseQiYunMax"])
 		peak.stability = float(config["city"]["stabilityBase"])
 		peak.housing = int(config["city"]["housingBase"]) + peak.level * int(config["city"]["housingPerPeakLevel"])
+		peak.food = 0.0
+		peak.foodProgress = 0.0
+		peak.freeWorkers = peak.population
 		sect.spiritPeaks.append(peak)
 		var tile: HexTile = state.tiles[peak.tileId]
 		tile.ownerSectId = sect.id
-		tile.districtId = "capital_%d" % index
-		peak.districts.append({"id": tile.districtId, "type": Enums.District.ALL[0], "tileId": tile.id})
+		var capital_district: District = District.new()
+		capital_district.id = "capital_%d" % index
+		capital_district.name = Enums.DistrictType.NAMES[Enums.DistrictType.SHOU_FU_QU]
+		capital_district.type = Enums.DistrictType.SHOU_FU_QU
+		capital_district.typeName = Enums.DistrictType.NAMES[Enums.DistrictType.SHOU_FU_QU]
+		capital_district.level = 1
+		capital_district.tileId = tile.id
+		peak.districts.append(capital_district)
+		tile.districtId = capital_district.id
 		if not tile.nodeId.is_empty(): state.nodes[tile.nodeId].ownerSectId = sect.id
 		for unit_index: int in range(1 + int(setup["outerCount"])):
 			var disciple: Disciple = Disciple.new()

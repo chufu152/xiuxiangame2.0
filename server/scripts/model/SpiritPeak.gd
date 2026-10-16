@@ -1,5 +1,6 @@
 class_name SpiritPeak
 extends RefCounted
+## 灵峰（城市）：R3 起承载人口/粮食/住房/安定、区域、建筑、耕作地块与项目队列。
 
 var id: String = ""
 var name: String = ""
@@ -15,8 +16,20 @@ var qiYunMax: int = 0
 var stability: float = 0.0
 var housing: int = 0
 var fengZhuId: String = ""
+## 已建成建筑：建筑类型名 -> `{id, type, name, level, districtId}`。
 var buildings: Dictionary = {}
-var districts: Array[Dictionary] = []
+## 区域列表：`SHOU_FU_QU` 首府区开局自带，其余由 `foundDistrict` 建成。
+var districts: Array[District] = []
+## R3 新增：粮食存量、粮食累计进度（达阈值涨人口）、空闲人口、被指派耕作的地块 id。
+var food: float = 0.0
+var foodProgress: float = 0.0
+var freeWorkers: int = 0
+var workedTileIds: Array[String] = []
+## R3 新增：本峰的项目队列（建造/建区/洞府/加固等，逐回合推进）。
+var projectQueue: Array[Project] = []
 
 func to_dict() -> Dictionary:
-	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "capital": capital, "level": level, "population": population, "capacity": capacity, "defense": defense, "qiYun": qiYun, "qiYunMax": qiYunMax, "stability": stability, "housing": housing, "fengZhuId": fengZhuId, "buildings": buildings.duplicate(true), "districts": districts.duplicate(true)}
+	var district_data: Array = []
+	for district: District in districts:
+		district_data.append(district.to_dict())
+	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "capital": capital, "level": level, "population": population, "capacity": capacity, "defense": defense, "qiYun": qiYun, "qiYunMax": qiYunMax, "stability": stability, "housing": housing, "fengZhuId": fengZhuId, "buildings": buildings.duplicate(true), "districts": district_data, "food": food, "foodProgress": foodProgress, "freeWorkers": freeWorkers, "workedTileIds": workedTileIds.duplicate()}

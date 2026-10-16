@@ -106,11 +106,11 @@ static func validate(config: Dictionary) -> Array[String]:
 	_exact_keys(config, "map.features", Enums.Feature.ALL, errors)
 	_exact_keys(config, "map.nodeSpawnByTerrain", Enums.NodeType.SPAWN, errors)
 	_exact_keys(config, "warfare.unitClasses", Enums.UnitClass.ALL, errors)
-	_exact_keys(config, "improvement.byType", Enums.Improvement.ALL, errors)
+	_exact_keys(config, "improvement.byType", Enums.ImprovementType.ALL, errors)
 	for building: String in Enums.Building.ALL:
 		_number(config, "building.costs." + building, errors, true)
 		_number(config, "building.turns." + building, errors, true)
-	for improvement: String in Enums.Improvement.ALL:
+	for improvement: String in Enums.ImprovementType.ALL:
 		_require(config, "improvement.byType." + improvement + ".buildable", TYPE_BOOL, errors)
 		_number(config, "improvement.byType." + improvement + ".cost", errors)
 		_require(config, "improvement.byType." + improvement + ".yields", TYPE_DICTIONARY, errors)

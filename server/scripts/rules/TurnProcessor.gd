@@ -51,28 +51,37 @@ func next_turn(state: GameState) -> Array[String]:
 # 各阶段
 # ---------------------------------------------------------------------------
 
-## TURN_START（R2 实做）：重算视野；每名弟子重置出手、按公式恢复移动力、宗门停留回合 +1。
-## **不做**：道路刷新/传送清零/宗主外出（R3/R5/R7）、伤愈（R5）、修炼（R4）、自动化（R6）。
+## TURN_START（R2 实做 + R3 回填道路刷新）：重算视野 → 刷新道路网 → 每名弟子重置出手、
+## 按公式恢复移动力（含本宗道路起点加成）、宗门停留回合 +1。
+## **不做**：传送清零（R5）、宗主外出（R7）、伤愈（R5）、修炼（R4）、自动化（R6）。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
+	# R3 回填：道路网等级刷新（R2 留的 TODO）。
+	RoadNetworkService.refresh(state, _config)
 	# R2 无淘汰机制（R7），全部宗门都刷新。
 	for sect: Sect in state.sects:
 		for disciple: Disciple in sect.disciples:
 			disciple.attacksRemaining = int(_config["warfare"]["attacksPerTurn"])
-			var points: int = MoveRules.calculate_max_move_points(disciple, _config)
+			var points: int = MoveRules.calculate_max_move_points(disciple, _config, state, sect)
 			disciple.maxMovePoints = points
 			disciple.movePoints = points
 			disciple.turnsInSect += 1
 
 
-func _run_spirit_peak(_state: GameState) -> void:
-	# TODO(R3/R4): 项目队列 / 研究队列 / 围城断供
-	pass
+## SPIRIT_PEAK（R3 实做）：项目队列推进（`turnsRemaining -= 1`，归零则落成）。
+## **留空**：围城断供（R5）、研究队列推进（R4）。
+func _run_spirit_peak(state: GameState) -> void:
+	for sect: Sect in state.sects:
+		for peak: SpiritPeak in sect.spiritPeaks:
+			CityAction.advance_projects(state, _config, sect, peak)
+	# TODO(R5): 围城断供削减；TODO(R4): 研究队列推进（工力不足则暂停）。
 
 
-func _run_settlement(_state: GameState) -> void:
-	# TODO(R3/R4/R6): 经济 / 道统 / 心魔 / 政令 / 节点冷却
-	pass
+## SETTLEMENT（R3 实做）：节点冷却 → 人口结算 → 经济结算（唯一入口 `EconomyRules.apply_settlement`）。
+## **留空**：道统成就 boost（R4）、心魔（R4）、政令（R6）。
+func _run_settlement(state: GameState) -> void:
+	EconomyRules.apply_settlement(state, _config)
+	# TODO(R4): 道统成就 boost；TODO(R4): 心魔结算；TODO(R6): 政令结算。
 
 
 func _run_ai_action(_state: GameState) -> void:

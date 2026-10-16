@@ -8,8 +8,9 @@ extends RefCounted
 ## `queryMoveRange`（高亮）与 `moveDisciple`（权威移动）**共用本文件**，
 ## 从结构上杜绝「高亮的格子实际走不进去」这类不一致。
 ##
-## **R2 不做**：外交过境关（外交已裁剪）、敌方 ZOC（R5）、青石道路（R3）、单位占格阻挡、战斗触发。
-## 可达性只由地形决定；己方多个弟子开局同格，移动后仍可与队友同格。
+## **R2 不做**：外交过境关（外交已裁剪）、敌方 ZOC（R5）、单位占格阻挡、战斗触发。
+## **R3 已回填**：本宗青石道路逐格减耗（经 `MoveRules.step_cost` → `RoadNetworkService`）。
+## 可达性只由地形与道路决定；己方多个弟子开局同格，移动后仍可与队友同格。
 
 
 ## 返回 `{origin: String, costs: Dictionary, order: Array}`：
@@ -22,6 +23,7 @@ static func reachable(state: GameState, config: Dictionary, disciple: Disciple) 
 	var origin: String = disciple.tileId
 	if not state.tiles.has(origin):
 		return {"origin": origin, "costs": costs, "order": order}
+	var mover: Sect = _sect_of(state, disciple.sectId)
 	costs[origin] = 0
 	order.append(origin)
 	var queue: Array[String] = [origin]
@@ -39,7 +41,7 @@ static func reachable(state: GameState, config: Dictionary, disciple: Disciple) 
 			# 山岳等不可通行先排除，不进入代价累加（step_cost 的 IMPASSABLE 契约）。
 			if not MoveRules.is_passable(neighbor, config):
 				continue
-			var step: int = MoveRules.step_cost(config, tile, neighbor)
+			var step: int = MoveRules.step_cost(config, tile, neighbor, mover, state)
 			if step < 0:
 				continue
 			var total: int = current_cost + step
@@ -52,3 +54,10 @@ static func reachable(state: GameState, config: Dictionary, disciple: Disciple) 
 				costs[neighbor_id] = total
 				queue.append(neighbor_id)
 	return {"origin": origin, "costs": costs, "order": order}
+
+
+static func _sect_of(state: GameState, sect_id: String) -> Sect:
+	for sect: Sect in state.sects:
+		if sect.id == sect_id:
+			return sect
+	return null

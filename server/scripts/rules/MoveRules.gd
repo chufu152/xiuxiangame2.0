@@ -4,8 +4,9 @@ extends RefCounted
 ##
 ## 数值唯一权威是 `data/gameConfig.json`；全部静态、无状态、只读 config。
 ## 进入成本口径（PRD §4.1.8，裁决二）：
-##   relief.moveCost + Σ 地貌 moveExtra + 险地附加(dangerTileMoveCost) + 跨河 moveExtra
-## **R2 不做**：敌方 ZOC（R5）、青石道路减耗（R3）、道法 MOVE_BONUS（R4）。
+##   relief.moveCost + Σ 地貌 moveExtra + 险地附加(dangerTileMoveCost) + 跨河 moveExtra − 本宗道路减耗(≥1)
+## **R2 不做**：敌方 ZOC（R5）、道法 MOVE_BONUS（R4）。
+## **R3 已回填**：青石道路逐格减耗与起点机动加成，均委托 `RoadNetworkService`。
 
 ## 不可通行（MOUNTAIN）的排除标记：调用方（BFS）先过 is_passable 跳过，不进入代价累加。
 const IMPASSABLE: int = -1
@@ -14,13 +15,17 @@ const IMPASSABLE: int = -1
 ## 移动力上限（开局与每回合开始共用同一函数，避免两处公式漂移）。
 ## 裁决一：灵根加成对**所有**灵根按 rootMoveBonus 计（金木水火土风雷各 +1、杂灵根 -1），
 ## 不照搬 1.0 `MoveAction.calculateMaxMovePoints()` 里 `if (root == FENG || root == ZA)` 的 bug。
-static func calculate_max_move_points(disciple: Disciple, config: Dictionary) -> int:
+## R3 回填：传入 `state`/`sect` 时追加「回合开始身处本宗青石道路」的机动加成（数值取自 `RoadNetworkService`）；
+## 不传则等价 R2 口径（R2 测试与开局播种沿用）。
+static func calculate_max_move_points(disciple: Disciple, config: Dictionary, state: GameState = null, sect: Sect = null) -> int:
 	var setup: Dictionary = config["map"]["setup"]
 	var total: int = int(config["disciple"]["baseMovePoints"])
 	total += int(setup["realmMoveBonus"][disciple.realm])
 	for root: String in disciple.spiritRoots:
 		total += int(setup["rootMoveBonus"][root])
 	total += int(config["warfare"]["unitClasses"][disciple.unitClass]["moveBonus"])
+	if state != null and sect != null and state.tiles.has(disciple.tileId):
+		total += RoadNetworkService.start_tile_bonus(state, config, sect, state.tiles[disciple.tileId])
 	return total
 
 
@@ -44,7 +49,9 @@ static func crosses_river(from_tile: HexTile, to_tile: HexTile) -> bool:
 
 
 ## 进入 `to_tile` 的移动代价；不可通行返回 IMPASSABLE(-1)。
-static func step_cost(config: Dictionary, from_tile: HexTile, to_tile: HexTile) -> int:
+## R3 回填：传入 `mover_sect`/`state` 时，本宗完好青石道路减 `road.stepCostReduction`（最低 `road.minStepCost`）；
+## 数值只取自 `RoadNetworkService`，本函数不硬编码道路数值。不传则等价 R2 口径。
+static func step_cost(config: Dictionary, from_tile: HexTile, to_tile: HexTile, mover_sect: Sect = null, state: GameState = null) -> int:
 	if not is_passable(to_tile, config):
 		return IMPASSABLE
 	var map_config: Dictionary = config["map"]
@@ -55,4 +62,9 @@ static func step_cost(config: Dictionary, from_tile: HexTile, to_tile: HexTile) 
 		cost += int(map_config["dangerTileMoveCost"])
 	if crosses_river(from_tile, to_tile):
 		cost += int(map_config["river"]["moveExtra"])
+	if mover_sect != null and state != null:
+		var reduction: int = RoadNetworkService.step_cost_reduction(state, config, mover_sect, to_tile)
+		if reduction > 0:
+			cost -= reduction
+			cost = maxi(cost, RoadNetworkService.min_step_cost(config))
 	return maxi(1, cost)

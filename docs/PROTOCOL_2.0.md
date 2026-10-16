@@ -139,8 +139,8 @@
 | `reclass` | 单位 | R5 | 是 | 否 | 待实现（R5） |
 | `promote` | 单位 | R5 | 是 | 否 | 待实现（R5） |
 | `queryDiscipleDetail` | 单位 | R5 | 否 | 是 | 待实现（R5） |
-| `foundSpiritPeak` | 单位 | R3 | 是 | 否 | 待实现（R3） |
-| `appointBuilder` | 单位 | R3 | 是 | 否 | 待实现（R3） |
+| `foundSpiritPeak` | 单位 | R3 | 是 | 否 | 已实现（R3） |
+| `appointBuilder` | 单位 | R3 | 是 | 否 | 已实现（R3） |
 | `rally` | 单位 | R6 | 是 | 否 | 待实现（R6） |
 | `returnToDefense` | 单位 | R6 | 是 | 否 | 待实现（R6） |
 | `tribulate` | 单位 | R7 | 是 | 否 | 待实现（R7） |
@@ -152,19 +152,19 @@
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `constructBuilding` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `queryBuildOptions` | 城市 | R3 | 否 | 是 | 待实现（R3） |
-| `openCave` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `fortifyPeak` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `foundDistrict` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `queryDistrictSites` | 城市 | R3 | 否 | 是 | 待实现（R3） |
-| `assignWorker` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `unassignWorker` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `queryAssignableTiles` | 城市 | R3 | 否 | 是 | 待实现（R3） |
-| `queryCityDetail` | 城市 | R3 | 否 | 是 | 待实现（R3） |
-| `buildImprovement` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `repairImprovement` | 城市 | R3 | 是 | 否 | 待实现（R3） |
-| `queryImprovementOptions` | 城市 | R3 | 否 | 是 | 待实现（R3） |
+| `constructBuilding` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `queryBuildOptions` | 城市 | R3 | 否 | 是 | 已实现（R3） |
+| `openCave` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `fortifyPeak` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `foundDistrict` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `queryDistrictSites` | 城市 | R3 | 否 | 是 | 已实现（R3） |
+| `assignWorker` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `unassignWorker` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `queryAssignableTiles` | 城市 | R3 | 否 | 是 | 已实现（R3） |
+| `queryCityDetail` | 城市 | R3 | 否 | 是 | 已实现（R3） |
+| `buildImprovement` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `repairImprovement` | 城市 | R3 | 是 | 否 | 已实现（R3） |
+| `queryImprovementOptions` | 城市 | R3 | 否 | 是 | 已实现（R3） |
 | `researchDao` | 城市 | R4 | 是 | 否 | 待实现（R4） |
 | `holdRecruitment` | 城市 | R4 | 是 | 否 | 待实现（R4） |
 | `queryProjectQueue` | 城市 | R4 | 否 | 是 | 待实现（R4） |
@@ -679,7 +679,7 @@
 - **events**：建城事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.2；`COMMAND_MAP.md` §2；2.0 PRD §4.1.9（山岳不可建城、缺水提示）、§7（R3 服务端含「灵峰」）。
 
 ### `appointBuilder`
@@ -697,7 +697,7 @@
 - **events**：任命事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2；2.0 PRD §7（R3 服务端含「改良」）。
 
 ### `rally`
@@ -825,7 +825,7 @@
 - **events**：建造入队事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3。
 
 ### `queryBuildOptions`
@@ -842,7 +842,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3。
 
 ### `openCave`
@@ -860,7 +860,7 @@
 - **events**：洞府开辟事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3。
 
 ### `fortifyPeak`
@@ -877,7 +877,7 @@
 - **events**：加固事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3。
 
 ### `foundDistrict`
@@ -897,7 +897,7 @@
 - **events**：区域落成事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3；2.0 PRD §4.1.9（区域地形邻接）。
 
 ### `queryDistrictSites`
@@ -916,7 +916,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5。
 
 ### `assignWorker`
@@ -934,7 +934,7 @@
 - **events**：指派事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3。
 
 ### `unassignWorker`
@@ -952,7 +952,7 @@
 - **events**：撤下事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3。
 
 ### `queryAssignableTiles`
@@ -969,7 +969,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.5。
 
 ### `queryCityDetail`
@@ -988,7 +988,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3、§11.5；`COMMAND_MAP.md` §3。
 
 ### `buildImprovement`
@@ -1001,14 +1001,14 @@
 | `sectId` | string | 是 | — | 宗门 id | 1.0 `PROTOCOL.md` §11.3 |
 | `discipleId` | string | 是 | — | 弟子 id | 同上 |
 | `tileId` | string | 是 | — | 地块 id | 同上 |
-| `improvementType` | string | 是 | — | 改良枚举名（`Enums.Improvement.ALL`）；非法值 → `BAD_PARAMS` | 同上 |
+| `improvementType` | string | 是 | — | 改良枚举名（`Enums.ImprovementType.ALL`）；非法值 → `BAD_PARAMS` | 同上 |
 
 - **result**：`BuildResult`。
 - **view**：是。
 - **events**：改良入队事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3；2.0 PRD §4.1.9（改良地形限制）。
 
 ### `repairImprovement`
@@ -1027,7 +1027,7 @@
 - **events**：修缮事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3。
 
 ### `queryImprovementOptions`
@@ -1045,7 +1045,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R3。
-- **状态**：待实现（R3）。
+- **状态**：已实现（R3）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3。
 
 ### `researchDao`
@@ -1503,6 +1503,11 @@
 | 11 | 里程碑归属：`researchDao`/`holdRecruitment`/`queryProjectQueue`/`cancelProject`/`accelerateProject` | — | 本文归 R4（PRD §7 R4 明列），而非 R3 的「城市 18 条」分组标签 | PRD §7 R4 明列优先于分组标签 |
 | 12 | 险地附加移动代价 `map.dangerTileMoveCost` | 1.0 `HexUtils.getMoveCost()` 记「基础 1 + 险地 2」= 进入险地共 2 点 | 2.0 按 PRD §4.1.8 **叠加公式**，该键语义改为「进入险地格的**附加**代价」，取 **1**；`data/gameConfig.json` 由 `2` 改为 `1`（R2 裁决二，R1 无任何规则代码读取该键，改值安全） | PRD §4.1.8；R2 提示词裁决二 |
 | 13 | 灵田梯田改良的道法门控键 `improvement.byType.LING_TIAN_TI_TIAN.requiredDaoKey` | 1.0 改良与道法用同名键 | 2.0 `requiredDaoKey` 约定取**道法 id**（对照 `JU_LING_ZHEN.requiredDaoKey = "ju_ling_zhen"`）；原值 `lingtian_ti` 是道法 `ling_tian_nong` 的 `UNLOCK_IMPROVEMENT` **效果简写 key**，非任何道法 id（悬空，会使灵田梯田永久不可建）。已修正为 `ling_tian_nong`（R3 预生成提示词复核时发现，R3 裁决一登记） | `data/gameConfig.json` `improvement.byType`；R3 提示词裁决一 |
+| 14 | 改良枚举类名 `Enums.Improvement.ALL` | 1.0 `ImprovementType` 为独立枚举类 | 2.0 模型新增全局 `class_name Improvement`（`server/scripts/model/Improvement.gd`）与 R1 内层枚举类同名，触发 Godot「Class hides a global script class」，故 R1 内层枚举类**改名** `Enums.ImprovementType`；§4 `buildImprovement.improvementType` 的枚举引用同步为 `Enums.ImprovementType.ALL`（R3 任务 1 登记） | GDScript `class_name` 全局唯一；2.0 代码 `shared/protocol/enums.gd` |
+| 15 | 区域枚举类名 `Enums.District` | 1.0 `DistrictType` 为独立枚举类 | 同 #14：R1 内层枚举类 `Enums.District` **改名** `Enums.DistrictType`（`ALL`/`NAMES`/`BUILDABLE` 取值不变），以让位 2.0 全局 `class_name District`（`server/scripts/model/District.gd`） | 同上 |
+| 16 | `improvement` 对象字段 `networkLevel` | 1.0 `Improvement` 无该字段 | 2.0 **只加** `networkLevel`（青石道路网络等级缓存：`0`=无 / `1`=连 / `2`=枢纽），由 `RoadNetworkService.refresh()` 维护；随 `view.improvements{}` 与 `queryCityDetail` 相关查询下发 | 2.0 代码 `RoadNetworkService.gd`、`Improvement.to_dict` |
+| 17 | `queryCityDetail.districts[].buildings` 元素类型 | 1.0 `District.buildings` 为 `List<BuildingType>` | 2.0 为**建筑类型字符串数组**（如 `["SHAN_MEN","CANG_JING_GE"]`），非对象数组 | 2.0 代码 `CityAction.query_city_detail` |
+| 18 | 道法门控改良在 R3 不可建 | 1.0 改良门控与道法同里程碑生效 | 2.0 道法系统属 **R4**（本里程碑非目标），故 `ImprovementRules._has_unlocked_dao()` 在 R3 **恒返回 false**（`# TODO(R4)`）：`LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）在 R3 `queryImprovementOptions.buildable=false`、`rejection` 提示「需道法」；R4 回填 | R3 提示词「非目标」（道法属 R4）；2.0 代码 `ImprovementRules` |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
@@ -1514,6 +1519,9 @@
 | 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | `TODO(需核对)` |
 | 5 | 地形 blocker 的归属 | PRD §6.7 末注：山岳不可建城/不可通行、雾泽、缺水由 `querySpiritPeakBlocker` / `queryBuildOptions` / `queryMoveRange` 返回 | `TODO(需核对)`：`querySpiritPeakBlocker` **不在 69 条命令清单内**（PRD §6.7 未登记），需确认它是否为新增命令或应并入 `queryBuildOptions`；本文**不新增命令**，故仅在 `foundSpiritPeak`/`queryMoveRange` 的说明中引用该语义 |
 | 6 | `awaitInput.options` 的 `routeId`/`description` 之外是否另有字段 | PRD §6.3 给出 `routeId`/`description` | 已按 PRD §6.3 落地，无 TODO |
+| 7 | `city` 配置缺「地貌/河流」产出表 | PRD §4.1.9 提及「丘陵石 +1」「河流 `foodBonus`」，但 `data/gameConfig.json` 的 `city.workYieldByTerrain`/`workYieldByNode` **无 `relief`/`river` 维度对应键**（R3 实做时逐键核对确认） | `TODO(需核对)`：核对 1.0 `EconomyCalculator` 该加成是配置驱动还是硬编码；R3 **未实现**该加成（仅按配置已有键计算产出），待权威源明确后回填 |
+| 8 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | `TODO(需核对)`：掠夺触发点在移动路径（R2 `MoveAction`）与攻击路径（R5 `attack`），**R3 未接线**；待对应里程碑落地时调用，避免提前改动已验证的移动规则 |
+| 9 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
 
 ---
 
@@ -1538,7 +1546,7 @@
 | `pendingVictoryChoices` | array | 待择胜利路线（R1 恒为 `[]`） | 同上 |
 | `tiles` | **object**（键 = tileId） | 地块；未探索格除 `id`/`q`/`r` 外全为 `null`（防泄露） | `StateView.build` + `HexTile.to_dict` |
 | `nodes` | **object**（键 = nodeId） | 节点；敌方/中立节点剔除 `reserve`/`output`/`cooldown` | `GameNode.to_dict` |
-| `improvements` | **object** | 改良（R1 恒为 `{}`，R3 落地） | `StateView.build` |
+| `improvements` | **object**（键 = improvementId） | 改良（R3 起填充）：己方/可见格实时，explored-but-not-visible 格冻结为最后可见快照，未探索格不下发（见 §12.6） | `StateView.build` + `Improvement.to_dict` |
 | `sects` | **array** | 宗门；含嵌套 `disciples[]` / `spiritPeaks[]` | `Sect` + `StateView.build` |
 | `visibleTiles` | string[] | 当前可见地块 id（迷雾三态权威来源） | `Sect.visibleTiles` |
 | `exploredTiles` | string[] | 曾探索地块 id | `Sect.exploredTiles` |
@@ -1575,15 +1583,21 @@
 | `spiritPeaks[]` | 己方灵峰实时；敌方灵峰按「可见实时 / 记忆冻结快照」下发，冻结态剔除 `fengZhuId` |
 | `resources{}` | **仅己方宗门**下发（`Enums.ResourceKind.ALL`） |
 
-`disciples[j]`（`Disciple.to_dict`）：`id, name, sectId, tileId, realm, position, rootGrade, spiritRoots[], unitClass, movePoints, attacksRemaining, assignedPeakId, bloodLine, generation, directLine, heartDevil, injured, cultivationProgress`
+`disciples[j]`（`Disciple.to_dict`）：`id, name, sectId, tileId, realm, position, rootGrade, spiritRoots[], unitClass, movePoints, maxMovePoints, attacksRemaining, turnsInSect, assignedPeakId, bloodLine, generation, directLine, heartDevil, injured, cultivationProgress, builderCharges`（R3 起追加 `builderCharges` 建造差事次数）
 
-`spiritPeaks[k]`（`SpiritPeak.to_dict`）：`id, name, sectId, tileId, capital, level, population, capacity, defense, qiYun, qiYunMax, stability, housing, fengZhuId, buildings{}, districts[]`
+`spiritPeaks[k]`（`SpiritPeak.to_dict`）：`id, name, sectId, tileId, capital, level, population, capacity, defense, qiYun, qiYunMax, stability, housing, fengZhuId, buildings{}, districts[], food, foodProgress, freeWorkers, workedTileIds[]`（R3 起 `districts[]` 为 `District.to_dict()` 对象数组，并追加 `food/foodProgress/freeWorkers/workedTileIds`）
+
+`districts[j]`（`District.to_dict`）：`id, name, type, typeName, level, populationAssigned, buildings[], tileId`（`type` ∈ `Enums.DistrictType.ALL`，`buildings[]` 为建筑**类型字符串**数组）
+
+`improvements[id]`（`Improvement.to_dict`，顶层 `view.improvements{}`）：`id, type, tileId, sectId, broken, charges, networkLevel`（`type` ∈ `Enums.ImprovementType.ALL`）
 
 ### 12.5 不下发的内部字段
 
 | 字段 | 归属 | 不下发理由 |
 |---|---|---|
-| `tileSnapshots` / `nodeSnapshots` / `peakSnapshots` | `Sect` | 迷雾「记忆态」内部缓存；客户端只需 `visibleTiles`/`exploredTiles` |
+| `tileSnapshots` / `nodeSnapshots` / `peakSnapshots` / `improvementSnapshots` | `Sect` | 迷雾「记忆态」内部缓存；客户端只需 `visibleTiles`/`exploredTiles` |
+| `projectQueue` | `SpiritPeak` | 项目队列（建造/建区/洞府/加固）；R4 `queryProjectQueue` 才下发，R3 仅内部推进 |
+| `builderCharges` 之外的 `Improvement.charges` | `Improvement` | 预留字段（R3 恒 `0`）；`Improvement.to_dict` 仍照发，客户端忽略 |
 | `policyCarry` / `lastPolicySwitchTurn` / `lastEventTurn` | `Sect` | 结算中间态与冷却记账（R6 落地） |
 | `lastReproduceTurn` | `Disciple` | 繁衍冷却记账（R4 落地） |
 

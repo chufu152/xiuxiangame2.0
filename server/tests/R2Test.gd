@@ -53,7 +53,7 @@ func _test_registration() -> void:
 	var implemented: Array = dispatcher.implemented_commands()
 	for command: String in ["ping", "newGame", "getState", "finishTurn", "beginPlayerTurn", "nextTurn", "moveDisciple", "queryMoveRange"]:
 		_check(implemented.has(command), "已登记命令：" + command)
-	_check(implemented.size() == 8, "R2 结束共登记 8 条命令（ping + 7）")
+	_check(implemented.size() >= 8, "已登记命令不少于 R2 的 8 条（ping + 7）")
 	for command: String in ["finishTurn", "beginPlayerTurn", "nextTurn", "moveDisciple", "queryMoveRange"]:
 		var response: Dictionary = _request(dispatcher, command, {})
 		_check(response.get("errorCode") == "NO_GAME", "%s 开局前 NO_GAME" % command)

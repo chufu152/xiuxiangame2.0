@@ -59,12 +59,38 @@ class UnitClass:
 	const KINDS: Array[String] = ["MELEE", "RANGED", "ANTI_CAVALRY", "CAVALRY", "SUPPORT", "SIEGE"]
 
 class Building:
-	const ALL: Array[String] = ["SHAN_MEN", "ZONG_ZHU_DA_DIAN", "CANG_JING_GE", "XIU_LIAN_FEN_FENG", "DAN_TANG_FEN_FENG", "QI_TANG_FEN_FENG", "JIANG_DAO_FEN_FENG", "HU_SHAN_JIAN_ZHEN", "ZU_CI", "WANG_CHAO_DI_DU"]
+	const SHAN_MEN: String = "SHAN_MEN"
+	const ZONG_ZHU_DA_DIAN: String = "ZONG_ZHU_DA_DIAN"
+	const CANG_JING_GE: String = "CANG_JING_GE"
+	const XIU_LIAN_FEN_FENG: String = "XIU_LIAN_FEN_FENG"
+	const DAN_TANG_FEN_FENG: String = "DAN_TANG_FEN_FENG"
+	const QI_TANG_FEN_FENG: String = "QI_TANG_FEN_FENG"
+	const JIANG_DAO_FEN_FENG: String = "JIANG_DAO_FEN_FENG"
+	const HU_SHAN_JIAN_ZHEN: String = "HU_SHAN_JIAN_ZHEN"
+	const ZU_CI: String = "ZU_CI"
+	const WANG_CHAO_DI_DU: String = "WANG_CHAO_DI_DU"
+	const ALL: Array[String] = [SHAN_MEN, ZONG_ZHU_DA_DIAN, CANG_JING_GE, XIU_LIAN_FEN_FENG, DAN_TANG_FEN_FENG, QI_TANG_FEN_FENG, JIANG_DAO_FEN_FENG, HU_SHAN_JIAN_ZHEN, ZU_CI, WANG_CHAO_DI_DU]
+	## 展示名（出处：REQUIREMENTS_2.0 §4.7 建筑表 / 1.0 `BuildingType`）。
+	const NAMES: Dictionary = {"SHAN_MEN": "山门", "ZONG_ZHU_DA_DIAN": "宗主大殿", "CANG_JING_GE": "藏经阁", "XIU_LIAN_FEN_FENG": "修炼分峰", "DAN_TANG_FEN_FENG": "丹堂分峰", "QI_TANG_FEN_FENG": "器堂分峰", "JIANG_DAO_FEN_FENG": "讲道台分峰", "HU_SHAN_JIAN_ZHEN": "护山剑阵", "ZU_CI": "祖祠", "WANG_CHAO_DI_DU": "王朝帝都"}
+	## 核心建筑（归首府区/藏经区）；非核心者为分峰（归对应区域）。
+	const CORE: Array[String] = [SHAN_MEN, ZONG_ZHU_DA_DIAN, CANG_JING_GE, HU_SHAN_JIAN_ZHEN, ZU_CI, WANG_CHAO_DI_DU]
 
-class District:
-	const ALL: Array[String] = ["SHOU_FU_QU", "XIU_LIAN_QU", "DAN_QI_QU", "CANG_JING_QU", "FA_TAN_QU", "SHI_JI_QU"]
+## 区域类型枚举（内层类名加 `Type` 后缀，避免与全局模型类 `District` 同名冲突）。
+class DistrictType:
+	const SHOU_FU_QU: String = "SHOU_FU_QU"
+	const XIU_LIAN_QU: String = "XIU_LIAN_QU"
+	const DAN_QI_QU: String = "DAN_QI_QU"
+	const CANG_JING_QU: String = "CANG_JING_QU"
+	const FA_TAN_QU: String = "FA_TAN_QU"
+	const SHI_JI_QU: String = "SHI_JI_QU"
+	const ALL: Array[String] = [SHOU_FU_QU, XIU_LIAN_QU, DAN_QI_QU, CANG_JING_QU, FA_TAN_QU, SHI_JI_QU]
+	## 展示名（出处：REQUIREMENTS_2.0 §4.7 区域表 / 1.0 `DistrictType`）。
+	const NAMES: Dictionary = {"SHOU_FU_QU": "首府区", "XIU_LIAN_QU": "修炼区", "DAN_QI_QU": "丹器区", "CANG_JING_QU": "藏经区", "FA_TAN_QU": "法坛区", "SHI_JI_QU": "坊市区"}
+	## 玩家可建区域（首府区为灵峰自带，不可自由选址）。
+	const BUILDABLE: Array[String] = [XIU_LIAN_QU, DAN_QI_QU, CANG_JING_QU, FA_TAN_QU, SHI_JI_QU]
 
-class Improvement:
+## 改良类型枚举（内层类名加 `Type` 后缀，避免与全局模型类 `Improvement` 同名冲突）。
+class ImprovementType:
 	const ALL: Array[String] = ["LING_TIAN_TI_TIAN", "LING_KUANG", "CAI_SHI_CHANG", "YAO_YUAN", "JU_LING_ZHEN", "QING_SHI_DAO_LU", "DONG_FU", "LING_QUAN_XIU_SHAN"]
 
 class ResourceKind:

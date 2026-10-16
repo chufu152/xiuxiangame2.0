@@ -12,6 +12,9 @@ extends Node3D
 
 const SIDEBAR_WIDTH: float = 320.0
 const TOPBAR_HEIGHT: float = 46.0
+## R3 城市面板（左下角，覆盖在地图之上，不改相机）。
+const CITY_PANEL_WIDTH: float = 400.0
+const CITY_PANEL_MAX_HEIGHT: float = 360.0
 
 var map: HexMap = null
 var fog: Fog = null
@@ -26,6 +29,29 @@ var topbar_turn_label: Label = null
 var topbar_phase_label: Label = null
 var topbar_resource_label: Label = null
 var end_turn_button: Button = null
+
+## R3 城市面板。
+var city_panel: CanvasLayer = null
+var city_title_label: Label = null
+var city_info_label: Label = null
+var city_status_label: Label = null
+var city_list: VBoxContainer = null
+## 当前选中的己方灵峰 id（空串 = 未选中）。
+var selected_peak_id: String = ""
+## 最近一次 `queryCityDetail` 回包（只读，客户端不推导）。
+var city_detail: Dictionary = {}
+## 最近一次 `queryBuildOptions` 回包。
+var build_options: Dictionary = {}
+## 最近一次 `queryImprovementOptions` 回包。
+var improvement_options: Dictionary = {}
+## 城市选址/指派模式：""（无）/ "district"（区域选址）/ "worker"（劳力指派）。
+var city_mode: String = ""
+## 当前城市模式下的候选地块（服务端权威，客户端不本地推导）。
+var city_candidate_ids: Array[String] = []
+## 区域选址模式下待落成的区域类型。
+var city_pending_district_type: String = ""
+## 改良查询所针对的地块（来自最近一次点选的普通地块）。
+var city_improvement_tile: String = ""
 
 ## 当前选中格的文字描述（供 UI 与自动验收断言）。
 var selection_text: String = ""
@@ -55,16 +81,24 @@ func _ready() -> void:
 	_build_lighting()
 	_build_sidebar()
 	_build_topbar()
+	_build_city_panel()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
 	Session.move_result_received.connect(_on_move_result_received)
+	Session.city_detail_received.connect(_on_city_detail_received)
+	Session.build_options_received.connect(_on_build_options_received)
+	Session.district_sites_received.connect(_on_district_sites_received)
+	Session.assignable_tiles_received.connect(_on_assignable_tiles_received)
+	Session.improvement_options_received.connect(_on_improvement_options_received)
+	Session.r3_result_received.connect(_on_r3_result_received)
 	if not Session.current_view.is_empty():
 		_render(Session.current_view)
 	else:
 		_set_selection("")
 		_refresh_status()
 		_refresh_topbar()
+		_render_city_panel()
 
 
 func _process(_delta: float) -> void:
@@ -96,6 +130,7 @@ func _render(view: Dictionary) -> void:
 		_set_selection(_describe_disciple(selected_disciple_id, {}))
 	_refresh_status()
 	_refresh_topbar()
+	_render_city_panel()
 
 
 func _view_bounds(view: Dictionary) -> Dictionary:
@@ -177,21 +212,35 @@ static func _list_of(data: Dictionary, key: String) -> String:
 # R2：点选 → 高亮 → 移动
 # ---------------------------------------------------------------------------
 
-## 左键点击优先级：① 移动模式下点可达格 → moveDisciple；② 点己方弟子所在格 → 选中并 queryMoveRange；
-## ③ 否则回到 R1 的地块选择并清除高亮。
+## 左键点击优先级：① 移动模式下点可达格 → moveDisciple；② 城市选址/指派模式下点候选格 → foundDistrict/assignWorker；
+## ③ 点己方弟子所在格 → 选中并 queryMoveRange；④ 点己方灵峰所在格 → 打开城市面板；⑤ 否则回到 R1 的地块选择。
 func on_tile_clicked(tile_id: String) -> void:
 	if move_mode and reachable_ids.has(tile_id):
 		Session.request_move_disciple(selected_disciple_id, tile_id)
+		return
+	if city_mode == "district" and city_candidate_ids.has(tile_id):
+		Session.request_found_district(player_sect_id(), selected_peak_id, city_pending_district_type, tile_id)
+		return
+	if city_mode == "worker" and city_candidate_ids.has(tile_id):
+		Session.request_assign_worker(selected_peak_id, tile_id)
 		return
 	var disciple: Dictionary = _player_disciple_at(tile_id)
 	if not disciple.is_empty():
 		select_disciple(str(disciple.get("id", "")))
 		return
+	var peak_id: String = _player_peak_at(tile_id)
+	if not peak_id.is_empty():
+		select_peak(peak_id)
+		return
+	_exit_city_mode()
 	_clear_move_state()
 	select_tile(tile_id)
+	city_improvement_tile = tile_id
 
 
 func select_disciple(disciple_id: String) -> void:
+	selected_peak_id = ""
+	_exit_city_mode()
 	selected_disciple_id = disciple_id
 	move_mode = false
 	reachable_ids.clear()
@@ -365,13 +414,391 @@ func _resource_text(view: Dictionary) -> String:
 		if not bool(sect.get("player", false)):
 			continue
 		var resources: Dictionary = sect.get("resources", {})
-		return "灵力 %d · 灵石 %d · 工力 %d · 声望 %d" % [
+		var materials: Dictionary = resources.get("materials", {})
+		return "灵力 %d · 灵石 %d · 工力 %d · 声望 %d · 粮 %d · 气运 %d · 道点 %d · 天晶 %d · 玄铁 %d · 灵木 %d" % [
 			int(resources.get("spiritPower", 0)),
 			int(resources.get("spiritStones", 0)),
 			int(resources.get("workPower", 0)),
 			int(resources.get("prestige", 0)),
+			int(resources.get("food", 0)),
+			int(resources.get("qiYun", 0)),
+			int(resources.get("daoPoints", 0)),
+			int(materials.get("tian_jing", 0)),
+			int(materials.get("xuan_tie", 0)),
+			int(materials.get("ling_mu", 0)),
 		]
 	return ""
+
+
+# ---------------------------------------------------------------------------
+# R3 城市面板（灵峰 / 建造 / 区域选址 / 劳力指派 / 改良）
+# ---------------------------------------------------------------------------
+
+func _build_city_panel() -> void:
+	city_panel = CanvasLayer.new()
+	city_panel.name = "CityPanel"
+	city_panel.layer = 3
+	add_child(city_panel)
+
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 0.0
+	panel.offset_right = CITY_PANEL_WIDTH
+	panel.offset_top = -CITY_PANEL_MAX_HEIGHT
+	panel.offset_bottom = 0.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.94)
+	style.border_color = Color("b6ad8b")
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	city_panel.add_child(panel)
+
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+
+	var header: HBoxContainer = HBoxContainer.new()
+	column.add_child(header)
+	city_title_label = Label.new()
+	city_title_label.text = "城市面板（点选己方灵峰）"
+	city_title_label.add_theme_font_size_override("font_size", 17)
+	city_title_label.add_theme_color_override("font_color", Color("294e48"))
+	city_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(city_title_label)
+	var close: Button = Button.new()
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: _clear_city_state())
+	header.add_child(close)
+
+	city_info_label = Label.new()
+	city_info_label.add_theme_font_size_override("font_size", 13)
+	city_info_label.add_theme_color_override("font_color", Color("3c4b45"))
+	city_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(city_info_label)
+
+	column.add_child(HSeparator.new())
+
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 150)
+	column.add_child(scroll)
+	city_list = VBoxContainer.new()
+	city_list.add_theme_constant_override("separation", 4)
+	city_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(city_list)
+
+	city_status_label = Label.new()
+	city_status_label.add_theme_font_size_override("font_size", 12)
+	city_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	city_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(city_status_label)
+
+
+## 选中己方灵峰：清移动态，拉取城市面板（只读）。
+## 注意：`Session._request` 是「单请求串行」语义——`busy` 期间再次 `_request` 会被直接丢弃。
+## 故 `queryBuildOptions` 不能与 `queryCityDetail` 连发，改为在详情回包后链式触发
+## （见 `_on_city_detail_received`）。
+func select_peak(peak_id: String) -> void:
+	_clear_move_state()
+	_exit_city_mode()
+	selected_peak_id = peak_id
+	_selected = ""
+	city_improvement_tile = ""
+	Session.request_query_city_detail(peak_id)
+
+
+func player_sect_id() -> String:
+	return str(Session.current_view.get("playerSectId", ""))
+
+
+func _player_peak_at(tile_id: String) -> String:
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for peak: Dictionary in sect.get("spiritPeaks", []):
+			if str(peak.get("tileId", "")) == tile_id:
+				return str(peak.get("id", ""))
+	return ""
+
+
+func _clear_city_state() -> void:
+	_exit_city_mode()
+	selected_peak_id = ""
+	city_detail.clear()
+	build_options.clear()
+	improvement_options.clear()
+	city_improvement_tile = ""
+	_render_city_panel()
+
+
+func _exit_city_mode() -> void:
+	if city_mode.is_empty():
+		return
+	city_mode = ""
+	city_candidate_ids.clear()
+	city_pending_district_type = ""
+	if map != null:
+		map.clear_move_range()
+
+
+func _enter_city_mode(mode: String, candidates: Array) -> void:
+	city_mode = mode
+	city_candidate_ids.clear()
+	for value: Variant in candidates:
+		city_candidate_ids.append(str(value))
+	if map != null:
+		map.show_move_range(city_candidate_ids, {}, "")
+	_render_city_panel()
+
+
+# --- 服务端回包 ---
+
+func _on_city_detail_received(result: Dictionary) -> void:
+	if str(result.get("peakId", "")) != selected_peak_id:
+		return
+	city_detail = result.duplicate(true)
+	_render_city_panel()
+	# 串行链：城市详情到齐后再拉可建建筑（单请求语义，见 `select_peak`）。
+	Session.request_query_build_options(player_sect_id())
+
+
+func _on_build_options_received(result: Dictionary) -> void:
+	build_options = result.duplicate(true)
+	_render_city_panel()
+
+
+func _on_district_sites_received(result: Dictionary) -> void:
+	if str(result.get("peakId", "")) != selected_peak_id:
+		return
+	var ids: Array = []
+	for site: Dictionary in result.get("sites", []):
+		ids.append(str(site.get("tileId", "")))
+	_enter_city_mode("district", ids)
+	city_status_label.text = "区域选址：%d 个候选格，点击高亮格落成" % ids.size()
+
+
+func _on_assignable_tiles_received(result: Dictionary) -> void:
+	if str(result.get("peakId", "")) != selected_peak_id:
+		return
+	var ids: Array = []
+	for tile: Dictionary in result.get("tiles", []):
+		ids.append(str(tile.get("tileId", "")))
+	_enter_city_mode("worker", ids)
+	city_status_label.text = "劳力指派：%d 个可指派格，点击高亮格指派" % ids.size()
+
+
+func _on_improvement_options_received(result: Dictionary) -> void:
+	improvement_options = result.duplicate(true)
+	_render_city_panel()
+
+
+func _on_r3_result_received(command: String, result: Dictionary) -> void:
+	if city_status_label == null:
+		return
+	# 只读 `query*` 的 result 不带 `success`（形状见 PROTOCOL §4，由各自 `*_received` 信号处理），
+	# 此处只接管写命令，避免把查询回包误判为「操作失败」并覆盖选址/指派提示。
+	if not result.has("success"):
+		return
+	var message: String = str(result.get("message", ""))
+	if not bool(result.get("success", false)):
+		city_status_label.text = "✗ " + (message if not message.is_empty() else "操作失败")
+		# 失败后退出选址/指派模式，避免残留高亮。
+		if command == Commands.FOUND_DISTRICT or command == Commands.ASSIGN_WORKER:
+			_exit_city_mode()
+		return
+	city_status_label.text = "✓ " + message
+	# 写命令成功后刷新城市面板（详情回包会再链式拉一次可建建筑，见 `_on_city_detail_received`）。
+	if command in [
+		Commands.CONSTRUCT_BUILDING, Commands.OPEN_CAVE, Commands.FORTIFY_PEAK,
+		Commands.FOUND_DISTRICT, Commands.ASSIGN_WORKER, Commands.UNASSIGN_WORKER,
+		Commands.BUILD_IMPROVEMENT, Commands.REPAIR_IMPROVEMENT,
+	]:
+		if not selected_peak_id.is_empty():
+			Session.request_query_city_detail(selected_peak_id)
+		if command == Commands.FOUND_DISTRICT or command == Commands.ASSIGN_WORKER:
+			_exit_city_mode()
+
+
+# --- 面板渲染 ---
+
+func _render_city_panel() -> void:
+	if city_title_label == null or city_info_label == null or city_list == null:
+		return
+	for child: Node in city_list.get_children():
+		city_list.remove_child(child)
+		child.queue_free()
+	if selected_peak_id.is_empty() or city_detail.is_empty():
+		city_title_label.text = "城市面板（点选己方灵峰）"
+		city_info_label.text = "点击己方灵峰所在格以查看城市详情。"
+		return
+	if not bool(city_detail.get("found", false)):
+		city_title_label.text = "城市面板 · 灵峰不存在"
+		city_info_label.text = "peakId=%s 未找到。" % selected_peak_id
+		return
+	city_title_label.text = "城市面板 · %s" % str(city_detail.get("name", selected_peak_id))
+	city_info_label.text = _city_info_text(city_detail)
+	_populate_city_buttons()
+
+
+func _city_info_text(detail: Dictionary) -> String:
+	var yield_text: String = _yield_text(detail.get("cityYield", {}))
+	return "\n".join(PackedStringArray([
+		"等级 %d · %s · 防御 %d" % [int(detail.get("level", 0)), "主峰" if bool(detail.get("capital", false)) else "副峰", int(detail.get("defense", 0))],
+		"人口 %d · 空闲劳力 %d · 住房 %d" % [int(detail.get("population", 0)), int(detail.get("freeWorkers", 0)), int(detail.get("housing", 0))],
+		"粮食 %d · 粮收支 %d · 安定 %d" % [int(detail.get("food", 0)), int(detail.get("foodBalance", 0)), int(detail.get("stability", 0))],
+		"气运 %d/%d · 产出倍率 %.2f" % [int(detail.get("qiYun", 0)), int(detail.get("qiYunMax", 0)), float(detail.get("outputMultiplier", 1.0))],
+		"工作格 %d · 区域 %d · 产出 %s" % [
+			(detail.get("workedTileIds", []) as Array).size(),
+			int(detail.get("builtDistrictCount", 0)),
+			yield_text if not yield_text.is_empty() else "无",
+		],
+	]))
+
+
+static func _yield_text(yields: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for key: String in ["food", "spiritPower", "spiritStones", "daoPoints", "qiYun"]:
+		var amount: int = int(yields.get(key, 0))
+		if amount != 0:
+			parts.append("%s%d" % [_resource_label(key), amount])
+	return "/".join(parts)
+
+
+static func _resource_label(key: String) -> String:
+	match key:
+		"food": return "粮"
+		"spiritPower": return "灵"
+		"spiritStones": return "石"
+		"daoPoints": return "道"
+		"qiYun": return "气运"
+	return key
+
+
+func _populate_city_buttons() -> void:
+	# 建造：queryBuildOptions 的可建建筑清单（allowed/blocker/cost/turns/affordable）。
+	var options: Array = build_options.get("options", [])
+	if not options.is_empty():
+		city_list.add_child(_city_section_label("建造（灵力/材料）"))
+		for option: Dictionary in options:
+			var label: String = "%s（灵%d · %d回合）" % [
+				str(option.get("displayName", option.get("type", "?"))),
+				int(option.get("cost", 0)),
+				int(option.get("turns", 0)),
+			]
+			var button: Button = Button.new()
+			button.text = label
+			button.tooltip_text = "已建满/材料不足时置灰；blocker：%s" % str(option.get("blocker", "无"))
+			button.disabled = not bool(option.get("allowed", false)) or not bool(option.get("affordable", true))
+			var building_type: String = str(option.get("type", ""))
+			button.pressed.connect(func() -> void: Session.request_construct_building(selected_peak_id, building_type))
+			city_list.add_child(button)
+	# 区域：districtTypes → 选址。
+	var district_types: Array = city_detail.get("districtTypes", [])
+	if not district_types.is_empty():
+		city_list.add_child(_city_section_label("区域（选址落成）"))
+		for entry: Dictionary in district_types:
+			var district_type: String = str(entry.get("id", ""))
+			if district_type == Enums.DistrictType.SHOU_FU_QU:
+				continue
+			var button: Button = Button.new()
+			button.text = "选址建区：%s" % str(entry.get("name", district_type))
+			button.pressed.connect(func() -> void: _begin_district_sites(district_type))
+			city_list.add_child(button)
+	# 劳力：指派 / 撤下。
+	city_list.add_child(_city_section_label("劳力（工作半径内）"))
+	var assign_button: Button = Button.new()
+	assign_button.text = "指派劳力（列出可指派格）"
+	assign_button.pressed.connect(func() -> void: Session.request_query_assignable_tiles(selected_peak_id))
+	city_list.add_child(assign_button)
+	for tile_id: Variant in city_detail.get("workedTileIds", []):
+		var unassign: Button = Button.new()
+		unassign.text = "撤下劳力：%s" % str(tile_id)
+		var target: String = str(tile_id)
+		unassign.pressed.connect(func() -> void: Session.request_unassign_worker(selected_peak_id, target))
+		city_list.add_child(unassign)
+	# 改良：查询本格 / 建 / 修缮。
+	city_list.add_child(_city_section_label("改良（需建造者身处本格）"))
+	if city_improvement_tile.is_empty():
+		var hint: Label = Label.new()
+		hint.text = "先点选一块己方地块，再查询改良。"
+		hint.add_theme_font_size_override("font_size", 12)
+		hint.add_theme_color_override("font_color", Color("6d7470"))
+		city_list.add_child(hint)
+	else:
+		var query_button: Button = Button.new()
+		query_button.text = "查询改良选项（%s）" % city_improvement_tile
+		query_button.pressed.connect(func() -> void: Session.request_query_improvement_options(player_sect_id(), city_improvement_tile))
+		city_list.add_child(query_button)
+		for option: Dictionary in improvement_options.get("options", []):
+			var option_button: Button = Button.new()
+			option_button.text = "%s（工力%d · %s）" % [
+				str(option.get("displayName", option.get("type", "?"))),
+				int(option.get("cost", 0)),
+				str(option.get("yieldText", "")),
+			]
+			option_button.tooltip_text = str(option.get("rejection", ""))
+			option_button.disabled = not bool(option.get("buildable", false))
+			var improvement_type: String = str(option.get("type", ""))
+			option_button.pressed.connect(func() -> void: _build_improvement(improvement_type))
+			city_list.add_child(option_button)
+
+
+func _begin_district_sites(district_type: String) -> void:
+	city_pending_district_type = district_type
+	Session.request_query_district_sites(player_sect_id(), selected_peak_id, district_type)
+
+
+func _build_improvement(improvement_type: String) -> void:
+	var disciple_id: String = _first_builder_id()
+	if disciple_id.is_empty():
+		city_status_label.text = "✗ 无可用建造者：请先 appointBuilder 任命低阶弟子"
+		return
+	Session.request_build_improvement(player_sect_id(), disciple_id, city_improvement_tile, improvement_type)
+
+
+## 取己方首个有建造次数的弟子（appointBuilder 后的建造者）；无则回退首个弟子。
+func _first_builder_id() -> String:
+	var fallback: String = ""
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for disciple: Dictionary in sect.get("disciples", []):
+			if fallback.is_empty():
+				fallback = str(disciple.get("id", ""))
+			if int(disciple.get("builderCharges", 0)) > 0:
+				return str(disciple.get("id", ""))
+	return fallback
+
+
+func _city_section_label(text: String) -> Label:
+	var label: Label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color("294e48"))
+	return label
+
+
+# --- 供自动验收断言 ---
+
+func city_panel_visible() -> bool:
+	return city_panel != null and not selected_peak_id.is_empty()
+
+func city_info_text() -> String:
+	return city_info_label.text if city_info_label != null else ""
+
+func city_button_count() -> int:
+	return city_list.get_child_count() if city_list != null else 0
+
+func city_candidate_count() -> int:
+	return city_candidate_ids.size()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -452,7 +879,7 @@ func _build_sidebar() -> void:
 	panel.add_child(column)
 
 	var title: Label = Label.new()
-	title.text = "山河画卷 · R2"
+	title.text = "山河画卷 · R3"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color("294e48"))
 	column.add_child(title)
@@ -489,7 +916,7 @@ func _build_sidebar() -> void:
 	buttons.add_child(back)
 
 	var hint: Label = Label.new()
-	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/地块 · 点高亮格移动 · 结束回合"
+	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 点高亮格移动/选址/指派 · 结束回合"
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color("6d7470"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

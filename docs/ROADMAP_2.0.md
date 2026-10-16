@@ -12,11 +12,11 @@
 ### 1.1 总体位置
 
 ```
-R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R5 · R6 · R7 · R8 · R9
-骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 全部未开始
+R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ R4 · R5 · R6 · R7 · R8 · R9
+骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 全部未开始
 ```
 
-**当前位置：R2「回合 / 移动 / 视野」已完成 → 下一个里程碑 R3「经济与城市」。**
+**当前位置：R3「经济与城市」已完成 → 下一个里程碑 R4「道统与修炼」。**
 
 - 分支：`main`（WorkBuddy 在独立 worktree 工作，分支 `workbuddy/main-*`，统一推 `HEAD:main`）。
 - 里程碑提交：
@@ -27,31 +27,36 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R
   - R1.5 `8c622b5 docs(r1.5): add protocol_2.0 contract, mount shared in worktree, schedule placeholder art`
   - R2 提示词 `d38e1fa docs(r2): add R2 prompt for turn state machine, BFS movement, vision on move`
   - R2 `6c5a232 feat(r2): turn state machine, terrain-aware BFS movement, vision on move`
+  - R2 收尾 `edf8656 docs(r2): record delivered r2 commit hash in roadmap`
+  - R3 提示词 `468fea2 docs(r3): add R3 milestone prompt`
+  - R3 前置修复 `b0a9e41 fix(config): correct dangling improvement requiredDaoKey (lingtian_ti -> ling_tian_nong)`
+  - R3 `feat(r3): economy settlement, spirit peak city, buildings districts workers improvements roads`（见 §4.1）
 
 ### 1.2 已交付并验证的资产
 
 | 层 | 文件 | 状态 |
 |---|---|---|
-| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（**R2 起 8 条**：`ping`/`newGame`/`getState`/`finishTurn`/`beginPlayerTurn`/`nextTurn`/`moveDisciple`/`queryMoveRange`）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量）、`dto`（信封解析与构造） |
+| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（**R3 起 23 条**：R2 的 8 条 + R3 城市/改良 15 条）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量；**R3 新增 `Building`（10 种 + `ALL`/`NAMES`/`CORE`）、`DistrictType`（首府区 + 5 可建 + `ALL`/`NAMES`/`BUILDABLE`）、`ImprovementType`（8 种 `ALL`）**）、`dto`（信封解析与构造） |
 | 共享几何 | `shared/geo/hex.gd` | ✅ 7 个静态函数（`id/coords/neighbors/distance/to_world/opposite/edge_vertices`）已按 R1 契约补齐，两端共用 |
-| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、`ping`/`newGame`/`getState`/`finishTurn`/`beginPlayerTurn`/`nextTurn`/`moveDisciple`/`queryMoveRange`、错误码口径、`view` 全量快照 + 迷雾快照 |
-| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算；**R2 新增**：移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机（已实做 TURN_START/SPIRIT_PEAK/PLAYER_ACTION，其余留 TODO） |
-| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`** |
-| 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出；**R2 起 `map.dangerTileMoveCost = 1`**（险地附加，裁决二） |
-| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar（回合/阶段/资源/结束回合）、点选→高亮→移动交互 |
-| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`（finishTurn→beginPlayerTurn） |
-| 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在 |
-| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R2 起 8 条标「已实现」**；校验脚本 35/35 全绿 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **13 阶段**（`[0/12]`–`[12/12]`），含 R0/R1/R2 全量断言 + 协议契约校验 |
+| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、**R3 起 23 条命令**、错误码口径、`view` 全量快照 + 迷雾快照；**R3 新增**：`view.improvements{}` 按 `Sect.improvementSnapshots` 做迷雾「最后可见」缓存下发 |
+| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算、移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机；**R3 新增**：`EconomyRules`（地块/灵峰产出、维护、安定、产出系数、粮食、`apply_settlement` 唯一入口、气运满溢吞并与灵峰晋升）、`CityRules`（工作半径/指派/住房/容量/区域产出与邻接/建城与建筑可建判定）、`ImprovementRules`（地形与道法/区域/节点门控、产出、洞府住房、道路机动、掠夺、修缮）、`RoadNetworkService`（路网连通度/减耗/起始格加成）、`CityAction`（开峰/建筑/洞府/加固/区域/劳力/项目队列推进/只读查询）、`ImprovementAction`（任命建造者/修筑/修缮/查询）；**R3 回填 R2 空钩子**：`MoveRules.step_cost` 与 `calculate_max_move_points` 改调 `RoadNetworkService`，`TurnProcessor` 的 `TURN_START` 调 `RoadNetworkService.refresh()`、`SPIRIT_PEAK` 推项目队列、`SETTLEMENT` 调 `EconomyRules.apply_settlement()` |
+| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`**；**R3 新增 `Project`/`District`/`Improvement`**，`SpiritPeak` 增 `food`/`foodProgress`/`freeWorkers`/`workedTileIds`/`projectQueue`、`Sect` 增 `improvements`/`improvementSnapshots`、`Disciple` 增 `builderCharges`、`GameState` 增 `projectSeq`/`improvementSeq` |
+| 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出；**R2 起 `map.dangerTileMoveCost = 1`**（险地附加，裁决二）；**R3 未新增顶层块**（`spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources` 均复用） |
+| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料 |
+| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`） |
+| 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
+| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R3 起 23 条标「已实现」**；`TODO(需核对)` 由 8 处增至 **11 处**（R3 新增 3 处缺口登记，见 §4.1）；校验脚本 35/35 全绿 |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **15 阶段**（`[0/14]`–`[14/14]`），含 R0/R1/R2/R3 全量断言 + 协议契约校验（81/81 全绿） |
 
-### 1.3 遗留缺口（进入 R2 前需知悉，不阻塞 R2）
+### 1.3 遗留缺口（进入 R4 前需知悉，不阻塞 R4）
 
 1. **美术资源实体文件为 0**（`assets/` 下除 `manifest.json` 外无实体文件）。**这是计划内状态**，不是缺陷：
    - `AssetLibrary` 对 manifest 里 60+ 逻辑 ID 缺失时**全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**。
-   - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/12]` 断言 `同一缺失 logicalID 只 WARN 一次`。
+   - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/14]` 断言 `同一缺失 logicalID 只 WARN 一次`。
+   - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 8 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内。**不阻塞 R2**（R2 只用 `finishTurn`/`nextTurn`/`beginPlayerTurn`/`moveDisciple`/`queryMoveRange`，其字段已完整），随对应里程碑逐条补齐。
-3. **R2–R9 提示词未生成**（按项目约定「进入该里程碑时再生成」，当前仅 `R0`、`R1`、`R1.5` 三份）。
+2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 新增：`city` 配置缺「丘陵石+1 / 河流 foodBonus」权威键、`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离。**不阻塞 R4**，随对应里程碑逐条补齐。
+3. **R4–R9 提示词已全部预生成**（草案）；`R4_道统与修炼.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
 
@@ -92,8 +97,8 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R
   串行原因：每个里程碑都在扩展同一套 `GameState` / `view` 快照 / 协议命令，前置未定型时后置会大面积返工。
 - **R8/R9 是收口**：不做新规则，只做表现与打包，可在 R7 验收通过后连续推进。
 - **可穿插的低风险补强**（不改变主线顺序）：
-  - 补齐 `PROTOCOL_2.0.md` 的 8 处 `TODO(需核对)`：随对应里程碑（R3/R5/R6）落地时一并回填，不必单独立项。
-  - 生成 R2–R9 提示词：严格「进入该里程碑时再生成」，保持与当时代码一致。
+  - 补齐 `PROTOCOL_2.0.md` 的 11 处 `TODO(需核对)`：随对应里程碑（R4/R5/R6）落地时一并回填，不必单独立项。
+  - 生成 R4–R9 提示词：严格「进入该里程碑时再生成」，保持与当时代码一致（R4–R9 草案已预生成，进入前须重新核对锚点）。
 
 ### 3.2 ★ 前置约束：R8 开工前必须先交付「最小水墨资源包」
 
@@ -115,37 +120,40 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R
 
 ---
 
-## 四、R2 交付纪要 与 下一步（R3）
+## 四、R3 交付纪要 与 下一步（R4）
 
-> R2 已于本里程碑完成并提交推送（见 §一 提交列表）。以下为**实际交付**与**R3 启动清单**。
+> R3 已于本里程碑完成并提交推送（见 §一 提交列表）。以下为**实际交付**与**R4 启动清单**。
 
-### 4.1 R2 实际交付（与本清单原始计划的偏差）
+### 4.1 R3 实际交付（与本清单原始计划的偏差）
 
-- **任务 0（硬门禁）先做**：修复 R1 端到端冷启动竞态——`Session.gd` 改为「拉起后 0.5s 轮询、40s 总超时」的就绪等待，`server_pid > 0` 期间连接失败不重复 `launch`；`R1ClientTest.gd` deadline 25s→45s 且提前返回前回收子进程。实测冷启动 5 连跑全 `R1_CLIENT_RESULT=OK`（13.86–15.46s）。
-- **服务端**：新增 `rules/{MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`；`Disciple` 加 `maxMovePoints`/`turnsInSect`；`CommandDispatcher` 注册 5 条新命令（共 8）；`map.dangerTileMoveCost` 2→1（裁决二）。
-- **六阶段状态机**：已实做 `TURN_START`/`SPIRIT_PEAK`/`PLAYER_ACTION`；`SETTLEMENT`/`AI_ACTION`/`VICTORY_CHECK` 为**空壳 + `# TODO(R3/R4/R6/R7)`**（R2 明确非目标）。
-- **客户端**：`HexMap` 高亮层、`UnitView` 选中标记、`World` TopBar（回合/阶段/资源/结束回合）+ 点选→高亮→移动交互；**客户端零可达计算**（全部消费 `queryMoveRange`）；相机全程不重置。
-- **偏差**：BFS 采用「`Array[String]` 队列 + 头游标 + 固定邻居序」的定序 Dijkstra（非 PRD 泛述的「ZOC − 道路」，ZOC/道路为 R5 非目标，未实现）。
-- **验收**：服务端 `R2Test` 220 checks、客户端 `R2ClientTest` 36 checks、`check.ps1` 13 阶段全绿。
+- **服务端新增文件**：`rules/{EconomyRules,CityRules,ImprovementRules,RoadNetworkService,CityAction,ImprovementAction}.gd`、`model/{Project,District,Improvement}.gd`、`tests/{R3Test.gd,R3Test.tscn}`。
+- **服务端修改文件**：`model/{SpiritPeak,Sect,Disciple,GameState}.gd`（新增字段 + `to_dict`）、`net/{CommandDispatcher,StateView}.gd`（15 handler + `view.improvements{}` 迷雾缓存）、`rules/{MoveRules,MoveRangeCalculator,TurnProcessor,SetupInitializer}.gd`（道路回填 + 三阶段 R3 实做）、`config/ConfigValidator.gd`、`shared/protocol/{commands,enums}.gd`。
+- **15 条命令**（**偏差：不是清单里写的 18 条**——`PROTOCOL_2.0.md` §4 分组的 18 条含 `researchDao`/`holdRecruitment`/`queryProjectQueue` 等 R4 命令，R3 实际归属为 15 条，见 `R3_经济与城市.md` 范围段）：`foundSpiritPeak`/`appointBuilder`（单位组）+ `constructBuilding`/`queryBuildOptions`/`openCave`/`fortifyPeak`/`foundDistrict`/`queryDistrictSites`/`assignWorker`/`unassignWorker`/`queryAssignableTiles`/`queryCityDetail`/`buildImprovement`/`repairImprovement`/`queryImprovementOptions`（城市组）。`hello.implementedCommands` 累计 **23 条**。
+- **回合阶段**：`TURN_START` 增 `RoadNetworkService.refresh()`；`SPIRIT_PEAK` 实做项目队列推进（`Project.turnsRemaining -= 1` → 归零结算落成：开峰/建筑/洞府/加固/区域）；`SETTLEMENT` 调 `EconomyRules.apply_settlement()`（节点冷却 → 人口/住房/安定 → 经济结算 → 气运满溢扩张）。仍留空：`# TODO(R4)` 研究队列/道统 boost/心魔、`# TODO(R5)` 围城断供、`# TODO(R6)` 政令、`# TODO(R7)` AI 行动/胜负判定。
+- **★ R3 回填（计划外但必需）**：开局每宗只占主峰一格（`SetupInitializer` 仅设 `spawnTiles[index].ownerSectId`），而 `foundDistrict`/`assignWorker`/`buildImprovement` 都要求 `tile.ownerSectId == sect.id` —— 没有领土增长机制时 R3 核心循环**不可玩**。已按 1.0 蓝本 `EconomyCalculator.annexAdjacentTile` / `developPeak` 忠实回填：气运攒满 `qiYunMax` 时优先吞并带资源节点的相邻无主地块，无处可吞则灵峰晋升（`capacity += capacityPerLevel`、`defense += baseDefense/2`）。这是 1.0 唯一非战斗领土增长途径（战斗 R5、外交 R7）。登记于 `docs/PROTOCOL_2.0.md` §11.1。
+- **客户端**：`World` 增 `CityPanel`（CanvasLayer，layer 3）+ 城市模式（区域选址 / 劳力指派高亮候选格）+ R3 信号处理；`Session` 增 15 条 `request_*` + 6 个信号；`SectView` 增区域/建筑占位几何；TopBar 资源栏追加 粮/气运/道点/天晶/玄铁/灵木。**客户端零规则**：产出/造价/人口/安定/可建性全部来自 `query*` 回包。
+- **偏差/修复（客户端两处）**：① `_on_r3_result_received` 原先把只读 `query*` 回包（不带 `success`）误判为「操作失败」，已改为只接管写命令；② `select_peak` 原先连发 `queryCityDetail` + `queryBuildOptions`，而 `Session._request` 是单请求串行语义（`busy` 期间静默丢弃），已改为「详情回包后链式拉取可构建清单」。
+- **协议契约**：`PROTOCOL_2.0.md` 15 条 `待实现（R3）`→`已实现（R3）`；§11.1 增 5 行冲突裁决（`Enums.Improvement`/`Enums.District` 重命名、`Improvement.networkLevel`、`queryCityDetail.districts[].buildings` 为字符串数组、道法门控在 R3 不可建）；§11.2 增 3 处缺口；§12.1/§12.4/§12.5 同步 `view` 字段。`TODO(需核对)` 8 → 11 处（脚本只统计不断言）。
+- **验收**：服务端 `R3_PASS checks=268`；客户端无头 `R3_CLIENT_RESULT=OK checks=5`、端到端 `R3_CLIENT_RESULT=OK checks=43`；`check.ps1` **15 阶段 81/81 全绿**；`check_protocol.ps1` 35/35（69 条分组点数 13/22/18/4/4/6/2 不变、23 条已实现）；无残留 godot 进程、无 `.java`。
 
-### 4.2 下一步 · R3「经济与城市」启动清单
+### 4.2 下一步 · R4「道统与修炼」启动清单
 
-**Step 0 · 生成 R3 提示词**
-- 按 `docs/prompts/README.md` §8 模板撰写，必读锚点指向 `REQUIREMENTS_2.0.md` §4.3（经济/产出/人口/住房/安定）/§4.4（灵峰/建筑/区域/劳力/改良/道路）、`PROTOCOL_2.0.md` §2、§3。
-- 非目标写明：不做道统/修炼（R4）、不做战斗（R5）。
+**Step 0 · 核对 R4 提示词**
+- 按当时最新代码/config 重新核对 `docs/prompts/R4_道统与修炼.md` 的文件锚点与数值（`data/gameConfig.json` 的 `daoTree` / `cultivation` / `breakthrough` / `recruit` 等块）。
 
 **Step 1 · 服务端规则**
-- 经济结算（回合 `SETTLEMENT` 阶段落地，替换 R2 的 TODO 空壳）、地形产出、人口/住房/安定、灵峰、建筑、区域（含地形邻接）、劳力、改良、道路。
+- 修炼/突破/渡劫、21 道法树/道点/成就 boost、`SPIRIT_PEAK` 的研究队列推进（替换 R3 的 `# TODO(R4)`）、`SETTLEMENT` 的道统 boost 与心魔结算（替换 R3 的 `# TODO(R4)`）、收徒。
+- **回填 R3 遗留**：`ImprovementRules._has_unlocked_dao()` 当前恒 `false`（R3 无道统系统），R4 接入已解锁道法集合后应改为真实判定，使 `LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）真正可建。
 
 **Step 2 · 协议命令**
-- 城市 18 条命令（`PROTOCOL_2.0.md` 分组 22）；在 `commands.gd` 登记并在 `CommandDispatcher` 注册；`hello.implementedCommands` 自动同步。
+- `researchDao` / `holdRecruitment` / `queryProjectQueue` / `cancelProject` / `accelerateProject`；在 `commands.gd` 登记并在 `CommandDispatcher` 注册。
 
 **Step 3 · 客户端表现**
-- 城市面板、建造/区域选址、劳力指派、改良、资源栏。
+- 道统树面板、研究队列、弟子详情（境界/灵根/进度）。
 
 **Step 4 · 验收与提交**
-- 扩展 `tools/check.ps1`：产出与 config 一致、山岳不可建城、丘陵/灵林限制、区域邻接与上限、安定惩罚生效。
-- 全绿后：`git add -A && git commit -m "feat(r3): ..." && git push origin HEAD:main`。
+- 扩展 `tools/check.ps1`：21 道法前置/时代/流派门控、进度/突破/渡劫、成就 boost 触发。
+- 全绿后：`git add -A && git commit -m "feat(r4): ..." && git push origin HEAD:main`。
 
 ---
 
@@ -158,8 +166,8 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R
 | 3 | 服务端/客户端几何口径漂移 | 单位位置错位、移动范围与渲染不符 | 换算只在 `shared/geo/hex.gd`，两端共用 |
 | 4 | 相机在操作/刷新后被重置（1.0 老问题） | 直接违反 PRD §8.4 | `CameraRig` 自持 transform/size；已有 `check.ps1` 断言「view 刷新保持相机」 |
 | 5 | **R8 无真实资产可打磨** | R8 打磨项落空、被迫返工 | **§3.2 前置约束**：R7 完成后、R8 启动前先交付「最小水墨资源包」 |
-| 6 | **协议契约存在未核对字段** | 相关里程碑（R3/R5/R6）落地时字段口径分歧 | `PROTOCOL_2.0.md` §11 已逐条登记 8 处 `TODO(需核对)` 与 11 处冲突裁决；随里程碑回填，`check_protocol.ps1` 持续统计 |
-| 7 | **新 worktree 未挂载 `shared/` 联接** | 全线 `class_name not declared` | 每个新 worktree 首次开工先跑 `tools/setup_shared.ps1`；`check.ps1` `[1/10]` 已断言 |
+| 6 | **协议契约存在未核对字段** | 相关里程碑（R4/R5/R6）落地时字段口径分歧 | `PROTOCOL_2.0.md` §11 已逐条登记 11 处 `TODO(需核对)` 与 18 处冲突裁决；随里程碑回填，`check_protocol.ps1` 持续统计 |
+| 7 | **新 worktree 未挂载 `shared/` 联接** | 全线 `class_name not declared` | 每个新 worktree 首次开工先跑 `tools/setup_shared.ps1`；`check.ps1` `[1/14]` 已断言 |
 | 8 | Windows 环境坑（import / Start-Process / 控制台编码 / BOM） | 脚本挂死或中文乱码 | 已实证并写入 `docs/prompts/README.md` §5；含中文 `.ps1` 必须带 UTF-8 BOM |
 | 9 | 里程碑提示词滞后于代码 | 派发指令与实现不符 | 严格「进入该里程碑时再生成」；每步结束更新 `prompts/README.md` 进度 |
 | 10 | 客户端越界实现规则 | 破坏「服务端权威」架构 | 客户端只读 `view`；「能不能做/花多少」一律走 `query*` |

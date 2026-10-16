@@ -21,6 +21,8 @@ var directLine: bool = false
 var heartDevil: int = 0
 var injured: bool = false
 var cultivationProgress: float = 0.0
+## R3 新增：建造者差事的剩余建造次数（`appointBuilder` 赋予 `improvement.builderCharges`）。
+var builderCharges: int = 0
 
 func to_dict() -> Dictionary:
-	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress}
+	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges}
