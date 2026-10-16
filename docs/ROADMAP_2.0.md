@@ -30,7 +30,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
   - R2 收尾 `edf8656 docs(r2): record delivered r2 commit hash in roadmap`
   - R3 提示词 `468fea2 docs(r3): add R3 milestone prompt`
   - R3 前置修复 `b0a9e41 fix(config): correct dangling improvement requiredDaoKey (lingtian_ti -> ling_tian_nong)`
-  - R3 `feat(r3): economy settlement, spirit peak city, buildings districts workers improvements roads`（见 §4.1）
+  - R3 `b036bb4 feat(r3): economy settlement, spirit peak city, buildings districts workers improvements roads`
 
 ### 1.2 已交付并验证的资产
 
