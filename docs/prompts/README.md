@@ -18,6 +18,15 @@
 - 客户端：`--path client`
 - 若 Godot 路径变动，放 `tools/godot_path.txt`（不入库）或设环境变量 `GODOT_CONSOLE_EXE`。
 
+## Windows 环境已知坑（R0 实证，务必遵守）
+
+1. **先 `--import` 再运行**：新克隆或新增 `class_name` 全局类后，第一次跑工程要先生成全局类缓存，否则所有全局类报 "not declared"：
+   - `Godot_v4.4.1-stable_win64_console.exe --headless --path server --import`
+   - `Godot_v4.4.1-stable_win64.exe --headless --path client --import`
+   - `tools/check.ps1` 已内置；新增脚本/场景后若报类未声明，重跑 import。
+2. **拉子进程不要用 `Start-Process`**：本机同时存在大小写两份 `HTTP_PROXY`/`http_proxy`，`Start-Process` 重建环境块会抛"已添加项"。工具脚本统一用 .NET `System.Diagnostics.Process`；**等待服务端就绪用 TCP 端口轮询**，不要依赖匹配控制台日志。
+3. **脚本不要设 `[Console]::OutputEncoding`**：CP936 控制台强行切 UTF-8 会导致中文乱码；日志输出用英文，或交给 Godot 自身处理。
+
 ## 通用硬约束（每个里程碑都适用）
 
 - 完全 Godot 4.4 + GDScript 静态类型，**零 Java、零 JVM**，全仓库无 `.java`。
