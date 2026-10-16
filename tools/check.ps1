@@ -303,8 +303,18 @@ try {
     }
     catch { $roundTripOk = $false }
     finally {
+        # 清理探测文件。部分托管/安全环境会拦截 Remove-Item 并抛出终止性异常（此时文件通常已被移走）。
+        # 清理失败绝不能中断自检主流程——否则后续导入/启动/自测等核心验收步骤会被整体跳过。
+        # 故逐个吞掉异常，并回退到 cmd del 兜底。
         foreach ($p in @($probeClient, $probeServer, $probeTop)) {
-            if (Test-Path $p) { Remove-Item $p -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $p) {
+                try { Remove-Item $p -Force -ErrorAction Stop }
+                catch {
+                    # 拦截后文件通常已被移走，del 会报「找不到」；在 Stop 模式下该错误会再次
+                    # 变成终止异常，故必须连输出一起吞掉。
+                    try { cmd /c del /f /q "$p" 2>&1 | Out-Null } catch { }
+                }
+            }
         }
     }
     Assert-Check $roundTripOk 'client/shared 写入内容在 server/shared 与顶层 shared 均可见'
