@@ -16,14 +16,21 @@ extends RefCounted
 var _config: Dictionary = {}
 var _handlers: Dictionary = {}
 var state: GameState = null
+var _turns: TurnProcessor = null
 const SAFE_JSON_INTEGER: int = 9007199254740991
 
 
 func _init(config: Dictionary = {}) -> void:
 	_config = config
+	_turns = TurnProcessor.new(config)
 	_handlers[Commands.PING] = Callable(self, "_handle_ping")
 	_handlers[Commands.NEW_GAME] = Callable(self, "_handle_new_game")
 	_handlers[Commands.GET_STATE] = Callable(self, "_handle_get_state")
+	_handlers[Commands.FINISH_TURN] = Callable(self, "_handle_finish_turn")
+	_handlers[Commands.BEGIN_PLAYER_TURN] = Callable(self, "_handle_begin_player_turn")
+	_handlers[Commands.NEXT_TURN] = Callable(self, "_handle_next_turn")
+	_handlers[Commands.MOVE_DISCIPLE] = Callable(self, "_handle_move_disciple")
+	_handlers[Commands.QUERY_MOVE_RANGE] = Callable(self, "_handle_query_move_range")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -85,6 +92,58 @@ func _handle_new_game(request_id: String, params: Dictionary) -> Dictionary:
 	VisionCalculator.recalculate(next, _config)
 	state = next
 	return Dto.ok_response(request_id, [], StateView.build(state, _config), {"success": true})
+
+
+# ---------------------------------------------------------------------------
+# 处理器（R2：回合状态机 + 移动）
+# ---------------------------------------------------------------------------
+
+func _handle_finish_turn(request_id: String, _params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var events: Array[String] = _turns.finish_turn(state)
+	return Dto.ok_response(request_id, events, StateView.build(state, _config), null)
+
+
+func _handle_begin_player_turn(request_id: String, _params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var events: Array[String] = _turns.begin_player_turn(state)
+	return Dto.ok_response(request_id, events, StateView.build(state, _config), null)
+
+
+func _handle_next_turn(request_id: String, _params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var events: Array[String] = _turns.next_turn(state)
+	return Dto.ok_response(request_id, events, StateView.build(state, _config), null)
+
+
+## 只读：不回 view，只回 result（PROTOCOL §3）。
+func _handle_query_move_range(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_id: Variant = params.get("discipleId")
+	if typeof(disciple_id) != TYPE_STRING or String(disciple_id).is_empty(): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "discipleId 必须是非空字符串")
+	var disciple: Disciple = MoveAction.find_disciple(state, String(disciple_id))
+	if disciple == null: return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "弟子不存在：" + String(disciple_id))
+	if disciple.sectId != state.playerSectId: return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能查询己方弟子的移动范围")
+	var result: Dictionary = MoveAction.query_move_range(state, _config, String(disciple_id))
+	return Dto.ok_response(request_id, [], null, result)
+
+
+## 权威移动：回 view + result。
+func _handle_move_disciple(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_id: Variant = params.get("discipleId")
+	if typeof(disciple_id) != TYPE_STRING or String(disciple_id).is_empty(): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "discipleId 必须是非空字符串")
+	var target_tile_id: Variant = params.get("targetTileId")
+	if typeof(target_tile_id) != TYPE_STRING or String(target_tile_id).is_empty(): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "targetTileId 必须是非空字符串")
+	var disciple: Disciple = MoveAction.find_disciple(state, String(disciple_id))
+	if disciple == null: return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "弟子不存在：" + String(disciple_id))
+	if disciple.sectId != state.playerSectId: return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能移动己方弟子")
+	if not state.tiles.has(String(target_tile_id)): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + String(target_tile_id))
+	if state.phase != Enums.TurnPhase.PLAYER_ACTION: return Dto.error_response(request_id, Msg.ERR_BAD_REQUEST, "当前阶段不可移动：" + state.phase)
+	var before: int = state.eventLog.size()
+	var result: Dictionary = MoveAction.move_disciple(state, _config, String(disciple_id), String(target_tile_id))
+	var events: Array = state.eventLog.slice(before)
+	return Dto.ok_response(request_id, events, StateView.build(state, _config), result)
 
 
 func _normalize_params(params: Dictionary) -> Dictionary:

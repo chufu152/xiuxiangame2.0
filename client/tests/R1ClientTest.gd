@@ -117,11 +117,14 @@ func verify_flat_top(side: MeshInstance3D) -> void:
 func integration(session: Node) -> void:
 	# 菜单节点在上文已 queue_free，不能再作为带类型的 Control 参数传入。
 	session.call("start_connection", 19537)
-	var deadline: int = Time.get_ticks_msec() + 25000
+	# 冷启动实测最长 19s，deadline 取 45s（> Session 的 40s 就绪超时）留足余量。
+	var deadline: int = Time.get_ticks_msec() + 45000
 	while not bool(session.call("supports", "newGame")) and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
 	check(bool(session.call("supports", "newGame")), "实际 Launcher/NetClient 收到 newGame hello")
 	if not bool(session.call("supports", "newGame")):
+		# 提前返回前必须回收拉起的服务端，否则残留 godot 进程。
+		session.call("shutdown")
 		return
 	var old_revision: int = int(session.get("view_revision"))
 	session.call("request_new_game", {"playerFaction": "ZONG_MEN", "sectName": "青岚测试宗", "mapWidth": 20, "mapHeight": 15, "randomSeed": "123456", "difficultyId": "normal"})

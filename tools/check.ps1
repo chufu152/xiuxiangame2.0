@@ -1,23 +1,28 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    里程碑自检：R0 工程骨架 + R1 地图开局 + R1.5 协议契约（对应 docs/prompts/*.md「自动验收」）。
+    里程碑自检：R0 工程骨架 + R1 地图开局 + R1.5 协议契约 + R2 回合/移动/视野
+    （对应 docs/prompts/*.md「自动验收」）。
 
 .DESCRIPTION
     依次执行：
-      [0/10] 环境与交付物清单（R0 + R1）
-      [1/10] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
-      [2/10] 两个工程 --import 无解析错误并生成 class_name 缓存
-      [3/10] 配置缺失时服务端非零退出（负向用例）
-      [4/10] console 版 --headless 启动服务端并监听 127.0.0.1:9527
-      [5/10] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
-      [6/10] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
-      [7/10] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
+      [0/12] 环境与交付物清单（R0 + R1）
+      [1/12] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
+      [2/12] 两个工程 --import 无解析错误并生成 class_name 缓存
+      [3/12] 配置缺失时服务端非零退出（负向用例）
+      [4/12] console 版 --headless 启动服务端并监听 127.0.0.1:9527
+      [5/12] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
+      [6/12] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
+      [7/12] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
             且同种子双跑导出的权威地图 outputs/r1_authority_a|b.json 逐字一致（SHA256 相同）
-      [8/10] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
+      [8/12] 服务端 R2 验收：res://tests/R2Test.tscn 打印 R2_PASS、退出码 0
+            （回合状态机 + 地形叠加移动成本 + BFS 可达 + 移动后视野刷新 + 确定性）
+      [9/12] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
             再加 --integration 端到端（真实拉起 headless 服务端 + newGame 300 格 view + getState 往返）
-      [9/10] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
-      [10/10] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
+      [10/12] 客户端 R2 验收：res://tests/R2ClientTest.tscn 无头全绿；
+            再加 --integration 端到端（点选弟子 → 移动高亮 → moveDisciple → 结束回合 → 相机不重置）
+      [11/12] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
+      [12/12] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
 
     退出码：0 = 全绿；1 = 存在失败项。
 
@@ -227,7 +232,7 @@ try {
     Write-Host "临时目录：$workDir"
 
     # ---------------------------------------------------------------- 0. 环境
-    Write-Host "`n[0/10] 环境与交付物清单（R0 + R1）" -ForegroundColor Cyan
+    Write-Host "`n[0/12] 环境与交付物清单（R0 + R1）" -ForegroundColor Cyan
     $godotExe = $null
     try { $godotExe = Resolve-GodotConsole }
     catch { Assert-Check $false '定位 Godot 控制台版可执行文件' $_.Exception.Message }
@@ -273,7 +278,7 @@ try {
     if (-not $godotExe) { throw '未定位到 Godot 可执行文件，后续步骤无法进行。' }
 
     # ------------------------------------------- 1. shared 目录联接（幂等 + 贯通）
-    Write-Host "`n[1/10] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
+    Write-Host "`n[1/12] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
     $setupScript = Join-Path $PSScriptRoot 'setup_shared.ps1'
 
     $firstOk = $true; $firstErr = ''
@@ -322,7 +327,7 @@ try {
     Assert-Check (-not (Test-Path $probeTop)) '临时探测文件已清理'
 
     # --------------------------------------------------------- 2. 工程导入
-    Write-Host "`n[2/10] 工程导入与 GDScript 解析" -ForegroundColor Cyan
+    Write-Host "`n[2/12] 工程导入与 GDScript 解析" -ForegroundColor Cyan
     if ($SkipImport) {
         Write-Host '  （-SkipImport：跳过导入步骤）' -ForegroundColor DarkGray
     }
@@ -343,7 +348,7 @@ try {
     }
 
     # --------------------------------------------- 3. 配置失败路径（负向用例）
-    Write-Host "`n[3/10] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
+    Write-Host "`n[3/12] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
     $missingConfig = Join-Path $workDir 'not-exists.json'
     $badResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$missingConfig") `
@@ -353,7 +358,7 @@ try {
     Assert-Check ($badCombined -match 'config_load_failed|配置加载失败') '配置缺失时输出可诊断的失败原因' $badCombined.Trim()
 
     # ------------------------------------------------- 4. 启动 headless 服务端
-    Write-Host "`n[4/10] headless 服务端启动并监听" -ForegroundColor Cyan
+    Write-Host "`n[4/12] headless 服务端启动并监听" -ForegroundColor Cyan
     $serverInfo = New-GodotStartInfo -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$dataPath") -CaptureOutput
     $serverProcess = [System.Diagnostics.Process]::Start($serverInfo)
@@ -371,7 +376,7 @@ try {
     Assert-Check (-not $serverProcess.HasExited) '服务端进程持续运行（未提前退出）'
 
     # ------------------------------------------------ 5. 无头自测（SmokeTest）
-    Write-Host "`n[5/10] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
+    Write-Host "`n[5/12] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
     if ($ready) {
         $smokeResult = Invoke-GodotCapture -Executable $godotExe `
             -Arguments @('--headless', '--path', $serverPath, 'res://tests/SmokeTest.tscn', '--', "--port=$Port") `
@@ -396,7 +401,7 @@ catch {
 }
 finally {
     # ------------------------------------------------------- 6. 清理与残留
-    Write-Host "`n[6/10] 进程清理（R0 服务端）" -ForegroundColor Cyan
+    Write-Host "`n[6/12] 进程清理（R0 服务端）" -ForegroundColor Cyan
 
     if ($serverProcess) {
         try { $serverProcess.Refresh() } catch { }
@@ -427,7 +432,7 @@ finally {
 }
 
 # ------------------------------------------- 7. 服务端 R1 验收（R1Test）
-Write-Host "`n[7/10] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[7/12] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r1Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R1Test.tscn') `
@@ -457,8 +462,24 @@ else {
     Assert-Check $false '运行服务端 R1 验收（未定位到 Godot，已跳过）'
 }
 
-# ------------------------------------------- 8. 客户端 R1 验收（无头 + 端到端）
-Write-Host "`n[8/10] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
+# ------------------------------------------- 8. 服务端 R2 验收（回合 + 移动 + 视野）
+Write-Host "`n[8/12] 服务端 R2 验收（res://tests/R2Test.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $r2Result = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $serverPath, 'res://tests/R2Test.tscn') `
+        -TimeoutMs 300000
+    $r2Combined = ($r2Result.StdOut + "`n" + $r2Result.StdErr)
+    Assert-Check ($r2Combined -match 'R2_PASS checks=\d+') '服务端 R2 验收打印 R2_PASS checks=N' $r2Combined.Trim()
+    Assert-Check ($r2Result.ExitCode -eq 0) '服务端 R2 验收退出码为 0' "退出码：$($r2Result.ExitCode)"
+    Assert-Check ($r2Combined -notmatch 'R2_FAIL') '服务端 R2 验收未出现 R2_FAIL' `
+        ((Select-GodotProblems -Text $r2Combined) -join "`n")
+}
+else {
+    Assert-Check $false '运行服务端 R2 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------------------- 9. 客户端 R1 验收（无头 + 端到端）
+Write-Host "`n[9/12] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $clientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn') `
@@ -476,13 +497,14 @@ if ($godotExe) {
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn', '--', '--integration') `
         -TimeoutMs 240000
     $integrationCombined = ($integrationResult.StdOut + "`n" + $integrationResult.StdErr)
-    Assert-Check ($integrationCombined -match '实际 Launcher/NetClient 收到 newGame hello') `
+    # 必须匹配 R1_CLIENT_PASS: 前缀：仅凭中文 label 会把 push_error 的 R1_CLIENT_FAIL 也误判为 PASS。
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_PASS: 实际 Launcher/NetClient 收到 newGame hello') `
         '端到端：客户端拉起 headless 服务端并收到 newGame hello' `
         ((Select-GodotProblems -Text $integrationCombined) -join "`n")
-    Assert-Check ($integrationCombined -match '实际 newGame 返回300格 view') '端到端：newGame 返回 300 格 view'
-    Assert-Check ($integrationCombined -match '实际 newGame 返回四宗公开信息') '端到端：newGame 返回四宗公开信息'
-    Assert-Check ($integrationCombined -match '实际 getState 往返成功') '端到端：getState 往返成功'
-    Assert-Check ($integrationCombined -match '实际服务端刷新保持相机') '端到端：view 刷新保持相机 transform/size'
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_PASS: 实际 newGame 返回300格 view') '端到端：newGame 返回 300 格 view'
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_PASS: 实际 newGame 返回四宗公开信息') '端到端：newGame 返回四宗公开信息'
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_PASS: 实际 getState 往返成功') '端到端：getState 往返成功'
+    Assert-Check ($integrationCombined -match 'R1_CLIENT_PASS: 实际服务端刷新保持相机') '端到端：view 刷新保持相机 transform/size'
     Assert-Check ($integrationCombined -match 'R1_CLIENT_RESULT=OK') '端到端集成验收全绿（R1_CLIENT_RESULT=OK）' `
         ((Select-GodotProblems -Text $integrationCombined) -join "`n")
 
@@ -495,8 +517,46 @@ else {
     Assert-Check $false '运行客户端 R1 验收（未定位到 Godot，已跳过）'
 }
 
-# ------------------------------------------------------ 9. 仓库扫描与最终残留
-Write-Host "`n[9/10] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
+# ------------------------------ 10. 客户端 R2 验收（点选 → 高亮 → 移动 → 结束回合）
+Write-Host "`n[10/12] 客户端 R2 验收（res://tests/R2ClientTest.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $r2ClientResult = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R2ClientTest.tscn') `
+        -TimeoutMs 120000
+    $r2ClientCombined = ($r2ClientResult.StdOut + "`n" + $r2ClientResult.StdErr)
+    Assert-Check ($r2ClientCombined -match 'R2_CLIENT_RESULT=OK') '客户端 R2 无头验收全绿（R2_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $r2ClientCombined) -join "`n")
+    Assert-Check ($r2ClientResult.ExitCode -eq 0) '客户端 R2 无头验收退出码为 0' "退出码：$($r2ClientResult.ExitCode)"
+    Assert-Check ($r2ClientCombined -notmatch 'R2_CLIENT_FAIL') '客户端 R2 无头验收未出现 R2_CLIENT_FAIL'
+    Assert-Check ($r2ClientCombined -match 'hello 前结束回合按钮禁用') 'R2 TopBar 结束回合按钮在 hello 前门控'
+
+    $r2Integration = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R2ClientTest.tscn', '--', '--integration') `
+        -TimeoutMs 300000
+    $r2IntegrationCombined = ($r2Integration.StdOut + "`n" + $r2Integration.StdErr)
+    # 与 R1 同理：必须匹配 R2_CLIENT_PASS: 前缀，否则 FAIL 也会被判 PASS。
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：点选弟子后出现移动高亮') `
+        '端到端 R2：点选己方弟子出现移动高亮' `
+        ((Select-GodotProblems -Text $r2IntegrationCombined) -join "`n")
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：高亮格数与 queryMoveRange 结果一致') '端到端 R2：高亮格数与 queryMoveRange 一致'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：moveDisciple 成功，权威位置更新') '端到端 R2：moveDisciple 成功且位置更新'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：移动后迷雾变化') '端到端 R2：移动后迷雾刷新'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：结束回合后回合数 \+1') '端到端 R2：结束回合后回合数 +1'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：beginPlayerTurn 恢复弟子移动力') '端到端 R2：beginPlayerTurn 恢复移动力'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_PASS: 端到端：点选/移动/结束回合全程相机 transform/size 不变') '端到端 R2：全程相机不重置'
+    Assert-Check ($r2IntegrationCombined -match 'R2_CLIENT_RESULT=OK') '端到端 R2 集成验收全绿（R2_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $r2IntegrationCombined) -join "`n")
+
+    Start-Sleep -Milliseconds 800
+    [void](Stop-ProjectGodotProcesses -ProjectPaths @($serverPath, $clientPath))
+    Start-Sleep -Milliseconds 500
+}
+else {
+    Assert-Check $false '运行客户端 R2 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------------------------------ 11. 仓库扫描与最终残留
+Write-Host "`n[11/12] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
 $javaFiles = @()
 try {
     $javaFiles = Get-ChildItem -Path $root -Recurse -File -Filter '*.java' -ErrorAction SilentlyContinue |
@@ -513,8 +573,8 @@ Assert-Check ($finalServer.Count -eq 0) 'R1 验收结束后无残留 godot 服�
 Assert-Check ($finalClient.Count -eq 0) 'R1 验收结束后无残留 godot 客户端进程' `
     (($finalClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 
-# ---------------------------------------------- 10. 协议契约（PROTOCOL_2.0）
-Write-Host "`n[10/10] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
+# ---------------------------------------------- 12. 协议契约（PROTOCOL_2.0）
+Write-Host "`n[12/12] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
 $protocolScript = Join-Path $PSScriptRoot 'check_protocol.ps1'
 if (Test-Path -PathType Leaf $protocolScript) {
     # 必须放到子进程执行：脚本内的 exit 会终止当前会话，直接 & 调用会把自检一起带走。

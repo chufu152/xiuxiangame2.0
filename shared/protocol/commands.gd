@@ -10,3 +10,10 @@ extends RefCounted
 const PING: String = "ping"
 const NEW_GAME: String = "newGame"
 const GET_STATE: String = "getState"
+
+# --- R2：回合状态机 + 六边形移动 ---
+const FINISH_TURN: String = "finishTurn"
+const BEGIN_PLAYER_TURN: String = "beginPlayerTurn"
+const NEXT_TURN: String = "nextTurn"
+const MOVE_DISCIPLE: String = "moveDisciple"
+const QUERY_MOVE_RANGE: String = "queryMoveRange"

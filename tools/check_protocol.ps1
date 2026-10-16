@@ -10,7 +10,8 @@
       2. PROTOCOL_2.0.md 正文覆盖 69 条 + ping，分组点数严格为
          会话13 / 单位22 / 城市18 / 探索4 / 政令4 / 自动化6 / 待抉择2 = 69，不缺不溢；
       3. 每条命令条目都含 params / result / view / errorCode / 里程碑 / 状态 / 出处 七个小节；
-      4. commands.gd 中已登记的命令（ping/newGame/getState）在文档里均标「已实现」；
+      4. commands.gd 中已登记的命令（R2 起为 ping/newGame/getState/finishTurn/beginPlayerTurn/
+         nextTurn/moveDisciple/queryMoveRange 共 8 条，动态读取）在文档里均标「已实现」；
       5. 裁剪的 19 条命令只出现在 §10，不出现在 §2–§9 正文；
       6. 全文 TODO(需核对) 数量单独打印（列出清单，但不因 TODO 判失败）。
 

@@ -109,9 +109,9 @@
 |---|---|---|---|---|---|
 | `newGame` | 会话 | R1 | 是 | 否 | 已实现 |
 | `getState` | 会话 | R1 | 是 | 否 | 已实现 |
-| `finishTurn` | 会话 | R2 | 是 | 否 | 待实现（R2） |
-| `beginPlayerTurn` | 会话 | R2 | 是 | 否 | 待实现（R2） |
-| `nextTurn` | 会话 | R2 | 是 | 否 | 待实现（R2） |
+| `finishTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
+| `beginPlayerTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
+| `nextTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
 | `listSaves` | 会话 | R7 | 否 | 是 | 待实现（R7） |
 | `saveGame` | 会话 | R7 | 否 | 否 | 待实现（R7） |
 | `loadGame` | 会话 | R7 | 是 | 否 | 待实现（R7） |
@@ -125,8 +125,8 @@
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `moveDisciple` | 单位 | R2 | 是 | 否 | 待实现（R2） |
-| `queryMoveRange` | 单位 | R2 | 否 | 是 | 待实现（R2） |
+| `moveDisciple` | 单位 | R2 | 是 | 否 | 已实现（R2） |
+| `queryMoveRange` | 单位 | R2 | 否 | 是 | 已实现（R2） |
 | `batchMove` | 单位 | R5 | 是 | 否 | 待实现（R5） |
 | `attack` | 单位 | R5 | 是 | 否 | 待实现（R5） |
 | `queryAttackPreview` | 单位 | R5 | 否 | 是 | 待实现（R5） |
@@ -258,7 +258,7 @@
 - **events**：本轮结算事件（收入、维护、AI 行动、胜负检查）。
 - **errorCode**：`NO_GAME`。
 - **里程碑**：R2。
-- **状态**：待实现（R2）。
+- **状态**：已实现（R2）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1；2.0 PRD §7（R2）。
 
 ### `beginPlayerTurn`
@@ -270,7 +270,7 @@
 - **events**：TURN_START / SPIRIT_PEAK 事件。
 - **errorCode**：`NO_GAME`。
 - **里程碑**：R2。
-- **状态**：待实现（R2）。
+- **状态**：已实现（R2）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1；2.0 PRD §7（R2）。
 
 ### `nextTurn`
@@ -282,7 +282,7 @@
 - **events**：本回合事件。
 - **errorCode**：`NO_GAME`。
 - **里程碑**：R2。
-- **状态**：待实现（R2）。
+- **状态**：已实现（R2）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1；2.0 PRD §7（R2）。
 
 ### `listSaves`
@@ -428,9 +428,9 @@
 - **result**：`MoveResult` = `{success, message, reachedTileId, turnsRemaining, triggeredEvent}`。
 - **view**：是（迷雾随移动刷新）。
 - **events**：迷雾刷新 / 触发事件（若 1.0 有）。
-- **errorCode**：`BAD_PARAMS`、`NO_GAME`。
+- **errorCode**：`BAD_PARAMS`、`BAD_REQUEST`（当前阶段非 PLAYER_ACTION）、`NO_GAME`。
 - **里程碑**：R2。
-- **状态**：待实现（R2）。
+- **状态**：已实现（R2）。
 - **出处**：1.0 `PROTOCOL.md` §11.2、§11.4；`COMMAND_MAP.md` §2；2.0 PRD §7（R2）。
 
 ### `queryMoveRange`
@@ -447,7 +447,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R2。
-- **状态**：待实现（R2）。
+- **状态**：已实现（R2）。
 - **出处**：1.0 `PROTOCOL.md` §11.2、§11.4；`COMMAND_MAP.md` §2；2.0 PRD §4.1.8（移动成本叠加）。
 
 ### `batchMove`
@@ -1501,6 +1501,7 @@
 | 9 | 只读命令条数 | `PROTOCOL.md` §9 自述 28 条，但 `Protocol.java` 实为 29 条（含 `setSetting`） | 2.0 去裁剪后为 **22 条**（见 §1「只读」列） | 1.0 源自身不自洽，已按实际枚举重算并登记 |
 | 10 | 里程碑归属：`foundSpiritPeak`/`appointBuilder` | — | 本文归 R3（PRD §7 R3 服务端含「灵峰」「改良」） | PRD §7 |
 | 11 | 里程碑归属：`researchDao`/`holdRecruitment`/`queryProjectQueue`/`cancelProject`/`accelerateProject` | — | 本文归 R4（PRD §7 R4 明列），而非 R3 的「城市 18 条」分组标签 | PRD §7 R4 明列优先于分组标签 |
+| 12 | 险地附加移动代价 `map.dangerTileMoveCost` | 1.0 `HexUtils.getMoveCost()` 记「基础 1 + 险地 2」= 进入险地共 2 点 | 2.0 按 PRD §4.1.8 **叠加公式**，该键语义改为「进入险地格的**附加**代价」，取 **1**；`data/gameConfig.json` 由 `2` 改为 `1`（R2 裁决二，R1 无任何规则代码读取该键，改值安全） | PRD §4.1.8；R2 提示词裁决二 |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 

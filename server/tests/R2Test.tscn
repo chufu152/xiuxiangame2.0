@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="Runner"]
+script/source = "extends Node
+func _ready() -> void:
+	var test_script: GDScript = load(\"res://tests/R2Test.gd\")
+	if test_script == null or not test_script.can_instantiate():
+		printerr(\"R2_FAIL 测试或依赖脚本未能编译\")
+		get_tree().quit(1)
+		return
+	var test_node: Node = Node.new()
+	test_node.set_script(test_script)
+	add_child(test_node)
+"
+
+[node name="R2Test" type="Node"]
+script = SubResource("Runner")

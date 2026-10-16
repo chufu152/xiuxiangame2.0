@@ -3,7 +3,7 @@
     "defaultWidth": 20,
     "defaultHeight": 15,
     "dangerTileChance": 0.1,
-    "dangerTileMoveCost": 2,
+    "dangerTileMoveCost": 1,
     "nodeSpawnChance": {
       "lingTian": 0.15,
       "lingMai": 0.08,

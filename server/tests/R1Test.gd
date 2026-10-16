@@ -62,7 +62,11 @@ func _check(condition: bool, message: String) -> void:
 
 func _test_params() -> void:
 	var dispatcher: CommandDispatcher = CommandDispatcher.new(_config)
-	_check(dispatcher.implemented_commands().size() == 3, "只实现 ping/newGame/getState")
+	# R2 起已登记命令随里程碑增长（R2 为 8 条），故只断言 R1 三命令仍在册，不再锁死总数。
+	var implemented: Array = dispatcher.implemented_commands()
+	for required: String in ["ping", "newGame", "getState"]:
+		_check(implemented.has(required), "R1 命令仍在册：" + required)
+	_check(implemented.size() >= 3, "已登记命令不少于 R1 的 3 条")
 	_check(_request(dispatcher, "getState").get("errorCode") == "NO_GAME", "getState 开局前 NO_GAME")
 	var base: Dictionary = {"sectName": "参数宗", "playerFaction": "JIA_ZU", "randomSeed": "9007199254740993"}
 	var good: Dictionary = _request(dispatcher, "newGame", base)

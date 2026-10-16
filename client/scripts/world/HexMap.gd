@@ -7,10 +7,18 @@ var river_count: int = 0
 var fog: Fog = null
 var assets: AssetLibrary = null
 var river_keys: Dictionary = {}
+## 移动高亮层（独立于 Fog，不改地形数据）；由 show_move_range / clear_move_range 维护。
+var highlight_root: Node3D = null
+var highlight_ids: Array[String] = []
+var highlight_costs: Dictionary = {}
 
 func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> void:
 	assets = library
 	fog = fog_layer
+	# render_view 会清空全部子节点，高亮层随之失效，必须一并复位（调用方随后按需重绘）。
+	highlight_root = null
+	highlight_ids.clear()
+	highlight_costs.clear()
 	for child: Node in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -153,6 +161,57 @@ func _render_rivers(tile: Dictionary, state: Fog.State, data: Dictionary) -> voi
 func top_position(tile_id: String) -> Vector3:
 	var tile: Node3D = tiles[tile_id] as Node3D
 	return tile.position + Vector3(0, float(tile.get_meta("height")), 0)
+
+
+# ---------------------------------------------------------------------------
+# 移动高亮层（R2）
+# ---------------------------------------------------------------------------
+
+## 在可达格顶面叠半透明高亮（起点另色）。可达集与代价一律来自服务端 queryMoveRange 回包，
+## 客户端**不本地推导**可达性。
+func show_move_range(tile_ids: Array, costs: Dictionary, origin: String) -> void:
+	clear_move_range()
+	highlight_root = Node3D.new()
+	highlight_root.name = "MoveRange"
+	add_child(highlight_root)
+	for value: Variant in tile_ids:
+		var tile_id: String = str(value)
+		if not tiles.has(tile_id):
+			continue
+		var disc: CylinderMesh = CylinderMesh.new()
+		disc.top_radius = 0.94
+		disc.bottom_radius = 0.94
+		disc.height = 0.02
+		disc.radial_segments = 6
+		var is_origin: bool = tile_id == origin
+		# 起点用金边强调，其余用淡墨青，均半透明；不遮挡地形与单位。
+		var color: Color = Color(0.85, 0.64, 0.24, 0.62) if is_origin else Color(0.24, 0.55, 0.49, 0.34)
+		var material: StandardMaterial3D = solid(color)
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var instance: MeshInstance3D = add_mesh(highlight_root, "Highlight", disc, top_position(tile_id) + Vector3(0, 0.03, 0), material)
+		instance.rotation.y = PI / 6.0
+		highlight_ids.append(tile_id)
+	highlight_costs = costs.duplicate()
+
+
+func clear_move_range() -> void:
+	if highlight_root != null and is_instance_valid(highlight_root):
+		remove_child(highlight_root)
+		highlight_root.queue_free()
+	highlight_root = null
+	highlight_ids.clear()
+	highlight_costs.clear()
+
+
+## 该格当前是否处于移动高亮中。
+func has_highlight(tile_id: String) -> bool:
+	return highlight_ids.has(tile_id)
+
+
+## 该格的累计移动代价；未高亮返回 -1。
+func highlight_cost(tile_id: String) -> int:
+	return int(highlight_costs.get(tile_id, -1))
+
 
 func pick_tile(camera: Camera3D, screen_position: Vector2) -> String:
 	var origin: Vector3 = camera.project_ray_origin(screen_position)

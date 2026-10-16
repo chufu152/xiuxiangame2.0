@@ -45,9 +45,10 @@ static func initialize(state: GameState, params: Dictionary, config: Dictionary,
 			for root_index: int in range(int(setup["rootCount"])):
 				disciple.spiritRoots.append(str(roots[rng.next_int(0, roots.size() - 1)]))
 			disciple.unitClass = str(setup["unitClass"])
-			disciple.movePoints = int(config["disciple"]["baseMovePoints"]) + int(setup["realmMoveBonus"][disciple.realm])
-			for root: String in disciple.spiritRoots: disciple.movePoints += int(setup["rootMoveBonus"][root])
-			disciple.movePoints += int(config["warfare"]["unitClasses"][disciple.unitClass]["moveBonus"])
+			# 移动力公式唯一来源：开局与每回合开始共用 MoveRules，避免两处漂移。
+			var move_points: int = MoveRules.calculate_max_move_points(disciple, config)
+			disciple.maxMovePoints = move_points
+			disciple.movePoints = move_points
 			disciple.attacksRemaining = int(config["warfare"]["attacksPerTurn"])
 			if unit_index == 0:
 				disciple.assignedPeakId = peak.id

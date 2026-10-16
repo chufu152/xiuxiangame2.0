@@ -12,40 +12,43 @@
 ### 1.1 总体位置
 
 ```
-R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ← 当前位置 ┃ R2 ⬜ ┃ R3 · R4 · R5 · R6 · R7 · R8 · R9
-骨架完成 ┃ 地图开局 ┃ R2 前置修复         ┃ 下一目标┃ 全部未开始
+R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅ ← 当前位置 ┃ R3 · R4 · R5 · R6 · R7 · R8 · R9
+骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 全部未开始
 ```
 
-**当前位置：R2 前置修复（R1.5）已完成 → 下一个里程碑 R2「回合 / 移动 / 视野」。**
+**当前位置：R2「回合 / 移动 / 视野」已完成 → 下一个里程碑 R3「经济与城市」。**
 
 - 分支：`main`（WorkBuddy 在独立 worktree 工作，分支 `workbuddy/main-*`，统一推 `HEAD:main`）。
 - 里程碑提交：
   - R0 `d4c5bf7 feat(r0): godot dual-project scaffold and websocket handshake`
   - R1 `9754360 feat(r1): layered terrain generation, newgame view, 2.5d locked camera and fog`
   - R1 收尾 `fac1593 fix(check): tolerate sandbox-blocked probe cleanup`
-  - R1.5 提示词 `3e49c09 docs(r1.5): add pre-r2 fix prompt`
+  - R1.5 提示词 `3e49c09 docs(r1.5): add pre-r2 fix prompt (worktree mount, protocol contract, art schedule)`
+  - R1.5 `8c622b5 docs(r1.5): add protocol_2.0 contract, mount shared in worktree, schedule placeholder art`
+  - R2 提示词 `d38e1fa docs(r2): add R2 prompt for turn state machine, BFS movement, vision on move`
+  - R2 `PENDING` `feat(r2): turn state machine, terrain-aware BFS movement, vision on move`
 
 ### 1.2 已交付并验证的资产
 
 | 层 | 文件 | 状态 |
 |---|---|---|
-| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（`ping`/`newGame`/`getState`）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量）、`dto`（信封解析与构造） |
+| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（**R2 起 8 条**：`ping`/`newGame`/`getState`/`finishTurn`/`beginPlayerTurn`/`nextTurn`/`moveDisciple`/`queryMoveRange`）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量）、`dto`（信封解析与构造） |
 | 共享几何 | `shared/geo/hex.gd` | ✅ 7 个静态函数（`id/coords/neighbors/distance/to_world/opposite/edge_vertices`）已按 R1 契约补齐，两端共用 |
-| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、`ping`/`newGame`/`getState`、错误码口径、`view` 全量快照 + 迷雾快照 |
-| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算 |
-| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()` |
-| 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出 |
-| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退 |
-| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收 |
+| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、`ping`/`newGame`/`getState`/`finishTurn`/`beginPlayerTurn`/`nextTurn`/`moveDisciple`/`queryMoveRange`、错误码口径、`view` 全量快照 + 迷雾快照 |
+| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算；**R2 新增**：移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机（已实做 TURN_START/SPIRIT_PEAK/PLAYER_ACTION，其余留 TODO） |
+| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`** |
+| 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出；**R2 起 `map.dangerTileMoveCost = 1`**（险地附加，裁决二） |
+| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar（回合/阶段/资源/结束回合）、点选→高亮→移动交互 |
+| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`（finishTurn→beginPlayerTurn） |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在 |
-| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；校验脚本 35/35 全绿 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **11 阶段**（`[0/10]`–`[10/10]`），含 R0/R1 全量断言 + 协议契约校验 |
+| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R2 起 8 条标「已实现」**；校验脚本 35/35 全绿 |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **13 阶段**（`[0/12]`–`[12/12]`），含 R0/R1/R2 全量断言 + 协议契约校验 |
 
 ### 1.3 遗留缺口（进入 R2 前需知悉，不阻塞 R2）
 
 1. **美术资源实体文件为 0**（`assets/` 下除 `manifest.json` 外无实体文件）。**这是计划内状态**，不是缺陷：
    - `AssetLibrary` 对 manifest 里 60+ 逻辑 ID 缺失时**全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**。
-   - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[8/10]` 断言 `同一缺失 logicalID 只 WARN 一次`。
+   - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/12]` 断言 `同一缺失 logicalID 只 WARN 一次`。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
 2. **协议契约仍有 8 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内。**不阻塞 R2**（R2 只用 `finishTurn`/`nextTurn`/`beginPlayerTurn`/`moveDisciple`/`queryMoveRange`，其字段已完整），随对应里程碑逐条补齐。
 3. **R2–R9 提示词未生成**（按项目约定「进入该里程碑时再生成」，当前仅 `R0`、`R1`、`R1.5` 三份）。
@@ -112,30 +115,37 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ← 当前位置 ┃ R2 ⬜ ┃ R3 · R4 · R
 
 ---
 
-## 四、下一步（R2）启动清单
+## 四、R2 交付纪要 与 下一步（R3）
 
-> 提示词**尚未生成**（按约定在进入里程碑时生成）：需先产出 `docs/prompts/R2_回合移动视野.md`，套用 `docs/prompts/README.md` §8 模板，含显式签名与可机检断言。
+> R2 已于本里程碑完成并提交推送（见 §一 提交列表）。以下为**实际交付**与**R3 启动清单**。
 
-**Step 0 · 生成 R2 提示词**
-- 按 `docs/prompts/README.md` §8 模板撰写，必读锚点指向 `REQUIREMENTS_2.0.md` §4.1.8（移动成本叠加）/§4.2（视野）/§4.5（回合流程）/§6.7、`PROTOCOL_2.0.md` §2、§3。
-- 硬约束写明：山岳不可通行、BFS 与 `queryMoveRange` 同算法、相机刷新不重置。
-- 非目标写明：不做经济/城市（R3）、不做战斗（R5）。
+### 4.1 R2 实际交付（与本清单原始计划的偏差）
 
-**Step 1 · 服务端规则（R2 核心）**
-- 6 阶段回合状态机（`Enums.TurnPhase.ALL`：`TURN_START`/`SPIRIT_PEAK`/`PLAYER_ACTION`/`SETTLEMENT`/`AI_ACTION`/`VICTORY_CHECK`）。
-- 地形移动力叠加（海拔 + 地貌 + 险地 + 跨河 + ZOC − 道路，取整 ≥1）+ BFS 可达；**与 `queryMoveRange` 共用同一算法**。
-- 视野随动（丘陵站立 +1；回合开始/移动/驻守/夺峰夺点后重算）。
+- **任务 0（硬门禁）先做**：修复 R1 端到端冷启动竞态——`Session.gd` 改为「拉起后 0.5s 轮询、40s 总超时」的就绪等待，`server_pid > 0` 期间连接失败不重复 `launch`；`R1ClientTest.gd` deadline 25s→45s 且提前返回前回收子进程。实测冷启动 5 连跑全 `R1_CLIENT_RESULT=OK`（13.86–15.46s）。
+- **服务端**：新增 `rules/{MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`；`Disciple` 加 `maxMovePoints`/`turnsInSect`；`CommandDispatcher` 注册 5 条新命令（共 8）；`map.dangerTileMoveCost` 2→1（裁决二）。
+- **六阶段状态机**：已实做 `TURN_START`/`SPIRIT_PEAK`/`PLAYER_ACTION`；`SETTLEMENT`/`AI_ACTION`/`VICTORY_CHECK` 为**空壳 + `# TODO(R3/R4/R6/R7)`**（R2 明确非目标）。
+- **客户端**：`HexMap` 高亮层、`UnitView` 选中标记、`World` TopBar（回合/阶段/资源/结束回合）+ 点选→高亮→移动交互；**客户端零可达计算**（全部消费 `queryMoveRange`）；相机全程不重置。
+- **偏差**：BFS 采用「`Array[String]` 队列 + 头游标 + 固定邻居序」的定序 Dijkstra（非 PRD 泛述的「ZOC − 道路」，ZOC/道路为 R5 非目标，未实现）。
+- **验收**：服务端 `R2Test` 220 checks、客户端 `R2ClientTest` 36 checks、`check.ps1` 13 阶段全绿。
+
+### 4.2 下一步 · R3「经济与城市」启动清单
+
+**Step 0 · 生成 R3 提示词**
+- 按 `docs/prompts/README.md` §8 模板撰写，必读锚点指向 `REQUIREMENTS_2.0.md` §4.3（经济/产出/人口/住房/安定）/§4.4（灵峰/建筑/区域/劳力/改良/道路）、`PROTOCOL_2.0.md` §2、§3。
+- 非目标写明：不做道统/修炼（R4）、不做战斗（R5）。
+
+**Step 1 · 服务端规则**
+- 经济结算（回合 `SETTLEMENT` 阶段落地，替换 R2 的 TODO 空壳）、地形产出、人口/住房/安定、灵峰、建筑、区域（含地形邻接）、劳力、改良、道路。
 
 **Step 2 · 协议命令**
-- 在 `shared/protocol/commands.gd` 登记 `finishTurn`/`nextTurn`/`beginPlayerTurn`/`moveDisciple`/`queryMoveRange`，并在 `CommandDispatcher` 注册处理器；`hello.implementedCommands` 自动同步。
-- 按 `PROTOCOL_2.0.md` §2/§3 的 `params`/`result`/`view` 口径落地（`queryMoveRange` 为只读、不回 `view`）。
+- 城市 18 条命令（`PROTOCOL_2.0.md` 分组 22）；在 `commands.gd` 登记并在 `CommandDispatcher` 注册；`hello.implementedCommands` 自动同步。
 
 **Step 3 · 客户端表现**
-- 点选单位、移动范围高亮（消费 `queryMoveRange`，**客户端不自己算**）、点击移动、TopBar（回合/阶段/资源）。
+- 城市面板、建造/区域选址、劳力指派、改良、资源栏。
 
 **Step 4 · 验收与提交**
-- 扩展 `tools/check.ps1` 到 R2 阶段：高亮即可达、山岳不可达、丘陵/灵林/雾泽/跨河扣力与预览一致、迷雾随移动更新。
-- 全绿后：`git add -A && git commit -m "feat(r2): ..." && git push origin HEAD:main`。
+- 扩展 `tools/check.ps1`：产出与 config 一致、山岳不可建城、丘陵/灵林限制、区域邻接与上限、安定惩罚生效。
+- 全绿后：`git add -A && git commit -m "feat(r3): ..." && git push origin HEAD:main`。
 
 ---
 
