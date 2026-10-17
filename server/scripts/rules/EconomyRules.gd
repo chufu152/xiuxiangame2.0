@@ -50,19 +50,26 @@ static func tile_yield(state: GameState, config: Dictionary, tile: HexTile, peak
 
 
 ## 无视指派、纯按地块计算产出（指派预览 / 选址提示用）。
-## 组成：基底地形 + 地貌（`map.features[].yield`）+ 节点（`city.workYieldByNode`）+ 改良（完好时）。
-## 说明：`city` 无「海拔产出表」键，故 §4.1.9 的「丘陵石+1」与「河 foodBonus」无权威数值来源，
-## 本实现不臆造，登记为缺口（见里程碑汇报的 `TODO(需核对)` 清单）。
+## 组成（顺序同 PRD §4.1.9 L315）：基底地形 + 海拔（`map.relief[].yield`，丘陵石 +1）
+## + 地貌（`map.features[].yield`）+ 河流（`map.river.foodBonus`，沿河粮 +1）+ 节点
+## （`city.workYieldByNode`）+ 改良（完好时）。
 static func tile_yield_preview(state: GameState, config: Dictionary, tile: HexTile) -> Dictionary:
 	var result: Dictionary = zero_yield()
 	var city: Dictionary = config["city"]
 	var terrain_table: Dictionary = city["workYieldByTerrain"]
 	if terrain_table.has(tile.baseTerrain):
 		add_yield(result, terrain_table[tile.baseTerrain])
+	# 海拔加成（PRD §4.1.3「丘陵 石 +1」；平地/山岳为空表）
+	var relief_table: Dictionary = config["map"]["relief"]
+	if relief_table.has(tile.relief) and relief_table[tile.relief].has("yield"):
+		add_yield(result, relief_table[tile.relief]["yield"])
 	var feature_table: Dictionary = config["map"]["features"]
 	for feature: String in tile.features:
 		if feature_table.has(feature) and feature_table[feature].has("yield"):
 			add_yield(result, feature_table[feature]["yield"])
+	# 沿河灌溉（PRD §4.1.5 L280「沿河地块：粮 +1」）
+	if not tile.riverEdges.is_empty():
+		result["food"] = int(result["food"]) + int(config["map"]["river"]["foodBonus"])
 	if not tile.nodeId.is_empty() and state.nodes.has(tile.nodeId):
 		var node: GameNode = state.nodes[tile.nodeId]
 		var node_table: Dictionary = city["workYieldByNode"]

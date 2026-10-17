@@ -36,7 +36,8 @@
         "moveCost": 1,
         "defenseBonus": 0.0,
         "visionBonus": 0,
-        "passable": true
+        "passable": true,
+        "yield": {}
       },
       "HILL": {
         "height": 1.7,
@@ -44,7 +45,10 @@
         "moveCost": 2,
         "defenseBonus": 0.2,
         "visionBonus": 1,
-        "passable": true
+        "passable": true,
+        "yield": {
+          "spiritStones": 1
+        }
       },
       "MOUNTAIN": {
         "height": 3.0,
@@ -52,7 +56,8 @@
         "moveCost": 0,
         "defenseBonus": 0.0,
         "visionBonus": 0,
-        "passable": false
+        "passable": false,
+        "yield": {}
       }
     },
     "features": {

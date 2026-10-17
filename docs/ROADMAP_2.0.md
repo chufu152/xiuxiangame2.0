@@ -55,7 +55,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
    - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/14]` 断言 `同一缺失 logicalID 只 WARN 一次`。
    - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 新增：`city` 配置缺「丘陵石+1 / 河流 foodBonus」权威键、`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离。**不阻塞 R4**，随对应里程碑逐条补齐。
+2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 新增：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）。**已消项**：原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）。**不阻塞 R4**，随对应里程碑逐条补齐。
 3. **R4–R9 提示词已全部预生成**（草案）；`R4_道统与修炼.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
@@ -135,6 +135,17 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
 - **偏差/修复（客户端两处）**：① `_on_r3_result_received` 原先把只读 `query*` 回包（不带 `success`）误判为「操作失败」，已改为只接管写命令；② `select_peak` 原先连发 `queryCityDetail` + `queryBuildOptions`，而 `Session._request` 是单请求串行语义（`busy` 期间静默丢弃），已改为「详情回包后链式拉取可构建清单」。
 - **协议契约**：`PROTOCOL_2.0.md` 15 条 `待实现（R3）`→`已实现（R3）`；§11.1 增 5 行冲突裁决（`Enums.Improvement`/`Enums.District` 重命名、`Improvement.networkLevel`、`queryCityDetail.districts[].buildings` 为字符串数组、道法门控在 R3 不可建）；§11.2 增 3 处缺口；§12.1/§12.4/§12.5 同步 `view` 字段。`TODO(需核对)` 8 → 11 处（脚本只统计不断言）。
 - **验收**：服务端 `R3_PASS checks=268`；客户端无头 `R3_CLIENT_RESULT=OK checks=5`、端到端 `R3_CLIENT_RESULT=OK checks=43`；`check.ps1` **15 阶段 81/81 全绿**；`check_protocol.ps1` 35/35（69 条分组点数 13/22/18/4/4/6/2 不变、23 条已实现）；无残留 godot 进程、无 `.java`。
+
+### 4.1.1 R3 收尾完善（交付后补做）
+
+- **补齐地块产出的海拔/河流加成**（原 §11.2 #7 缺口）：`EconomyRules.tile_yield_preview` 现按 PRD §4.1.9 L315 的顺序计算 **基底 → 海拔 → 地貌 → 河流 → 节点 → 改良**。
+  - 海拔：新增配置键 `map.relief[].yield`（形状对齐既有 `map.features[].yield`），`HILL = {spiritStones: 1}`（PRD §4.1.3 表「丘陵…石 +1」），`FLAT`/`MOUNTAIN` 空表；`ConfigValidator` 增对应类型校验。
+  - 河流：接通 `map.river.foodBonus`（值 1，PRD §4.1.5 L280「沿河地块：粮 +1」）。**该键与校验此前早已存在但无任何代码读取（死键）**，本次一并修掉。
+  - 影响：丘陵不再是「只涨移动成本、无经济收益」的废格；`BARREN` 的 `spiritStones` 基底与丘陵加成叠加后可达 3。
+- **新增 `_test_tile_yield`**（11 项断言）：平地基线、丘陵石 +1、平地/山岳无海拔加成、沿河粮 +1、丘陵+沿河+灵林+灵田四重叠加逐项累加、未指派不产出。
+- **登记新缺口 §11.2 #9**：灵泉衰减/修缮恢复（`economy.lingQuanDecayRate` / `lingQuanMinOutput` / `improvement.lingQuanRestorePerTurn` 三个死键）。1.0 以 `lingQuanBaseOutput`(15) 为分母求衰减下限，2.0 改由 `city.workYieldByNode.LING_QUAN` 给出产出后分母无权威取值；灵泉枯竭属 PRD §5.1「灾劫」，归 R6，故 R3 **不臆造系数**、留待 R6 一并回填。
+- **死键审计**（`city`/`economy`/`road`/`improvement`/`spiritPeak`/`building`/`qiYun` 全部标量键对照代码引用）：除上述已修与已登记项外，其余未读键均属后续里程碑计划内（`recruitment*`/`refundRate`/`accelerateStonePerTurn`/`prestigeCultivation*`/`qiYunPerUnlockedDao` → R4；`prestigePerBattleWin` → R5；`cityAutoBuild*`/`guoJiaGovernancePerTile` → R6），无遗漏。
+- **验收变化**：`R3_PASS checks=268 → 279`；`check.ps1` 仍 15 阶段全绿；`check_protocol.ps1` 仍 35/35（`TODO(需核对)` 计数 11 → 11：消 1 增 1，见上）。
 
 ### 4.2 下一步 · R4「道统与修炼」启动清单
 

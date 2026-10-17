@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_districts()
 	_test_workers()
 	_test_improvements()
+	_test_tile_yield()
 	_test_settlement()
 	_test_roads()
 	_test_annex()
@@ -459,6 +460,80 @@ func _test_improvements() -> void:
 # ---------------------------------------------------------------------------
 # 6. 经济结算（apply_settlement）
 # ---------------------------------------------------------------------------
+
+## 地块产出构成（PRD §4.1.9 L315）：基底 + 海拔（丘陵石+1）+ 地貌 + 沿河粮+1 + 节点 + 改良。
+## 逐项独立复算，不经由被测函数推导期望值。
+func _test_tile_yield() -> void:
+	var dispatcher: CommandDispatcher = _new_game("123456")
+	var state: GameState = dispatcher.state
+	var tile: HexTile = state.tiles[state.sects[0].spiritPeaks[0].tileId]
+	# 用一座无节点、无地貌、无河流、无改良的平地作为基线
+	var original: Dictionary = {
+		"baseTerrain": tile.baseTerrain, "relief": tile.relief, "features": tile.features.duplicate(),
+		"riverEdges": tile.riverEdges.duplicate(), "nodeId": tile.nodeId, "improvementId": tile.improvementId,
+	}
+	tile.baseTerrain = Enums.BaseTerrain.SPIRIT_PLAIN
+	tile.relief = Enums.Relief.FLAT
+	var no_features: Array[String] = []
+	tile.features = no_features
+	var no_edges: Array[int] = []
+	tile.riverEdges = no_edges
+	tile.nodeId = ""
+	tile.improvementId = ""
+	var plain: Dictionary = EconomyRules.tile_yield_preview(state, _config, tile)
+	var base: Dictionary = _config["city"]["workYieldByTerrain"][Enums.BaseTerrain.SPIRIT_PLAIN]
+	_check(_same_yield(plain, base), "平地基线产出 == workYieldByTerrain（粮%d 灵力%d）" % [int(base["food"]), int(base["spiritPower"])])
+
+	# ① 丘陵：石 +map.relief.HILL.yield.spiritStones（PRD §4.1.3）
+	tile.relief = Enums.Relief.HILL
+	var hill: Dictionary = EconomyRules.tile_yield_preview(state, _config, tile)
+	var hill_bonus: Dictionary = _config["map"]["relief"]["HILL"]["yield"]
+	_check(int(hill["spiritStones"]) == int(base.get("spiritStones", 0)) + int(hill_bonus["spiritStones"]), "丘陵地块灵石 +%d" % int(hill_bonus["spiritStones"]))
+	_check(int(hill["food"]) == int(base["food"]), "丘陵不改粮产")
+	_check(int(_config["map"]["relief"]["FLAT"]["yield"].size()) == 0, "平地无海拔产出加成")
+	_check(int(_config["map"]["relief"]["MOUNTAIN"]["yield"].size()) == 0, "山岳无海拔产出加成")
+
+	# ② 沿河：粮 +map.river.foodBonus（PRD §4.1.5 L280）
+	tile.relief = Enums.Relief.FLAT
+	var river_edge: Array[int] = [0]
+	tile.riverEdges = river_edge
+	var riverside: Dictionary = EconomyRules.tile_yield_preview(state, _config, tile)
+	_check(int(riverside["food"]) == int(base["food"]) + int(_config["map"]["river"]["foodBonus"]), "沿河地块粮 +%d" % int(_config["map"]["river"]["foodBonus"]))
+	_check(int(riverside["spiritPower"]) == int(base["spiritPower"]), "沿河不改灵力产出")
+
+	# ③ 叠加：丘陵 + 沿河 + 灵林地貌 + 灵田节点，逐项累加
+	tile.relief = Enums.Relief.HILL
+	var forest: Array[String] = [Enums.Feature.SPIRIT_FOREST]
+	tile.features = forest
+	var node: GameNode = GameNode.new()
+	node.id = "test_ling_tian"
+	node.type = Enums.NodeType.LING_TIAN
+	node.tileId = tile.id
+	state.nodes[node.id] = node
+	tile.nodeId = node.id
+	var stacked: Dictionary = EconomyRules.tile_yield_preview(state, _config, tile)
+	var expected_food: int = int(base["food"]) + int(_config["map"]["features"][Enums.Feature.SPIRIT_FOREST]["yield"].get("food", 0)) + int(_config["map"]["river"]["foodBonus"]) + int(_config["city"]["workYieldByNode"][Enums.NodeType.LING_TIAN].get("food", 0))
+	var expected_stones: int = int(base.get("spiritStones", 0)) + int(hill_bonus["spiritStones"])
+	var expected_power: int = int(base["spiritPower"]) + int(_config["map"]["features"][Enums.Feature.SPIRIT_FOREST]["yield"].get("spiritPower", 0)) + int(_config["city"]["workYieldByNode"][Enums.NodeType.LING_TIAN].get("spiritPower", 0))
+	_check(int(stacked["food"]) == expected_food, "叠加产出粮 == 独立累加(%d)" % expected_food)
+	_check(int(stacked["spiritStones"]) == expected_stones, "叠加产出灵石 == 独立累加(%d)" % expected_stones)
+	_check(int(stacked["spiritPower"]) == expected_power, "叠加产出灵力 == 独立累加(%d)" % expected_power)
+
+	# ④ 未指派 → 不产出（`tile_yield` 要求 workedByPeakId 匹配）
+	var peak: SpiritPeak = state.sects[0].spiritPeaks[0]
+	peak.workedTileIds.clear()
+	tile.workedByPeakId = ""
+	_check(_same_yield(EconomyRules.tile_yield(state, _config, tile, peak), EconomyRules.zero_yield()), "未指派地块不产出")
+
+	# 还原
+	tile.baseTerrain = str(original["baseTerrain"])
+	tile.relief = str(original["relief"])
+	tile.features = original["features"]
+	tile.riverEdges = original["riverEdges"]
+	tile.nodeId = str(original["nodeId"])
+	tile.improvementId = str(original["improvementId"])
+	state.nodes.erase("test_ling_tian")
+
 
 func _test_settlement() -> void:
 	var dispatcher: CommandDispatcher = _new_game("123456")

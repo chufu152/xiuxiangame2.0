@@ -1508,6 +1508,7 @@
 | 16 | `improvement` 对象字段 `networkLevel` | 1.0 `Improvement` 无该字段 | 2.0 **只加** `networkLevel`（青石道路网络等级缓存：`0`=无 / `1`=连 / `2`=枢纽），由 `RoadNetworkService.refresh()` 维护；随 `view.improvements{}` 与 `queryCityDetail` 相关查询下发 | 2.0 代码 `RoadNetworkService.gd`、`Improvement.to_dict` |
 | 17 | `queryCityDetail.districts[].buildings` 元素类型 | 1.0 `District.buildings` 为 `List<BuildingType>` | 2.0 为**建筑类型字符串数组**（如 `["SHAN_MEN","CANG_JING_GE"]`），非对象数组 | 2.0 代码 `CityAction.query_city_detail` |
 | 18 | 道法门控改良在 R3 不可建 | 1.0 改良门控与道法同里程碑生效 | 2.0 道法系统属 **R4**（本里程碑非目标），故 `ImprovementRules._has_unlocked_dao()` 在 R3 **恒返回 false**（`# TODO(R4)`）：`LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）在 R3 `queryImprovementOptions.buildable=false`、`rejection` 提示「需道法」；R4 回填 | R3 提示词「非目标」（道法属 R4）；2.0 代码 `ImprovementRules` |
+| 19 | 海拔/河流产出加成的配置落点 | 1.0 `EconomyCalculator` 无「丘陵石+1」「沿河粮+1」实现（`grep foodBonus`/`HILL` 于 1.0 全仓无命中），该加成为 **2.0 PRD 新增** | 2.0 按 PRD 既有写法落为配置键：`map.relief[].yield`（形状对齐 `map.features[].yield`，`HILL` 取 `{spiritStones:1}`、`FLAT`/`MOUNTAIN` 空表，依据 PRD §4.1.3 表「丘陵…石 +1」）与 `map.river.foodBonus`（**该键 2.0 配置与 `ConfigValidator` 早已存在但此前无代码读取**，依据 PRD §4.1.5 L280「沿河地块：粮 +1」）。产出顺序 = 基底 → 海拔 → 地貌 → 河流 → 节点 → 改良（PRD §4.1.9 L315）。R3 收尾完善时回填，`EconomyRules.tile_yield_preview` 唯一出口 | PRD §4.1.3 / §4.1.5 L280 / §4.1.9 L315；2.0 代码 `EconomyRules`、`ConfigValidator` |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
@@ -1519,9 +1520,9 @@
 | 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | `TODO(需核对)` |
 | 5 | 地形 blocker 的归属 | PRD §6.7 末注：山岳不可建城/不可通行、雾泽、缺水由 `querySpiritPeakBlocker` / `queryBuildOptions` / `queryMoveRange` 返回 | `TODO(需核对)`：`querySpiritPeakBlocker` **不在 69 条命令清单内**（PRD §6.7 未登记），需确认它是否为新增命令或应并入 `queryBuildOptions`；本文**不新增命令**，故仅在 `foundSpiritPeak`/`queryMoveRange` 的说明中引用该语义 |
 | 6 | `awaitInput.options` 的 `routeId`/`description` 之外是否另有字段 | PRD §6.3 给出 `routeId`/`description` | 已按 PRD §6.3 落地，无 TODO |
-| 7 | `city` 配置缺「地貌/河流」产出表 | PRD §4.1.9 提及「丘陵石 +1」「河流 `foodBonus`」，但 `data/gameConfig.json` 的 `city.workYieldByTerrain`/`workYieldByNode` **无 `relief`/`river` 维度对应键**（R3 实做时逐键核对确认） | `TODO(需核对)`：核对 1.0 `EconomyCalculator` 该加成是配置驱动还是硬编码；R3 **未实现**该加成（仅按配置已有键计算产出），待权威源明确后回填 |
-| 8 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | `TODO(需核对)`：掠夺触发点在移动路径（R2 `MoveAction`）与攻击路径（R5 `attack`），**R3 未接线**；待对应里程碑落地时调用，避免提前改动已验证的移动规则 |
-| 9 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
+| 7 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | `TODO(需核对)`：掠夺触发点在移动路径（R2 `MoveAction`）与攻击路径（R5 `attack`），**R3 未接线**；待对应里程碑落地时调用，避免提前改动已验证的移动规则 |
+| 8 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
+| 9 | 灵泉衰减/修缮恢复的生效口径 | 配置含 `economy.lingQuanDecayRate` 0.02 / `lingQuanMinOutput` 3 / `improvement.lingQuanRestorePerTurn` 0.05，PRD §4.4 记「灵泉修缮：灵泉每回合恢复 5%」；但 2.0 配置**无 `lingQuanBaseOutput`**（1.0 有，值 15），而 2.0 节点产出改由 `city.workYieldByNode.LING_QUAN`（`spiritPower:6`）给出，衰减下限 `minFactor` 的分母无权威取值 | `TODO(需核对)`：1.0 `EconomyCalculator.settleLingQuanDecay()` 以 `lingQuanMinOutput / lingQuanBaseOutput` 求下限、以 `node.decayRate` 乘算产出；2.0 改用 `workYieldByNode` 后分母应取哪个键未定。**R3 未实现衰减与恢复**（灵泉枯竭属 PRD §5.1「灾劫」，归 R6 判定），待 R6 落地时一并回填，避免臆造系数 |
 
 ---
 

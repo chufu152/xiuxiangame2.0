@@ -61,6 +61,11 @@ static func validate(config: Dictionary) -> Array[String]:
 	for relief: String in Enums.Relief.ALL:
 		for field: String in ["height", "ratio", "moveCost", "defenseBonus", "visionBonus"]: _number(config, "map.relief." + relief + "." + field, errors)
 		_require(config, "map.relief." + relief + ".passable", TYPE_BOOL, errors)
+		# 海拔产出加成（PRD §4.1.9 L315「丘陵石+1」）；平地/山岳为空表
+		_require(config, "map.relief." + relief + ".yield", TYPE_DICTIONARY, errors)
+		for resource: String in ["food", "spiritPower", "spiritStones", "daoPoints", "qiYun"]:
+			if _lookup(config, "map.relief." + relief + ".yield") != null and (_lookup(config, "map.relief." + relief + ".yield") as Dictionary).has(resource):
+				_number(config, "map.relief." + relief + ".yield." + resource, errors)
 		var ratio: Variant = _lookup(config, "map.relief." + relief + ".ratio")
 		if _is_number(ratio):
 			ratio_sum += float(ratio)
