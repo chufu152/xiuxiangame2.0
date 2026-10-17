@@ -6,7 +6,8 @@ extends RefCounted
 ## **不检查宣战**（PRD §5.2 #1）：攻击只看战力与目标价值，不需要战争状态。
 ##
 ## 行为只由 `ai.*` 与 `difficulty.levels.*` 驱动，每回合按 `aiActionPoints`（难度覆盖）逐点决策：
-## 攻击 → 扩张 → 探索 → 研究 → 驻守 → 收徒 → 血脉 → 修路。
+## 攻击 → 扩张 → 探索 → 研究 → 驻守 → 收徒 → 血脉 → 修路；行动点用完后另有**每回合至多一次**
+## 的渡劫飞升（不占行动点，见 `_try_tribulate`）。
 ## 顺序固定（先打后建），每类动作由对应倾向值掷骰决定「本回合要不要尝试」，
 ## 三流派靠 `ai.*` 倾向值与 `faction.*` 特性自然分化（宗门偏研究、家族偏血脉、国家偏扩张）。
 ##
@@ -35,6 +36,11 @@ static func run_turn(state: GameState, config: Dictionary, sect: Sect) -> Array[
 			break
 		events.append(text)
 		state.eventLog.append(text)
+	# R10 修复：渡劫飞升。**不放进 `_next_action` 的优先级链**，每回合至多一次（见 `_try_tribulate`）。
+	var tribulation: String = _try_tribulate(state, config, sect)
+	if not tribulation.is_empty():
+		events.append(tribulation)
+		state.eventLog.append(tribulation)
 	return events
 
 
@@ -74,12 +80,33 @@ static func _try_attack(state: GameState, config: Dictionary, sect: Sect) -> Str
 		return ""
 	var threshold: float = float(ai["combatAdvantageThreshold"])
 	var min_chance: float = float(ai["attackMinWinChance"])
+	# **性能：敌方格集合每次进攻只算一次**（见 `_enemy_tiles` 的注释）。
+	var enemy_tiles: Array[String] = _enemy_tiles(state, sect)
+	if enemy_tiles.is_empty():
+		return ""
 	for disciple: Disciple in _sorted_disciples(sect):
 		if not UnitRules.can_fight(disciple) or disciple.attacksRemaining <= 0:
 			continue
+		# **R10 修复：不得以「本宗当场覆灭」为代价发起进攻。**
+		# 宗门流「宗主陨落且无金丹以上继承人」即覆灭（`VictoryRules.check_defeat` 第三分支），
+		# 而 AI 原先把宗主当普通战力派出去——只看 `can_fight` 与战力比，不看职位。
+		# 平衡抽样里宗门流因此 48/48 席全部在第 74 回合前后自灭，胜率 0%。
+		# 判据直接取自失败规则本身（反事实推演「此人没了会不会覆灭」），不引入新的调参项。
+		if VictoryRules.would_collapse_if_lost(sect, disciple.id):
+			continue
+		var origin: HexTile = state.tiles.get(disciple.tileId, null)
+		if origin == null:
+			continue
+		var reach: int = UnitRules.range_of(config, disciple)
 		var best_tile: String = ""
 		var best_chance: float = -1.0
-		for tile_id: String in _enemy_targets_of(state, config, disciple):
+		for tile_id: String in enemy_tiles:
+			var tile: HexTile = state.tiles.get(tile_id, null)
+			if tile == null:
+				continue
+			var distance: int = Hex.distance(Vector2i(origin.q, origin.r), Vector2i(tile.q, tile.r))
+			if distance < 1 or distance > reach:
+				continue
 			var preview: Dictionary = CombatResolver.preview(state, config, disciple.id, tile_id)
 			if not bool(preview["attackable"]):
 				continue
@@ -87,7 +114,8 @@ static func _try_attack(state: GameState, config: Dictionary, sect: Sect) -> Str
 			if chance < min_chance:
 				continue
 			var defender_power: int = maxi(1, int(preview["defenderPower"]))
-			if float(int(preview["attackerPower"])) / float(defender_power) < threshold:				continue
+			if float(int(preview["attackerPower"])) / float(defender_power) < threshold:
+				continue
 			if chance > best_chance:
 				best_chance = chance
 				best_tile = tile_id
@@ -99,22 +127,22 @@ static func _try_attack(state: GameState, config: Dictionary, sect: Sect) -> Str
 	return ""
 
 
-## 该弟子射程内的「有敌方内容」的格子（敌方弟子 / 敌方节点 / 敌方灵峰）。
-## 先做廉价的归属过滤再 `preview`，避免对全图每格都算一次对战矩阵。
-static func _enemy_targets_of(state: GameState, config: Dictionary, disciple: Disciple) -> Array[String]:
-	var targets: Array[String] = []
-	var origin: HexTile = state.tiles.get(disciple.tileId, null)
-	if origin == null:
-		return targets
-	var reach: int = UnitRules.range_of(config, disciple)
+## 该宗视角下「有敌方内容」的全部格子（敌方地块 / 敌方节点 / 敌方灵峰），按 id 升序。
+##
+## **必须每回合只算一次，不能放进弟子循环。** 原实现是「每名弟子 × 每个行动点」各扫一遍全图，
+## 而 `_has_enemy_content` 内部还要遍历**全部宗门的全部灵峰**，于是复杂度是
+## `O(弟子 × 地块 × 宗门 × 峰)`。突破判定修好之后 AI 真的会开峰（1 座 → 最多 11 座），
+## 这个四层嵌套立刻爆炸：平衡抽样单局从 5 秒涨到 109 秒，瓶颈全在这里。
+## 抽成一次预计算后是 `O(地块 × 宗门 × 峰) + O(弟子 × 敌方格)`。
+## **语义与排序完全不变**（仍是「先廉价过滤归属、再算距离、再 preview」，且返回有序数组，
+## 故 `chance > best_chance` 的平手取先规则也不变）。
+static func _enemy_tiles(state: GameState, sect: Sect) -> Array[String]:
+	var tiles: Array[String] = []
 	for tile: HexTile in state.tiles.values():
-		var distance: int = Hex.distance(Vector2i(origin.q, origin.r), Vector2i(tile.q, tile.r))
-		if distance < 1 or distance > reach:
-			continue
-		if _has_enemy_content(state, disciple.sectId, tile):
-			targets.append(tile.id)
-	targets.sort()
-	return targets
+		if _has_enemy_content(state, sect.id, tile):
+			tiles.append(tile.id)
+	tiles.sort()
+	return tiles
 
 
 static func _has_enemy_content(state: GameState, my_sect_id: String, tile: HexTile) -> bool:
@@ -256,22 +284,67 @@ static func _is_active_sect(state: GameState, sect_id: String) -> bool:
 # ---------------------------------------------------------------------------
 
 ## 探索：把闲着的弟子送去机缘（`exploreTendency` 掷骰）。
+##
+## **R10 修复：候选集原先是「自家节点」，于是机缘探索恒为 0 次。**
+## `ExploreRules.send_to_ji_yuan` 的规则本身**不校验节点归属**（机缘是公共野点，谁都能去），
+## 而节点归属只能靠「在该地块开灵峰」或气运吞并取得——20×14 地图上机缘节点只有个位数，
+## AI 一座都占不到，`_sorted_node_ids` 就恒为空 → 从不探索 → 天晶恒为初始 2 →
+## 渡劫要 3 天晶 → **化神/飞升永远 0**（家族流「举族登仙」因此 0/4）。
+## 现改为遍历全图机缘节点（归属无关），与规则口径一致。
+##
+## **只挑「最近的一对」再调规则**：`send_to_ji_yuan` 内部会走一次全图 BFS（`MoveAction.move_disciple`），
+## 若对「节点 × 弟子」逐对调用，单回合就是几十次 BFS——实测把整局从 67 秒拖到 300 秒。
+## 距离是纯算术，先用它选出一对最优组合，**每次尝试只跑一次 BFS**。
 static func _try_explore(state: GameState, config: Dictionary, sect: Sect) -> String:
 	if not state.rng.chance(clampf(float(config["ai"]["exploreTendency"]), 0.0, 1.0)):
 		return ""
-	for disciple: Disciple in _sorted_disciples(sect):
-		if disciple.injured or not disciple.garrisonNodeId.is_empty() or not disciple.missionNodeId.is_empty():
+	var best_node: String = ""
+	var best_disciple: Disciple = null
+	var best_distance: int = 1 << 30
+	var candidates: Array[Disciple] = _sorted_disciples(sect)
+	for node_id: String in _explorable_node_ids(state):
+		var node: GameNode = state.nodes[node_id]
+		if node.cooldown > 0:
 			continue
-		for node_id: String in _sorted_node_ids(state, sect):
-			var node: GameNode = state.nodes[node_id]
-			if node.type != Enums.NodeType.JI_YUAN or node.cooldown > 0:
+		var target: HexTile = state.tiles.get(node.tileId, null)
+		if target == null:
+			continue
+		var cell: Vector2i = Vector2i(target.q, target.r)
+		for disciple: Disciple in candidates:
+			if disciple.injured or not disciple.garrisonNodeId.is_empty() or not disciple.missionNodeId.is_empty():
 				continue
-			var result: Dictionary = ExploreRules.send_to_ji_yuan(state, config, disciple.id, node_id)
-			if bool(result.get("success", false)):
-				return "[AI] %s 派 %s 探索机缘 %s" % [sect.name, disciple.name, node.name]
+			var origin: HexTile = state.tiles.get(disciple.tileId, null)
+			if origin == null:
+				continue
+			var distance: int = Hex.distance(Vector2i(origin.q, origin.r), cell)
+			# **廉价上界剪枝**：BFS 步数 ≥ 六边形直线距离，故「直线距离 > 移动力」的组合一定到不了。
+			if distance > disciple.movePoints:
+				continue
+			# 平手取先（节点按 id 升序、弟子按 id 升序），保证同种子逐字一致。
+			if distance < best_distance:
+				best_distance = distance
+				best_node = node_id
+				best_disciple = disciple
+	if best_disciple == null:
+		return ""
+	var picked: GameNode = state.nodes[best_node]
+	var result: Dictionary = ExploreRules.send_to_ji_yuan(state, config, best_disciple.id, best_node)
+	if bool(result.get("success", false)):
+		return "[AI] %s 派 %s 探索机缘 %s" % [sect.name, best_disciple.name, picked.name]
 	return ""
 
 
+## 全图机缘节点（按 id 升序）：**不看归属**，与 `ExploreRules.send_to_ji_yuan` 同口径。
+static func _explorable_node_ids(state: GameState) -> Array[String]:
+	var ids: Array[String] = []
+	for node: GameNode in state.nodes.values():
+		if node.type == Enums.NodeType.JI_YUAN:
+			ids.append(node.id)
+	ids.sort()
+	return ids
+
+
+## 本宗**自有**节点（按 id 升序）：驻守等「只能在自己地盘做」的动作才用它。
 static func _sorted_node_ids(state: GameState, sect: Sect) -> Array[String]:
 	var ids: Array[String] = []
 	for node: GameNode in state.nodes.values():
@@ -397,6 +470,44 @@ static func _try_improve(state: GameState, config: Dictionary, sect: Sect) -> St
 			state, config, sect.id, disciple.id, disciple.tileId, AutomationRules.ROAD_TYPE)
 		if bool(result.get("success", false)):
 			return "[AI] %s 于 %s 修筑道路" % [sect.name, disciple.tileId]
+	return ""
+
+
+# ---------------------------------------------------------------------------
+# 渡劫
+# ---------------------------------------------------------------------------
+
+## 渡劫飞升：元婴且修为已满的弟子尝试晋化神（走命令层 `AppointmentAction.tribulate`，
+## 以便与玩家点命令完全同一条路径：成功补 `ascended=true`、失败身死道消时走血脉死亡处理）。
+##
+## **R10 修复：AI 原先完全不会渡劫。** `DiscipleRules.tribulate` 与命令层
+## `AppointmentAction.tribulate` 在 R4/R7 都已实现，但只有玩家点命令能触发，AI 没有任何入口。
+## 平衡抽样里所有宗门的最强弟子**永远停在元婴**（`topRealmLevel` 恒为 4），于是：
+## 家族流「举族登仙」的 `ascensionCount` 永远 0/4，路线一次都走不通；
+## 分数公式里的 `ascensionWeight = 12` 也永远拿不到分。
+##
+## **每回合至多一次、且不占行动点**：渡劫要花 500 灵力 + 300 灵石 + 材料，
+## 若塞进 `_next_action` 的优先级链，一个回合的 5 点行动力会把它连点 5 次、直接抽干家底。
+## 失败也返回事件文本（消耗本回合这唯一一次机会），避免「失败即原地重试」烧光资源。
+##
+## **不在本函数另设资源门槛**：付不付得起由规则函数判定（`DiscipleRules.tribulate` 在掷骰之前
+## 就按灵力/灵石/材料逐项拒绝，既不掉资源也不消耗随机数）。这里只区分两种拒绝——
+## 「付不起/不合法」不算尝试（换下一个弟子继续找，不写日志），
+## 只有真的掷过骰的 `渡劫失败` 才返回事件文本。
+static func _try_tribulate(state: GameState, config: Dictionary, sect: Sect) -> String:
+	for disciple: Disciple in _sorted_disciples(sect):
+		if disciple.realm != Enums.Realm.YUAN_YING or not disciple.breakthroughPending:
+			continue
+		if disciple.injured:
+			continue
+		var result: Dictionary = AppointmentAction.tribulate(state, config, disciple.id)
+		if bool(result.get("success", false)):
+			return "[AI] %s %s 渡劫飞升" % [sect.name, disciple.name]
+		# 规则只在**真的掷过骰**之后才给 `reason = "渡劫失败"`；其余 reason（灵力/灵石/材料不足、
+		# 仅元婴可渡劫…）都是「没尝试」的拒绝，此时资源未扣、随机数未动，不该记成一次失败。
+		if str(result.get("reason", "")) != "渡劫失败":
+			continue
+		return "[AI] %s %s 渡劫失败" % [sect.name, disciple.name]
 	return ""
 
 

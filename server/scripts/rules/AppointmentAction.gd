@@ -43,6 +43,10 @@ static func tribulate(state: GameState, config: Dictionary, disciple_id: String)
 		if bool(result.get("fallen", false)):
 			result["message"] = "%s 渡劫失败, 身死道消" % disciple.name
 			BloodlineRules.on_clan_death(state, config, CityAction.find_sect(state, disciple.sectId), disciple)
+			# **R10 修复**：`DiscipleRules.tribulate` 只置 `fallen=true`，注释写明「由调用方移除弟子」，
+			# 而调用方一直没移——「身死道消」的弟子仍留在名册里，继续被算进 `highRealmMembers`、
+			# 战力与家族人口。此处补上唯一出口 `DiscipleRules.remove_disciple`。
+			DiscipleRules.remove_disciple(state, disciple)
 		else:
 			result["message"] = "%s 渡劫失败: %s" % [disciple.name, reason] if not reason.is_empty() \
 				else "%s 渡劫失败" % disciple.name

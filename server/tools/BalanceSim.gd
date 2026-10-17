@@ -227,6 +227,7 @@ func _sect_list(state: GameState) -> Array:
 
 ## 单宗终局/中间指标。全部走 `VictoryRules` 的现成只读函数，不另算一套口径。
 ## `signatureGoals` 是招牌路线的**逐目标**完成率——报告 §4.2 靠它定位「卡在哪个目标」。
+## `highRealm` / `topRealmLevel` 用来验证「突破判定是否真的在跑」：境界推不动时它们恒为 0。
 func _sect_metrics(state: GameState, sect: Sect) -> Dictionary:
 	var routes: Array[String] = VictoryRules.routes_for(_config, sect.factionType)
 	var signature: String = "" if routes.is_empty() else routes[0]
@@ -237,6 +238,9 @@ func _sect_metrics(state: GameState, sect: Sect) -> Dictionary:
 		ratio = float(progress["ratio"])
 		for goal: Dictionary in (progress["goals"] as Array):
 			goals.append({"name": str(goal["name"]), "ratio": float(goal["ratio"])})
+	var top_level: int = 0
+	for disciple: Disciple in sect.disciples:
+		top_level = maxi(top_level, disciple.realmLevel)
 	return {
 		"id": sect.id,
 		"name": sect.name,
@@ -251,6 +255,8 @@ func _sect_metrics(state: GameState, sect: Sect) -> Dictionary:
 		"tileShare": VictoryRules.claimed_tile_share(state, sect),
 		"daoCompletion": VictoryRules.dao_completion(_config, sect),
 		"ascension": VictoryRules.ascension_count(sect),
+		"highRealm": VictoryRules.high_realm_members(sect, Disciple.level_of(Enums.Realm.JIN_DAN)),
+		"topRealmLevel": top_level,
 		"signatureRoute": signature,
 		"signatureRatio": ratio,
 		"signatureGoals": goals,
@@ -512,13 +518,14 @@ func _render_ffa(ffa: Array) -> Array[String]:
 	lines.append("")
 	lines.append("### 2.5 各流派终局指标（覆灭者按 0 计）")
 	lines.append("")
-	lines.append("| 流派 | 平均评分 | 平均势力等级 | 平均灵峰 | 平均弟子 | 平均王土份额 | 平均道统完成度 | 招牌路线平均进度 |")
-	lines.append("|---|---|---|---|---|---|---|---|")
+	lines.append("| 流派 | 平均评分 | 平均势力等级 | 平均灵峰 | 平均弟子 | 平均金丹以上 | 平均王土份额 | 平均道统完成度 | 招牌路线平均进度 |")
+	lines.append("|---|---|---|---|---|---|---|---|---|")
 	for faction: String in FACTION_ALL:
 		var scores: Array = []
 		var powers: Array = []
 		var peaks: Array = []
 		var members: Array = []
+		var highs: Array = []
 		var shares: Array = []
 		var daos: Array = []
 		var ratios: Array = []
@@ -530,11 +537,12 @@ func _render_ffa(ffa: Array) -> Array[String]:
 			powers.append(float(entry["powerLevel"]))
 			peaks.append(float(entry["peaks"]))
 			members.append(float(entry["disciples"]))
+			highs.append(float(entry.get("highRealm", 0)))
 			shares.append(float(entry["tileShare"]))
 			daos.append(float(entry["daoCompletion"]))
 			ratios.append(float(entry["signatureRatio"]))
-		lines.append("| %s | %.1f | %.1f | %.1f | %.1f | %s | %s | %s |" % [
-			faction, _mean(scores), _mean(powers), _mean(peaks), _mean(members),
+		lines.append("| %s | %.1f | %.1f | %.1f | %.1f | %.1f | %s | %s | %s |" % [
+			faction, _mean(scores), _mean(powers), _mean(peaks), _mean(members), _mean(highs),
 			_pct(_percent(_mean(shares)), 100), _pct(_percent(_mean(daos)), 100),
 			_pct(_percent(_mean(ratios)), 100),
 		])

@@ -218,6 +218,28 @@ static func heal_tick(state: GameState, config: Dictionary, disciple: Disciple) 
 	return false
 
 
+## 弟子陨落：出宗 + 清驻守/任务 + 清峰主（1.0 `removeDisciple`；2.0 血脉结算归 R7）。
+##
+## **R10 修复**：本函数原在 `ExploreRules`，于是「渡劫失败身死道消」这条路径够不着它
+## （`AppointmentAction` 不该反向依赖探索规则），`DiscipleRules.tribulate` 注释写的
+## 「由调用方移除弟子」从来没有调用方兑现——陨落者仍留在名册里，继续被算进
+## `highRealmMembers`、战力与家族人口。现在它是弟子生命周期的唯一出口，谁都能用。
+static func remove_disciple(state: GameState, disciple: Disciple) -> void:
+	if disciple == null:
+		return
+	var sect: Sect = CityAction.find_sect(state, disciple.sectId)
+	if sect != null:
+		sect.disciples.erase(disciple)
+	for node: GameNode in state.nodes.values():
+		node.garrisonDiscipleIds.erase(disciple.id)
+	for owner: Sect in state.sects:
+		for peak: SpiritPeak in owner.spiritPeaks:
+			if peak.fengZhuId == disciple.id:
+				peak.fengZhuId = ""
+	disciple.garrisonNodeId = ""
+	disciple.missionNodeId = ""
+
+
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------

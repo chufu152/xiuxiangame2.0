@@ -52,10 +52,10 @@ func next_turn(state: GameState) -> Array[String]:
 # ---------------------------------------------------------------------------
 
 ## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零 + R6 回填自动化
-## + R7 回填宗主外出检查）：
+## + R7 回填宗主外出检查 + R10 修复突破判定）：
 ## 重算视野 → 刷新道路网 → 传送次数清零 → 每名弟子重置出手/转职冷却、按公式恢复移动力
-## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼 → **玩家宗门自动化**
-## → **宗主外出检查**。
+## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼 → **突破判定**
+## → **玩家宗门自动化** → **宗主外出检查**。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
 	# R3 回填：道路网等级刷新（R2 留的 TODO）。
@@ -73,11 +73,23 @@ func _run_turn_start(state: GameState) -> void:
 			# R5：转职冷却递减（1.0 `UnitRules.beginTurn` 语义）。
 			if disciple.reclassCooldown > 0: disciple.reclassCooldown -= 1
 	# R4 回填：伤愈 + 修炼（R2 留的修炼 TODO）。顺序固定（宗门序 → 弟子序），保证同种子逐字一致。
+	# **R10 修复：突破判定此前从未被调用。** `advance_cultivation` 只负责「把进度条填满并置
+	# `breakthroughPending`」，而全仓没有任何地方消费这个标志，于是修为满了就永久卡住——
+	# 弟子境界停在开局值（外门永远炼气）→ 没有金丹 → `AIController._try_expand` 永远没有
+	# 合格人选 → 灵峰恒为 1 座；元婴/化神永远 0 人 → 家族流「举族登仙」飞升 0/4。
+	# 这里是 `try_breakthrough` 的**唯一**调用点，判定权仍完全归它（含「元婴→化神须渡劫」的
+	# 拒绝分支），本处不重复任何条件。
 	for sect: Sect in state.sects:
 		for disciple: Disciple in sect.disciples:
 			if DiscipleRules.heal_tick(state, _config, disciple):
 				state.eventLog.append("[修炼] %s 伤愈" % disciple.name)
 			DiscipleRules.advance_cultivation(state, _config, disciple)
+			# 灵力不足时 `advance_cultivation` 会提前返回，但上一回合攒下的 `breakthroughPending`
+			# 依然有效，故此处只认 pending 标志、不看返回值。
+			# 元婴弟子会一直保持 pending=true（等玩家 `tribulate`），此时本调用是纯 no-op：
+			# `try_breakthrough` 在掷骰之前就返回，不消耗随机数、不写事件日志。
+			if disciple.breakthroughPending:
+				DiscipleRules.try_breakthrough(state, _config, disciple)
 	# R6 回填：玩家宗门自动化（R2 留的 TODO）。必须放在移动力恢复之后——自动工序要移动建造者/弟子。
 	AutomationRules.run_turn(state, _config)
 	# R7 回填：宗主外出检查（R2 留的 TODO）。只在**状态翻转时**记事件，避免每回合刷屏；

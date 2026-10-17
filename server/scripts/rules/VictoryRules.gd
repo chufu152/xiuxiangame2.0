@@ -370,18 +370,48 @@ static func check_defeat(state: GameState, config: Dictionary, sect: Sect) -> bo
 		state.eventLog.append("[胜负] %s 灵峰尽失, 无立足之地, 该宗覆灭" % sect.name)
 		return true
 	if sect.factionType == Enums.FactionType.ZONG_MEN:
-		var has_zong_zhu: bool = false
-		var has_heir: bool = false
-		var heir_level: int = Disciple.level_of(Enums.Realm.JIN_DAN)
-		for disciple: Disciple in sect.disciples:
-			if disciple.position == Enums.Position.ZONG_ZHU:
-				has_zong_zhu = true
-			if disciple.realmLevel >= heir_level:
-				has_heir = true
-		if not has_zong_zhu and not has_heir:
+		if not _has_succession(sect):
 			state.eventLog.append("[胜负] %s 宗主陨落且无金丹以上继承人, 该宗覆灭" % sect.name)
 			return true
 	return false
+
+
+## 宗门流的「继承链」是否成立：有宗主 **或** 有金丹以上继承人。
+## 纯查询、不写日志；`check_defeat` 与 `would_collapse_if_lost` 共用同一口径，避免两处漂移。
+## `except_id` 非空时跳过该弟子（用于「假设此人阵亡」的反事实推演）。
+static func _has_succession(sect: Sect, except_id: String = "") -> bool:
+	var heir_level: int = Disciple.level_of(Enums.Realm.JIN_DAN)
+	for disciple: Disciple in sect.disciples:
+		if not except_id.is_empty() and disciple.id == except_id:
+			continue
+		if disciple.position == Enums.Position.ZONG_ZHU:
+			return true
+		if disciple.realmLevel >= heir_level:
+			return true
+	return false
+
+
+## **纯查询**：假设 `disciple_id` 阵亡，该宗是否会立刻覆灭。不写事件日志、不掷骰。
+##
+## 用途：`AIController` 用它避免「以本宗当场覆灭为代价发起进攻」。AI 原先只看 `can_fight`
+## 与战力比，把宗主当普通战力派出去，于是宗门流在平衡抽样里 48/48 席全部在第 74 回合前后
+## 因「宗主陨落且无金丹继承人」自灭——这不是运气差，是决策层缺了一条保命约束。
+##
+## 口径与 `check_defeat` 一致，只少一条与「失去该弟子」无关的分支：**灵峰尽失**不是弟子造成的，
+## 不计入；而「弟子全灭」按剩余 0 人计入。
+static func would_collapse_if_lost(sect: Sect, disciple_id: String) -> bool:
+	if sect == null or sect.defeated:
+		return false
+	var remaining: int = 0
+	for disciple: Disciple in sect.disciples:
+		if disciple.id == disciple_id:
+			continue
+		remaining += 1
+	if remaining <= 0:
+		return true
+	if sect.factionType != Enums.FactionType.ZONG_MEN:
+		return false
+	return not _has_succession(sect, disciple_id)
 
 
 ## 覆灭清算（1.0 `collapseSect`）：解除地块/节点归属、清空弟子与灵峰与研究队列。

@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_victory_choice()
 	_test_save()
 	_test_backfill()
+	_test_r10_regressions()
 	_test_determinism()
 	_clean_test_slots()
 	_finished = true
@@ -963,7 +964,288 @@ func _test_backfill() -> void:
 
 
 # ---------------------------------------------------------------------------
-# 12. 确定性：双跑整局 view 与事件流逐字一致
+# 12. R10 回归：突破判定接线 / 覆灭反事实 / AI 保命与渡劫
+# ---------------------------------------------------------------------------
+
+## 平衡抽样（W4）暴露的五处规则层缺口，逐条钉成回归断言。
+## 共同特征：**规则函数本身早就写对了，缺的是调用点**——所以断言不能只测规则函数，
+## 必须测「回合流水线 / AI 决策链真的走到了它」。
+func _test_r10_regressions() -> void:
+	_test_breakthrough_wired()
+	_test_would_collapse_if_lost()
+	_test_ai_keeps_succession()
+	_test_ai_tribulate()
+	_test_ai_explores_any_ji_yuan()
+
+
+## 缺口①：`DiscipleRules.try_breakthrough` 在生产代码零调用点。
+## 症状：修为满了只置 `breakthroughPending`，没人消费 → 弟子永远停在开局境界
+## → 没有金丹 → AI 无扩张人选 → 灵峰恒 1 座；元婴/化神恒 0 人 → 家族流飞升 0/4。
+func _test_breakthrough_wired() -> void:
+	# 把炼气突破成功率钉成 1，让「判定确实发生了」变成确定性事实而非概率事件。
+	var config: Dictionary = _config.duplicate(true)
+	config["disciple"]["cultivation"]["breakthroughChancePerRealm"]["LIAN_QI"] = 1.0
+	var dispatcher: CommandDispatcher = _new_game_with(config, "r10-breakthrough")
+	var state: GameState = dispatcher.state
+	var sect: Sect = _player(dispatcher)
+	var capital: SpiritPeak = _capital(sect)
+	sect.resources["spiritPower"] = 100000
+
+	var outer: Disciple = _make_disciple(state, sect, "外门弟子", Enums.Realm.LIAN_QI,
+		Enums.Position.WAI_MEN, capital)
+	outer.cultivationProgress = DiscipleRules.progress_cap(config, outer)
+	outer.breakthroughPending = true
+
+	# 元婴弟子同样 pending，但**必须不被本调用点越权晋化神**（裁决六：元婴→化神须 tribulate）。
+	var yuanying: Disciple = _make_disciple(state, sect, "元婴长老", Enums.Realm.YUAN_YING,
+		Enums.Position.ZHANG_LAO, capital)
+	yuanying.cultivationProgress = DiscipleRules.progress_cap(config, yuanying)
+	yuanying.breakthroughPending = true
+
+	# 突破判定挂在 TURN_START（`beginPlayerTurn`），走真实命令入口而非直接调规则函数。
+	_request(dispatcher, Commands.FINISH_TURN, {})
+	_request(dispatcher, Commands.BEGIN_PLAYER_TURN, {})
+
+	_check(outer.realm == Enums.Realm.ZHU_JI,
+		"TURN_START 消费 breakthroughPending：炼气→筑基（当前 %s）" % outer.realm)
+	_check(not outer.breakthroughPending, "突破成功后清 pending")
+	_check(_count_events(state, "突破至") >= 1, "突破成功写事件日志（突破至…）")
+	_check(yuanying.realm == Enums.Realm.YUAN_YING and yuanying.breakthroughPending,
+		"元婴 pending 不被突破判定越权处理（仍待渡劫，realm=%s）" % yuanying.realm)
+
+
+## 缺口②的判据：`VictoryRules.would_collapse_if_lost` —— 假设此人阵亡会不会当场覆灭。
+func _test_would_collapse_if_lost() -> void:
+	var dispatcher: CommandDispatcher = _new_game("r10-collapse")
+	var state: GameState = dispatcher.state
+	var sect: Sect = _player(dispatcher)
+	var capital: SpiritPeak = _capital(sect)
+	_check(VictoryRules.would_collapse_if_lost(null, "x") == false, "sect=null 时反事实判定回 false")
+
+	# 清空名册，从「只有宗主」这一最脆弱形态开始（AI 原先正是把这种宗主当普通战力送出去）。
+	sect.disciples.clear()
+	var zong_zhu: Disciple = _make_disciple(state, sect, "孤宗宗主", Enums.Realm.JIN_DAN,
+		Enums.Position.ZONG_ZHU, capital)
+	_check(VictoryRules.would_collapse_if_lost(sect, zong_zhu.id), "只剩宗主时失去他 = 当场覆灭")
+
+	# 补一个金丹继承人 → 继承链成立，宗主不再不可替代。
+	var heir: Disciple = _make_disciple(state, sect, "金丹继承人", Enums.Realm.JIN_DAN,
+		Enums.Position.ZHANG_LAO, capital)
+	_check(not VictoryRules.would_collapse_if_lost(sect, zong_zhu.id), "有金丹继承人时失去宗主不覆灭")
+	_check(not VictoryRules.would_collapse_if_lost(sect, heir.id), "宗主在时失去继承人（非最后一人）不覆灭")
+
+	# 继承人掉到炼气 → 继承链断裂，与平衡报告里 48/48 覆灭的口径一致。
+	heir.realm = Enums.Realm.LIAN_QI
+	heir.realmLevel = Disciple.level_of(Enums.Realm.LIAN_QI)
+	_check(VictoryRules.would_collapse_if_lost(sect, zong_zhu.id), "继承人不足金丹时失去宗主仍覆灭")
+	# 与 `check_defeat` 同口径：宗主健在 → 未败；把宗主从名册抹掉 → 立刻判负。
+	_check(not VictoryRules.check_defeat(state, _config, sect), "宗主健在时 check_defeat=false")
+	sect.disciples.erase(zong_zhu)
+	_check(VictoryRules.check_defeat(state, _config, sect), "宗主阵亡且继承人不足金丹 → check_defeat=true")
+	sect.disciples.append(zong_zhu)
+
+	# 纯查询：不写事件日志、不掷骰（否则 AI 每回合都要多出几条「覆灭」日志）。
+	var before: int = state.eventLog.size()
+	VictoryRules.would_collapse_if_lost(sect, zong_zhu.id)
+	_check(state.eventLog.size() == before, "would_collapse_if_lost 不写事件日志")
+
+	# 非宗门流不按继承链判负；但「最后一人阵亡」对任何流派都是覆灭。
+	sect.factionType = Enums.FactionType.JIA_ZU
+	_check(not VictoryRules.would_collapse_if_lost(sect, zong_zhu.id), "家族流失去宗主不算覆灭")
+	sect.disciples.clear()
+	var last: Disciple = _make_disciple(state, sect, "独苗", Enums.Realm.LIAN_QI,
+		Enums.Position.ZA_YI, capital)
+	_check(VictoryRules.would_collapse_if_lost(sect, last.id), "最后一人阵亡对任何流派都是覆灭")
+
+	sect.defeated = true
+	_check(VictoryRules.would_collapse_if_lost(sect, last.id) == false, "已覆灭宗门不再重复判定")
+
+
+## 缺口③：`AIController._try_attack` 把宗主当普通战力派出去，宗门流 48/48 席自灭。
+## 断言方式：同一场景下「唯一宗主」不出手、「有继承人时的普通弟子」出手——
+## 后者证明场景**确实可打**，前者的空结果只可能来自保命约束。
+func _test_ai_keeps_succession() -> void:
+	var config: Dictionary = _config.duplicate(true)
+	# 把三项门槛压到 0 + 好战度拉满：只要能打就一定打，避免「没打是因为掷骰没过」的假阴性。
+	config["ai"]["aggression"] = 1.0
+	config["ai"]["attackMinWinChance"] = 0.0
+	config["ai"]["combatAdvantageThreshold"] = 0.0
+	var dispatcher: CommandDispatcher = _new_game_with(config, "r10-ai-guard")
+	var state: GameState = dispatcher.state
+	var ai_sect: Sect = _first_ai_sect(state)
+	_check(ai_sect != null, "存在 AI 宗门（保命断言前置）")
+	if ai_sect == null:
+		return
+	ai_sect.factionType = Enums.FactionType.ZONG_MEN
+	ai_sect.disciples.clear()
+	var capital: SpiritPeak = _capital(ai_sect)
+	var zong_zhu: Disciple = _make_disciple(state, ai_sect, "AI 宗主", Enums.Realm.HUA_SHEN,
+		Enums.Position.ZONG_ZHU, capital)
+
+	var pair: Dictionary = _enemy_pair(state, ai_sect)
+	_check(not pair.is_empty(), "地图上存在可贴脸进攻的敌方地块（保命断言前置）")
+	if pair.is_empty():
+		return
+	zong_zhu.tileId = str(pair["stand"])
+	zong_zhu.movePoints = 99
+	zong_zhu.attacksRemaining = 99
+
+	var guarded: String = AIController._try_attack(state, config, ai_sect)
+	_check(guarded.is_empty(), "AI 不派唯一宗主去进攻（would_collapse_if_lost 拦住，实得：%s）" % guarded)
+	_check(zong_zhu.attacksRemaining == 99, "宗主出手次数未被消耗（%d）" % zong_zhu.attacksRemaining)
+
+	# 对照组：补一个金丹长老（不是最后一人、也不是继承链唯一环节）→ 他应当真的打出去。
+	var elder: Disciple = _make_disciple(state, ai_sect, "AI 长老", Enums.Realm.JIN_DAN,
+		Enums.Position.ZHANG_LAO, capital)
+	elder.tileId = str(pair["stand"])
+	elder.movePoints = 99
+	elder.attacksRemaining = 99
+	var attacked: String = AIController._try_attack(state, config, ai_sect)
+	_check(not attacked.is_empty(), "有继承人时 AI 照常进攻（对照组，实得：%s）" % attacked)
+	_check(elder.attacksRemaining < 99, "对照组长老确实出手（剩 %d 次）" % elder.attacksRemaining)
+	_check(zong_zhu.attacksRemaining == 99, "对照组出手的仍不是宗主（剩 %d 次）" % zong_zhu.attacksRemaining)
+
+
+## 缺口④：AI 完全不会渡劫 → 全员卡元婴，家族流「举族登仙」飞升永远 0/4。
+func _test_ai_tribulate() -> void:
+	var config: Dictionary = _config.duplicate(true)
+	# 成功率钉 1、道法/灵根加成为 0：渡劫结果确定，断言不依赖运气。
+	config["disciple"]["cultivation"]["tribulationBaseSuccessChance"] = 1.0
+	config["disciple"]["cultivation"]["tribulationDaoBonusPerUnlocked"] = 0.0
+	config["disciple"]["cultivation"]["tribulationRootGradeBonusPerGrade"] = 0.0
+	# 好战度 0：本用例只关心渡劫，不希望 run_turn 先打一仗把弟子打伤/打死。
+	config["ai"]["aggression"] = 0.0
+	var dispatcher: CommandDispatcher = _new_game_with(config, "r10-ai-tribulate")
+	var state: GameState = dispatcher.state
+	var ai_sect: Sect = _first_ai_sect(state)
+	_check(ai_sect != null, "存在 AI 宗门（渡劫断言前置）")
+	if ai_sect == null:
+		return
+	var capital: SpiritPeak = _capital(ai_sect)
+	var disciple: Disciple = _make_disciple(state, ai_sect, "AI 元婴", Enums.Realm.YUAN_YING,
+		Enums.Position.ZHANG_LAO, capital)
+	disciple.breakthroughPending = true
+
+	# 付不起时**不算尝试**：规则在掷骰前就拒绝，AI 既不该写「渡劫失败」也不该扣资源。
+	var power_before: int = int(ai_sect.resources.get("spiritPower", 0))
+	ai_sect.resources["spiritPower"] = 0
+	_check(AIController._try_tribulate(state, config, ai_sect).is_empty(),
+		"灵力不足时 AI 不渡劫、也不记成「渡劫失败」")
+	_check(disciple.realm == Enums.Realm.YUAN_YING, "未渡劫时境界不变（%s）" % disciple.realm)
+	ai_sect.resources["spiritPower"] = power_before
+
+	ai_sect.resources["spiritPower"] = 100000
+	ai_sect.resources["spiritStones"] = 100000
+	ai_sect.resources["materials"] = {"tian_jing": 100, "xuan_tie": 100}
+	var text: String = AIController._try_tribulate(state, config, ai_sect)
+	_check(text.contains("渡劫"), "资源充足时 AI 渡劫（事件：%s）" % text)
+	_check(disciple.realm == Enums.Realm.HUA_SHEN, "AI 渡劫成功晋化神（当前 %s）" % disciple.realm)
+	_check(disciple.ascended, "AI 渡劫成功置 ascended（家族流 ascensionCount 依赖它）")
+	_check(not disciple.breakthroughPending, "AI 渡劫成功后清 pending")
+
+	# 接线：渡劫挂在 `run_turn` 末尾（不占行动点、每回合至多一次），不是只挂在私有函数里。
+	var second: Disciple = _make_disciple(state, ai_sect, "AI 元婴二", Enums.Realm.YUAN_YING,
+		Enums.Position.QIN_CHUAN, capital)
+	second.breakthroughPending = true
+	AIController.run_turn(state, config, ai_sect)
+	var ascended: int = 0
+	for each: Disciple in ai_sect.disciples:
+		if each.ascended:
+			ascended += 1
+	_check(ascended == 2, "run_turn 内含渡劫（已飞升 %d 人）" % ascended)
+
+
+## 缺口⑤：AI 的机缘候选集被限制在「自家节点」，而节点归属只能靠开峰 / 气运吞并取得，
+## 于是机缘探索恒为 0 次 → 天晶恒为初始 2 → 渡劫要 3 天晶 → 化神/飞升永远 0。
+func _test_ai_explores_any_ji_yuan() -> void:
+	var config: Dictionary = _config.duplicate(true)
+	config["ai"]["exploreTendency"] = 1.0
+	config["explore"]["jiYuanBaseSuccessChance"] = 1.0
+	config["explore"]["jiYuanRootGradeBonus"] = 0.0
+	var dispatcher: CommandDispatcher = _new_game_with(config, "r10-ai-explore")
+	var state: GameState = dispatcher.state
+	var ai_sect: Sect = _first_ai_sect(state)
+	_check(ai_sect != null, "存在 AI 宗门（机缘断言前置）")
+	if ai_sect == null:
+		return
+
+	# 造一个**无主**机缘节点（公共野点）：归属为空，按规则任何宗门都能去。
+	var target_tile: HexTile = null
+	var ids: Array[String] = []
+	for key: Variant in state.tiles.keys():
+		ids.append(str(key))
+	ids.sort()
+	for id: String in ids:
+		var candidate: HexTile = state.tiles[id]
+		if candidate.nodeId.is_empty():
+			target_tile = candidate
+			break
+	_check(target_tile != null, "存在无节点地块（机缘断言前置）")
+	if target_tile == null:
+		return
+	var node: GameNode = GameNode.new()
+	node.id = "node_probe_ji_yuan"
+	node.name = "探针机缘"
+	node.type = Enums.NodeType.JI_YUAN
+	node.tileId = target_tile.id
+	node.level = 1
+	node.ownerSectId = ""
+	state.nodes[node.id] = node
+	target_tile.nodeId = node.id
+
+	var capital: SpiritPeak = _capital(ai_sect)
+	var disciple: Disciple = _make_disciple(state, ai_sect, "探路弟子", Enums.Realm.ZHU_JI,
+		Enums.Position.NEI_MEN, capital)
+	disciple.tileId = target_tile.id
+	disciple.movePoints = 99
+	_check(node.ownerSectId != ai_sect.id, "该机缘节点确实不属于本宗（复现前置）")
+
+	var before: int = int(ai_sect.resources.get("materials", {}).get("tian_jing", 0))
+	var text: String = AIController._try_explore(state, config, ai_sect)
+	_check(not text.is_empty(), "AI 会去探索**无主**机缘节点（实得：%s）" % text)
+	# 不强求「派的是哪一名弟子、去的是哪一个节点」——只要求**有人被派去了一个不属于本宗的机缘**，
+	# 这正是修复点（原先候选集恒空，一个都派不出去）。
+	var sent: String = ""
+	for each: Disciple in ai_sect.disciples:
+		if not each.missionNodeId.is_empty():
+			sent = each.missionNodeId
+			break
+	_check(not sent.is_empty(), "探索后弟子带上 missionNodeId（%s）" % sent)
+	if not sent.is_empty() and state.nodes.has(sent):
+		_check(str(state.nodes[sent].ownerSectId) != ai_sect.id,
+			"被探索的机缘节点不属于本宗（%s）" % sent)
+	var gained: int = int(ai_sect.resources.get("materials", {}).get("tian_jing", 0)) - before
+	_check(gained >= 3, "机缘奖励真的入账天晶 +%d（渡劫门槛为 3）" % gained)
+
+
+## 找一个「敌方地块」及其旁边一个可站立的落脚格；返回 `{enemy, stand}`，无解回空字典。
+## 落脚格优先取**己方或中立**格（站到第三方领土上会引入额外的前置校验，污染保命断言的归因）。
+func _enemy_pair(state: GameState, sect: Sect) -> Dictionary:
+	var ids: Array[String] = []
+	for key: Variant in state.tiles.keys():
+		ids.append(str(key))
+	ids.sort()
+	for id: String in ids:
+		var tile: HexTile = state.tiles[id]
+		if tile.ownerSectId.is_empty() or tile.ownerSectId == sect.id:
+			continue
+		var fallback: String = ""
+		for neighbor: Vector2i in Hex.neighbors(Hex.coords(id)):
+			var stand_id: String = Hex.id(neighbor.x, neighbor.y)
+			var stand: HexTile = state.tiles.get(stand_id, null)
+			if stand == null:
+				continue
+			if stand.ownerSectId.is_empty() or stand.ownerSectId == sect.id:
+				return {"enemy": id, "stand": stand_id}
+			if fallback.is_empty():
+				fallback = stand_id
+		if not fallback.is_empty():
+			return {"enemy": id, "stand": fallback}
+	return {}
+
+
+# ---------------------------------------------------------------------------
+# 13. 确定性：双跑整局 view 与事件流逐字一致
 # ---------------------------------------------------------------------------
 
 func _test_determinism() -> void:
@@ -1030,7 +1312,13 @@ func _seed_of(text: String) -> int:
 
 
 func _new_game(seed: String, faction: String = Enums.FactionType.ZONG_MEN) -> CommandDispatcher:
-	var dispatcher: CommandDispatcher = CommandDispatcher.new(_config)
+	return _new_game_with(_config, seed, faction)
+
+
+## 用**指定配置**开局：把某条规则钉成确定性分支（突破/渡劫成功率 = 1、AI 门槛 = 0 等）。
+## 除 `config` 外与 `_new_game` 完全一致，避免各用例各写一遍 newGame 参数。
+func _new_game_with(config: Dictionary, seed: String, faction: String = Enums.FactionType.ZONG_MEN) -> CommandDispatcher:
+	var dispatcher: CommandDispatcher = CommandDispatcher.new(config)
 	var response: Dictionary = _request(dispatcher, "newGame", {"sectName": "验收宗", "playerFaction": faction,
 		"mapWidth": 20, "mapHeight": 14, "randomSeed": _seed_of(seed), "difficultyId": "normal"})
 	if dispatcher.state == null:

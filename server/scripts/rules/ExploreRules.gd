@@ -202,7 +202,7 @@ static func send_to_ji_yuan(state: GameState, config: Dictionary, disciple_id: S
 			(result["casualties"] as Array).append(disciple.id)
 			result["message"] = "%s 机缘探索失败, 弟子陨落" % disciple.name
 			state.eventLog.append("[探索] %s" % str(result["message"]))
-			remove_disciple(state, disciple)
+			DiscipleRules.remove_disciple(state, disciple)
 		elif roll < fall_chance + injury_chance:
 			disciple.injured = true
 			disciple.movePoints = 0
@@ -314,7 +314,7 @@ static func explore_mi_jing(state: GameState, config: Dictionary, disciple_ids: 
 				add_heart_devil(config, disciple, devil)
 		# 先算完所有人的骰，再统一移除陨落者（保持骰序与 1.0 一致，且避免边遍历边改容器）。
 		for disciple: Disciple in dead:
-			remove_disciple(state, disciple)
+			DiscipleRules.remove_disciple(state, disciple)
 		result["message"] = "秘境探索遇险, 弟子伤亡, 幸存者心魔+%d" % devil
 		state.eventLog.append("[探索] %s" % str(result["message"]))
 	else:
@@ -362,16 +362,5 @@ static func add_heart_devil(config: Dictionary, disciple: Disciple, amount: int)
 	disciple.heartDevil = mini(cap, maxi(0, disciple.heartDevil + amount))
 
 
-## 弟子陨落：出宗 + 清驻守/任务 + 清峰主（1.0 `removeDisciple`；2.0 血脉结算归 R7）。
-static func remove_disciple(state: GameState, disciple: Disciple) -> void:
-	var sect: Sect = CityAction.find_sect(state, disciple.sectId)
-	if sect != null:
-		sect.disciples.erase(disciple)
-	for node: GameNode in state.nodes.values():
-		node.garrisonDiscipleIds.erase(disciple.id)
-	for owner: Sect in state.sects:
-		for peak: SpiritPeak in owner.spiritPeaks:
-			if peak.fengZhuId == disciple.id:
-				peak.fengZhuId = ""
-	disciple.garrisonNodeId = ""
-	disciple.missionNodeId = ""
+## **R10 起实现移到 `DiscipleRules.remove_disciple`**：渡劫陨落也要走同一条移除路径，
+## 而渡劫在 `AppointmentAction`，不该反向依赖探索规则。
