@@ -54,15 +54,25 @@ var BLOOD: Color = Color("8c2f2a")        # 血（血脉）
 var AZURE: Color = Color("4a7d96")        # 水蓝（河流/剑光）
 var BONE: Color = Color("d9d3c0")         # 素白（屋身/石台）
 
+## 皮肤包预设：**同一套生成逻辑，只换调色板**。
+##   default = 水墨青绿（青绿山水 + 留白云雾，冷调）
+##   zhu_xia = 朱霞重彩（赭石 + 赤金 + 暖宣纸，暖调）——用于验证「换皮零代码」
+const PACK_DEFAULT: String = "default"
+const PACK_ZHU_XIA: String = "zhu_xia"
+
 var _root: String = ""
 var _written: int = 0
+## 目标皮肤包名（= `assets/art/<pack>/`）。由 `--pack=` 指定，默认 `default`。
+var _pack: String = PACK_DEFAULT
 
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	_root = Launcher.repo_root().path_join("assets").path_join("art").path_join("default")
+	_pack = _read_arg("--pack=", PACK_DEFAULT)
+	_apply_palette(_pack)
+	_root = Launcher.repo_root().path_join("assets").path_join("art").path_join(_pack)
 	for sub: String in ["terrain", "units", "buildings", "icons", "districts", "features"]:
 		DirAccess.make_dir_recursive_absolute(_root.path_join(sub))
 
@@ -75,9 +85,59 @@ func _ready() -> void:
 	_gen_features()
 	_gen_audio()
 
-	print("[AssetGen] 共写出 %d 个文件 → %s" % [_written, _root])
-	print("ASSETGEN_OK")
+	print("[AssetGen] 皮肤包 %s：共写出 %d 个文件 → %s" % [_pack, _written, _root])
+	print("ASSETGEN_OK pack=%s files=%d" % [_pack, _written])
 	get_tree().quit(0)
+
+
+## 换皮时对**硬编码地形色**做的整体色相偏移。
+## 地形各层的颜色是按地貌手调的字面量（不来自调色板），只换调色板的话地形几乎不变；
+## 故用一层统一 tint 把整套地形推向该皮肤的主色调。默认包强度 0 = 完全不动原色。
+var TINT: Color = Color("ffffff")
+var TINT_STRENGTH: float = 0.0
+
+
+## 把地形字面量色向皮肤主色靠拢。`TINT_STRENGTH == 0` 时原样返回（默认包零改动）。
+## `strength` 传负值表示用皮肤默认强度；河流等「必须有水感」的层可传更小的值。
+func _tinted(color: Color, strength: float = -1.0) -> Color:
+	var weight: float = TINT_STRENGTH if strength < 0.0 else strength
+	if weight <= 0.0:
+		return color
+	return color.lerp(TINT, weight)
+
+
+## 按包名切换调色板。默认包 = 水墨青绿（冷调）；
+## `zhu_xia` = 朱霞重彩（暖调：赭石替青绿、赤金替浅金、暖宣纸替冷宣纸）。
+## 两套色相整体错开约 120°，肉眼一眼可辨——这才是「换皮」，不是「微调」。
+func _apply_palette(pack: String) -> void:
+	if pack != PACK_ZHU_XIA:
+		return
+	INK = Color("3a2a24")          # 深褐墨（原 253b37 青黑）
+	INK_SOFT = Color("5e463c")     # 淡褐墨
+	JADE = Color("8a5a3c")         # 赭石（原 4e7a6f 青绿）
+	JADE_LIGHT = Color("c69a6a")   # 浅赭
+	PAPER = Color("f3e7d2")        # 暖宣纸（原 e8e3d2 冷宣纸）
+	GOLD = Color("d9a13a")         # 赤金（原 c9a227 浅金）
+	CINNABAR = Color("b23a2a")     # 朱砂更烈
+	SLATE = Color("6b5c52")        # 暖青石
+	BRONZE = Color("9a6a3a")       # 赤铜
+	PURPLE = Color("7a4a63")       # 紫檀
+	BLOOD = Color("8c2620")
+	AZURE = Color("3f6b8a")        # 墨蓝（原 4a7d96 水蓝）
+	BONE = Color("ece0c8")         # 暖素白
+	# 地形字面量色整体推向暖赭，否则「只换了纸色、地形几乎没变」。
+	TINT = Color("b8794a")
+	TINT_STRENGTH = 0.55
+
+
+static func _read_arg(prefix: String, fallback: String) -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	for arg: String in OS.get_cmdline_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return fallback
 
 
 func _out(sub: String, file_name: String) -> String:
@@ -239,7 +299,7 @@ func _terrain_top(file_name: String, light: Color, dark: Color, salt: int, furro
 			# 二次叠色：让色块边缘像笔触收尾。
 			var edge: float = _fbm(u, v, 7.0, 2, salt + 17)
 			color = color.lerp(dark, smoothstep(0.62, 0.92, edge) * 0.25)
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	if furrows > 0:
 		for index: int in range(furrows * 6):
 			var y0: float = (float(index) + 0.5) * size / float(furrows * 6)
@@ -261,7 +321,7 @@ func _relief_side(file_name: String, light: Color, dark: Color, salt: int, strat
 			var u: float = float(x) / size
 			var n: float = _fbm(u, v, 4.0, 3, salt)
 			var color: Color = base.lerp(dark, n * 0.35)
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	# 横向岩层：不均匀的深色横纹。
 	for index: int in range(strata):
 		var y0: float = (float(index) + 0.35 + 0.3 * _hash2(index, 3, salt)) * size / float(strata)
@@ -286,7 +346,7 @@ func _mountain_top(file_name: String, salt: int) -> void:
 			var v: float = float(y) / size
 			var n: float = _fbm(u, v, 3.5, 4, salt)
 			var color: Color = Color("cfd2c6").lerp(Color("6d746c"), smoothstep(0.35, 0.85, n))
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	# 皴线：沿等高方向的短促笔触，模拟连绵山脊。
 	for index: int in range(26):
 		var start: Vector2 = Vector2(_hash2(index, 2, salt) * size, _hash2(index, 4, salt) * size)
@@ -314,7 +374,8 @@ func _river(file_name: String, salt: int) -> void:
 			# 留白高光（水流反光）。
 			if wave > 0.86:
 				color = color.lerp(PAPER, (wave - 0.86) * 2.6)
-			image.set_pixel(x, y, color)
+			# 河流只吃 1/3 的 tint：整片水色被推成赭色就不像水了。
+			image.set_pixel(x, y, _tinted(color, TINT_STRENGTH * 0.33))
 	_fibers(image, 180, salt + 7)
 	_vignette(image, 0.14)
 	_save(image, "terrain", file_name)
@@ -329,7 +390,7 @@ func _danger(file_name: String, salt: int) -> void:
 			var v: float = float(y) / size
 			var n: float = _fbm(u, v, 4.5, 4, salt)
 			var color: Color = Color("6b625c").lerp(Color("2f2a28"), smoothstep(0.3, 0.8, n))
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	# 裂纹：从中心向外发散的折线，丹砂描边。
 	for index: int in range(7):
 		var angle: float = TAU * float(index) / 7.0 + 0.4 * _hash2(index, 3, salt)
@@ -356,7 +417,7 @@ func _fog_rice_paper(file_name: String, salt: int) -> void:
 			var v: float = float(y) / size
 			var n: float = _fbm(u, v, 2.0, 3, salt)
 			var color: Color = Color("f2ecdb").lerp(Color("e2dac4"), n * 0.7)
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	# 宣纸的云絮感：几团极淡的湿墨。
 	for index: int in range(6):
 		_blot(image,
@@ -378,7 +439,7 @@ func _fog_ink_map(file_name: String, salt: int) -> void:
 			var v: float = float(y) / size
 			var n: float = _fbm(u, v, 2.5, 3, salt)
 			var color: Color = Color("ded6bf").lerp(Color("c9c0a6"), n * 0.8)
-			image.set_pixel(x, y, color)
+			image.set_pixel(x, y, _tinted(color))
 	# 古地图排线：疏密不均的斜向细线（速写感）。
 	for index: int in range(64):
 		var y0: float = (float(index) + 0.5) * size / 64.0

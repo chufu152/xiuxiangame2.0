@@ -3989,6 +3989,7 @@ func _build_r8() -> void:
 		"volume": 0.6,
 	})
 	settings_panel.pref_changed.connect(_on_pref_changed)
+	settings_panel.skin_changed.connect(_on_skin_changed)
 	add_child(settings_panel)
 
 	guide_overlay = GuideOverlay.new()
@@ -4483,6 +4484,31 @@ func _apply_r8_prefs() -> void:
 
 func _on_pref_changed(_key: String, _value: Variant) -> void:
 	_apply_r8_prefs()
+
+
+## 换皮（R9 W2）：只按**当前 view** 重建表现层，不重新取景、不发请求、不动相机。
+## `frame_once` 早已被首次取景消费（`CameraRig.framed`），故这里天然不会改构图。
+func _on_skin_changed(pack: String) -> void:
+	if not Session.current_view.is_empty():
+		_render(Session.current_view)
+	_toast("已切换皮肤「%s」" % pack)
+
+
+## 供自动验收 / 外部调用的换皮入口：切包 + 同步下拉框 + 重建表现层。
+## 返回 false 表示皮肤包目录不存在（不静默降级）。
+func apply_skin(pack: String) -> bool:
+	if Session.assets == null or not Session.assets.set_pack(pack):
+		return false
+	if settings_panel != null:
+		settings_panel.set_skin_selection(pack)
+	if not Session.current_view.is_empty():
+		_render(Session.current_view)
+	return true
+
+
+## 当前生效的皮肤包名。
+func current_skin() -> String:
+	return "" if Session.assets == null else Session.assets.active_pack
 
 
 ## 小地图点击 → **只平移**相机（不改角度、不改缩放）。

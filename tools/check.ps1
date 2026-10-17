@@ -55,9 +55,12 @@
       [21/25] 客户端 R8 验收：res://tests/R8ClientTest.tscn 无头全绿；
             再加 --integration 端到端（hello 70 条 → 装饰层按真 view 生成 → 小地图只平移 →
             泼墨/存读档/结束回合/getState 全序列相机不重置 → setSetting 不进 view → 资源栏 13 项）
-      [22/25] Windows 导出冒烟（R9 W3）：客户端 R9 无头验收（开发态/导出态两套根目录
-            口径 + 缺 exe 时报错可诊断）→ 预设文件断言 → tools/export.ps1 产出
-            dist\xiuxian\{Xiuxian.exe,XiuxianServer.exe} → 导出态服务端 --headless 监听
+      [22/25] R9 皮肤化 + Windows 导出冒烟：
+            客户端 R9 无头验收（开发态/导出态两套根目录口径 + 缺 exe 时报错可诊断 +
+            皮肤包切换路径层）→ 端到端换皮（view 逐字不变 / 相机不变 / 贴图实例真换）
+            → 第二套皮肤包 zhu_xia 资源验收 75/75 → 预设文件断言 →
+            tools/export.ps1 产出 dist\xiuxian\{Xiuxian.exe,XiuxianServer.exe} →
+            导出态服务端 --headless 监听
             （未安装 4.4.1 导出模板或指定 -SkipExport 时打印 SKIP，跳过实际导出）
       [23/25] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
       [24/25] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
@@ -1075,6 +1078,37 @@ Assert-Check ($r9ClientCombined -match 'R9_CLIENT_PASS: 导出态 repo_root\(\) 
 Assert-Check ($r9ClientCombined -match 'R9_CLIENT_PASS: 导出态服务端可执行文件名与导出预设一致') `
     '客户端 R9：Launcher.SERVER_EXE_NAME 与 server/export_presets.cfg 产物名一致'
 
+# 22.05 换皮端到端：真 view 下切包，view 逐字不变、相机不变、贴图实例确实更换
+$r9Integration = Invoke-GodotCapture -Executable $godotExe `
+    -Arguments @('--headless', '--path', $clientPath, 'res://tests/R9ClientTest.tscn', '--', '--integration') `
+    -TimeoutMs 600000
+$r9IntegrationCombined = ($r9Integration.StdOut + "`n" + $r9Integration.StdErr)
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：换皮后 view 逐字不变') `
+    '端到端 R9：换皮后 view 逐字不变（纯表现，不动数据）' `
+    ((Select-GodotProblems -Text $r9IntegrationCombined) -join "`n")
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：换皮不触发 view 刷新') `
+    '端到端 R9：换皮不触发 view 刷新（revision 不变）'
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：换皮后相机 transform 不变') `
+    '端到端 R9：换皮后相机 transform 不变'
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：换皮后相机 size 不变') `
+    '端到端 R9：换皮后相机 size 不变'
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：换皮后地形贴图实例已更换') `
+    '端到端 R9：换皮后地形贴图实例已更换（证明真的重载）'
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_PASS: 端到端：切回默认后相机 transform 仍不变') `
+    '端到端 R9：切回默认包后相机 transform 仍不变'
+Assert-Check ($r9IntegrationCombined -match 'R9_CLIENT_RESULT=OK') '端到端 R9 集成验收全绿（R9_CLIENT_RESULT=OK）' `
+    ((Select-GodotProblems -Text $r9IntegrationCombined) -join "`n")
+
+# 22.06 第二套皮肤包资源验收：与默认包同口径 75/75
+$inkVerify = Invoke-GodotCapture -Executable $godotExe `
+    -Arguments @('--headless', '--path', $clientPath, 'res://tools/AssetVerify.tscn', '--', '--pack=zhu_xia') `
+    -TimeoutMs 300000
+$inkVerifyCombined = ($inkVerify.StdOut + "`n" + $inkVerify.StdErr)
+Assert-Check ($inkVerifyCombined -match 'ASSETVERIFY_OK covered=75 warned=0 pack=zhu_xia') `
+    '第二套皮肤包 zhu_xia 资源验收全绿（covered=75 warned=0）' `
+    (($inkVerifyCombined -split "`r?`n" | Where-Object { $_ -match 'AssetVerify|ASSETVERIFY' }) -join "`n")
+Assert-Check ($inkVerify.ExitCode -eq 0) 'zhu_xia 资源验收退出码为 0' "退出码：$($inkVerify.ExitCode)"
+
 # 22.1 预设文件
 $clientPreset = Join-Path $clientPath 'export_presets.cfg'
 $serverPreset = Join-Path $serverPath 'export_presets.cfg'
@@ -1149,6 +1183,13 @@ else {
             Where-Object { $_.Extension -in @('.glb', '.png') }).Count
     }
     Assert-Check ($exportedArtCount -ge 74) "产物含 assets\art\default 全部模型/贴图（≥74，实际 $exportedArtCount）"
+    $exportedSkinDir = Join-Path $exportedRoot 'assets\art\zhu_xia'
+    $exportedSkinCount = 0
+    if (Test-Path $exportedSkinDir) {
+        $exportedSkinCount = (Get-ChildItem -Path $exportedSkinDir -Recurse -File |
+            Where-Object { $_.Extension -in @('.glb', '.png') }).Count
+    }
+    Assert-Check ($exportedSkinCount -ge 74) "产物含第二套皮肤包 assets\art\zhu_xia（≥74，实际 $exportedSkinCount）"
 
     # 导出态服务端：不带 --path、直接跑 exe，验证「导出后可独立运行」。
     $exportPort = 19641

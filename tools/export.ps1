@@ -236,6 +236,20 @@ if ($artCount -ge 74) {
     $failures++
 }
 
+# 第二套皮肤包（R9 W2）必须一并进产物，否则导出后设置面板里选不到它。
+$skinDir = Join-Path $OutputDir 'assets\art\zhu_xia'
+$skinCount = 0
+if (Test-Path $skinDir) {
+    $skinCount = (Get-ChildItem -Path $skinDir -Recurse -File |
+        Where-Object { $_.Extension -in @('.glb', '.png') }).Count
+}
+if ($skinCount -ge 74) {
+    Write-Host ("  [PASS] assets\art\zhu_xia 共 {0} 个模型/贴图（≥ 74）" -f $skinCount)
+} else {
+    Write-Host ("  [FAIL] assets\art\zhu_xia 只有 {0} 个模型/贴图（期望 ≥ 74）" -f $skinCount) -ForegroundColor Red
+    $failures++
+}
+
 $bgm = Join-Path $OutputDir 'assets\audio\bgm\main.wav'
 if (Test-Path -PathType Leaf $bgm) {
     Write-Host "  [PASS] assets\audio\bgm\main.wav"

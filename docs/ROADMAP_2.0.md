@@ -717,6 +717,80 @@ static func repo_root() -> String:
 - 导出态服务端独立运行日志：`[Server] config ok: <产物>/data/gameConfig.json` + `server listening on 127.0.0.1:19641`
 - `tools/check.ps1` **200/200 `CHECK_RESULT=OK`**，`check_protocol.ps1` 仍 **38/38**
 
+### 4.14 R9 W2：换皮机制 + 第二套皮肤包（换皮零代码）
+
+目标：**加一套皮肤不需要改一行客户端逻辑**——只要在 `assets/art/<pack>/` 下放同名文件，
+设置面板里就能选到它。
+
+**一、`AssetLibrary`：把「换包」变成一等公民**
+
+`manifest.json` 早就写了「换皮肤时替换 `art/<pack>/` 文件并把 `activePack` 指向新包」，
+但此前只能**改文件 + 重启**。本轮补上运行时切换：
+
+| 新增 | 语义 |
+|---|---|
+| `active_pack` | 当前生效的包名；初始值来自 `manifest.activePack` |
+| `available_packs()` | 扫描 `assets/art/*` 子目录（磁盘即真相，不维护第二份清单） |
+| `set_pack(pack)` | 校验目录存在 → 清缓存 + 清 WARN 记录 → `reload_manifest()` → 发 `manifest_reloaded`；**返回 false 表示包不存在（不静默降级）** |
+| `reset_pack()` | 清掉运行时覆盖，回到 `manifest.activePack` |
+| `_pack_override` | 运行时覆盖，优先于 manifest 值 |
+
+`reload_manifest()` 里的路径改写仍是 `art/default/ → art/<pack>/`（manifest 只维护一套相对路径，
+换包靠改写，不复制清单）。
+
+**二、`SettingsPanel`：皮肤下拉**
+
+新增「皮肤（换皮零代码）」分组 + `OptionButton`（`SkinOption`），列出 `available_packs()`，
+初始选中 `active_pack`。选中即调 `AssetLibrary.set_pack()` 并 `emit skin_changed`。
+
+**关键取舍：换皮不发 `setSetting`。** 皮肤是纯客户端表现，写进对局状态会污染存档与权威快照，
+也会让 `setSetting` 的「服务端仅确认」语义变味。故换皮全程零网络请求。
+
+**三、`World`：换皮只重建表现层**
+
+```gdscript
+func _on_skin_changed(pack: String) -> void:
+    if not Session.current_view.is_empty():
+        _render(Session.current_view)   # 只按缓存 view 重画，不请求
+```
+
+`_render()` 里虽有 `frame_once(...)`，但 `CameraRig.framed` 已被首帧取景消费，故**天然不会改构图**——
+相机铁律不需要额外特判就成立。
+
+**四、`AssetGen`：一套逻辑，两套调色板**
+
+`--pack=<name>` 指定输出目录（`assets/art/<pack>/`）。`default` 走原调色板；
+`zhu_xia`（朱霞重彩）走暖调：赭石替青绿、赤金替浅金、暖宣纸替冷宣纸、墨蓝替水蓝，整体色相错开约 120°。
+
+**踩到的坑：地形几乎没变。** 第一版只换调色板变量，结果两套地形贴图的平均像素差只有 **1.6/255**——
+因为地形各层的颜色是**按地貌手调的字面量**（`Color("8d8f4e")` 之类），根本没读调色板。补了一层
+`_tinted(color, strength)`：按 `TINT / TINT_STRENGTH` 把字面量色整体推向该皮肤主色，
+默认包强度 **0**（原色零改动），`zhu_xia` 强度 **0.55**；河流单独降到 **0.33**（推成赭色就不像水了）。
+改后地形平均像素差升到 **22.2/255**、峰值 78。
+
+**五、断言**
+
+| 层 | 断言 |
+|---|---|
+| 单元（无需服务端） | 磁盘上存在两个包；初始包来自 manifest；`set_pack` 后条目路径改写到 `art/zhu_xia/`、缓存失效（拿到另一个资源实例）；不存在的包被拒绝且状态不变；`reset_pack` 回默认；设置面板下拉列出两包且初始选中正确 |
+| 端到端（真 view） | `apply_skin("zhu_xia")` 后 **view 逐字不变**、**view_revision 不变**（不触发刷新）、**相机 transform/size/rotation 全不变**、**地形贴图实例确实更换**（证明真的重载）；切回 default 后相机依旧不变 |
+| 资源 | `ASSETVERIFY_OK covered=75 warned=0 pack=zhu_xia`（与默认包同口径） |
+| 导出 | 产物含 `assets/art/zhu_xia`（≥74 个模型/贴图），否则导出后下拉里选不到它 |
+
+`R9_CLIENT_RESULT=OK checks=50 failures=0`（单元 36 + 端到端 14）。
+
+**六、工具扩展**
+
+`AssetVerify` / `AssetPreview` / `WorldShot` 均支持 `--pack=<name>`：
+- `AssetVerify --pack=zhu_xia` → 第二套包的 75/75 验收；
+- `AssetPreview --pack=zhu_xia` → `outputs/r8_asset_{models,icons,terrain}_zhu_xia.png`；
+- `WorldShot --pack=zhu_xia` → `client/outputs/ui_preview_map_zhu_xia.png`（真实渲染，非 headless），
+  与默认皮肤 `ui_preview_map.png` 并排即可肉眼比对换皮效果。
+
+**验收**
+- `check.ps1` **210/210 `CHECK_RESULT=OK`**（25 阶段；`[22/25]` 新增 10 条换皮断言）
+- `check_protocol.ps1` 仍 **38/38**
+
 ---
 
 ## 五、风险登记表

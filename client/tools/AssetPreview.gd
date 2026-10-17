@@ -36,12 +36,16 @@ const DIGITS: Array = [
 var _models: Array[String] = []
 var _paths: Array[String] = []
 var _out_dir: String = ""
+## 目标皮肤包名。
+var _pack: String = "default"
 
 
 func _ready() -> void:
 	_out_dir = Launcher.repo_root().path_join("outputs")
 	DirAccess.make_dir_recursive_absolute(_out_dir)
-	var art_root: String = Launcher.repo_root().path_join("assets").path_join("art").path_join("default")
+	# `--pack=<name>` 可对第二套皮肤包出联络表（默认 default）。
+	_pack = _read_arg("--pack=", "default")
+	var art_root: String = Launcher.repo_root().path_join("assets").path_join("art").path_join(_pack)
 
 	for unit_name: String in ["pu_tong", "jian_xiu", "fa_xiu", "ti_xiu", "qi_ji",
 			"fu_xiu", "ji_guan", "jian_zhen_shi", "xue_mai_xiu_shi", "ji_guan_jun_tuan"]:
@@ -77,7 +81,7 @@ func _ready() -> void:
 		sheet.blit_rect(cell_image, Rect2i(0, 0, CELL, CELL), Vector2i(cell_x, cell_y))
 		index_lines.append("%2d  %s" % [index + 1, _models[index]])
 
-	var sheet_path: String = _out_dir.path_join("r8_asset_models.png")
+	var sheet_path: String = _out_dir.path_join("r8_asset_models_%s.png" % _pack)
 	var error: Error = sheet.save_png(sheet_path)
 	if error != OK:
 		printerr("[AssetPreview] 写出失败 %s（Error %d）" % [sheet_path, error])
@@ -85,7 +89,7 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 
-	var index_path: String = _out_dir.path_join("r8_asset_models_index.txt")
+	var index_path: String = _out_dir.path_join("r8_asset_models_index_%s.txt" % _pack)
 	var index_file: FileAccess = FileAccess.open(index_path, FileAccess.WRITE)
 	if index_file != null:
 		index_file.store_string("\n".join(index_lines) + "\n")
@@ -128,7 +132,7 @@ func _compose_icon_sheet(art_root: String) -> void:
 		sheet.blit_rect(icon, Rect2i(0, 0, icon.get_width(), icon.get_height()),
 			Vector2i(cell_x + (cell - icon.get_width()) / 2, cell_y + (cell - icon.get_height()) / 2))
 		_stamp_number(sheet, index + 1, Vector2i(cell_x, cell_y))
-	var sheet_path: String = _out_dir.path_join("r8_asset_icons.png")
+	var sheet_path: String = _out_dir.path_join("r8_asset_icons_%s.png" % _pack)
 	sheet.save_png(sheet_path)
 	print("[AssetPreview] 图标联络表 → %s（%d 个）" % [sheet_path, names.size()])
 
@@ -157,7 +161,7 @@ func _compose_terrain_sheet(art_root: String) -> void:
 		var cell_y: int = MARGIN + int(index / columns) * (cell + MARGIN)
 		sheet.blit_rect(texture, Rect2i(0, 0, cell, cell), Vector2i(cell_x, cell_y))
 		_stamp_number(sheet, index + 1, Vector2i(cell_x + 2, cell_y + 2))
-	var sheet_path: String = _out_dir.path_join("r8_asset_terrain.png")
+	var sheet_path: String = _out_dir.path_join("r8_asset_terrain_%s.png" % _pack)
 	sheet.save_png(sheet_path)
 	print("[AssetPreview] 地形材质联络表 → %s（%d 张）" % [sheet_path, names.size()])
 
@@ -338,3 +342,13 @@ func _blend(image: Image, x: int, y: int, color: Color, alpha: float) -> void:
 		lerpf(base.g, color.g, a),
 		lerpf(base.b, color.b, a),
 		1.0))
+
+
+static func _read_arg(prefix: String, fallback: String) -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	for arg: String in OS.get_cmdline_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return fallback

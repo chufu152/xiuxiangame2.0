@@ -33,12 +33,22 @@ const EXPECTED_MINIMAL: int = 75
 
 var _library: AssetLibrary = null
 var _failures: Array[String] = []
+## 目标皮肤包（`--pack=<name>`）。空 = 用 manifest 的 `activePack`。
+var _pack: String = ""
 
 
 func _ready() -> void:
 	_library = AssetLibrary.new()
 	_library.name = "AssetLibrary"
 	add_child(_library)
+
+	_pack = _read_arg("--pack=", "")
+	if not _pack.is_empty() and not _library.set_pack(_pack):
+		printerr("[AssetVerify] 皮肤包不存在：%s" % _pack)
+		print("ASSETVERIFY_FAIL pack=%s" % _pack)
+		get_tree().quit(1)
+		return
+	print("[AssetVerify] 皮肤包：%s（%s）" % [_library.active_pack, _library.asset_root])
 
 	var groups: Dictionary = _manifest_groups()
 	if groups.is_empty():
@@ -98,13 +108,24 @@ func _ready() -> void:
 	_check_model_bounds(minimal)
 
 	if _failures.is_empty() and covered == minimal.size() and minimal.size() == EXPECTED_MINIMAL:
-		print("ASSETVERIFY_OK covered=%d warned=0" % covered)
+		print("ASSETVERIFY_OK covered=%d warned=0 pack=%s" % [covered, _library.active_pack])
 		get_tree().quit(0)
 		return
 	for message: String in _failures:
 		printerr("[AssetVerify] %s" % message)
-	print("ASSETVERIFY_FAIL covered=%d expected=%d" % [covered, minimal.size()])
+	print("ASSETVERIFY_FAIL covered=%d expected=%d pack=%s"
+		% [covered, minimal.size(), _library.active_pack])
 	get_tree().quit(1)
+
+
+static func _read_arg(prefix: String, fallback: String) -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	for arg: String in OS.get_cmdline_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return fallback
 
 
 ## 读取 manifest 原始分组（分组名 → 条目数组）。`AssetLibrary` 只保留扁平表，

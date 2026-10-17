@@ -10,6 +10,11 @@ var warning_count: int = 0
 var generation: int = 0
 var asset_root: String = ""
 var manifest_path: String = ""
+## 当前生效的皮肤包目录名（`assets/art/<pack>/`）。初始值来自 manifest 的 `activePack`。
+var active_pack: String = "default"
+## 运行时换皮覆盖：非空时优先于 manifest 的 `activePack`（见 `set_pack`）。
+var _pack_override: String = ""
+var _manifest_pack: String = "default"
 
 func _ready() -> void:
 	asset_root = Launcher.repo_root().path_join("assets")
@@ -29,18 +34,55 @@ func reload_manifest() -> void:
 	if int(data.get("schemaVersion", 0)) != 3:
 		_warn_once("manifest", "资源清单需要 schemaVersion 3")
 		return
+	_manifest_pack = str(data.get("activePack", "default"))
+	active_pack = _manifest_pack if _pack_override.is_empty() else _pack_override
 	entries.clear()
 	for value: Variant in data.values():
 		if value is Array:
 			for entry: Variant in value:
 				if entry is Dictionary and entry.has("id") and entry.has("path"):
 					var item: Dictionary = entry.duplicate(true)
-					var pack: String = str(data.get("activePack", "default"))
-					item["path"] = str(item["path"]).replace("art/default/", "art/%s/" % pack)
+					item["path"] = str(item["path"]).replace("art/default/", "art/%s/" % active_pack)
 					entries[str(item["id"])] = item
 	cache.clear()
 	generation += 1
 	manifest_reloaded.emit()
+
+
+## 磁盘上实际存在的皮肤包（`assets/art/*` 下的子目录，按名排序）。
+func available_packs() -> Array[String]:
+	var result: Array[String] = []
+	var dir: DirAccess = DirAccess.open(asset_root.path_join("art"))
+	if dir == null:
+		return result
+	for name: String in dir.get_directories():
+		if not name.begins_with("."):
+			result.append(name)
+	result.sort()
+	return result
+
+
+## 运行时换皮：只切资源包，**不碰 view、不碰相机、不发任何网络请求**。
+## 返回 false 表示该包目录不存在（调用方据此提示，不静默降级）。
+func set_pack(pack: String) -> bool:
+	if pack.is_empty():
+		return false
+	if not DirAccess.dir_exists_absolute(asset_root.path_join("art").path_join(pack)):
+		return false
+	_pack_override = pack
+	# 换包后旧告警不再代表当前包，清空以便新包的缺口能被如实报出。
+	warned.clear()
+	warning_count = 0
+	reload_manifest()
+	return true
+
+
+## 回到 manifest 里声明的默认包（等同于清掉运行时覆盖）。
+func reset_pack() -> void:
+	_pack_override = ""
+	warned.clear()
+	warning_count = 0
+	reload_manifest()
 
 func resource_for(logical_id: String, expected_type: String = "texture") -> Resource:
 	var key: String = logical_id + ":" + expected_type

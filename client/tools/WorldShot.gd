@@ -17,8 +17,12 @@ const WARMUP_FRAMES: int = 90
 const MAP_WIDTH: int = 26
 const MAP_HEIGHT: int = 18
 
+## 皮肤包（`--pack=<name>`）。非 default 时只截一张全景（面板与皮肤无关，不重复截）。
+var _shot_pack: String = "default"
+
 
 func _ready() -> void:
+	_shot_pack = _read_arg("--pack=", "default")
 	var session: Node = get_node("/root/Session")
 	session.call("start_connection", TEST_PORT)
 	var deadline: int = Time.get_ticks_msec() + 60000
@@ -47,6 +51,9 @@ func _ready() -> void:
 
 	var world: Node3D = (load("res://scenes/World.tscn") as PackedScene).instantiate() as Node3D
 	add_child(world)
+	# 换皮必须发生在取景之后：`apply_skin` 只重建表现层，不动相机（相机铁律）。
+	if _shot_pack != "default":
+		world.call("apply_skin", _shot_pack)
 	# 让远景/装饰/泼墨转场与 HUD 布局稳定下来再截。
 	for _frame: int in range(WARMUP_FRAMES):
 		await get_tree().process_frame
@@ -58,9 +65,15 @@ func _ready() -> void:
 		push_error("WORLDSHOT_FAIL: 视口无纹理")
 		get_tree().quit(1)
 		return
-	var path: String = ProjectSettings.globalize_path("res://outputs/ui_preview_map.png")
+	var map_name: String = "ui_preview_map.png" if _shot_pack == "default" else "ui_preview_map_%s.png" % _shot_pack
+	var path: String = ProjectSettings.globalize_path("res://outputs/" + map_name)
 	var code: int = image.save_png(path)
 	print("WORLDSHOT_SAVED: %s (%dx%d) code=%d" % [path, image.get_width(), image.get_height(), code])
+
+	if _shot_pack != "default":
+		print("WORLDSHOT_DONE pack=%s" % _shot_pack)
+		get_tree().quit(0)
+		return
 
 	# 打一个完整回合：让回合结算卷轴有真实资源增减与事件文案可展示（而不是空栏）。
 	await _play_one_turn(world, session)
@@ -139,3 +152,13 @@ func _capture_screen(world: Node3D, session: Node, file_name: String, open_call:
 		world.call(close_call)
 	for _frame: int in range(4):
 		await get_tree().process_frame
+
+
+static func _read_arg(prefix: String, fallback: String) -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	for arg: String in OS.get_cmdline_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return fallback

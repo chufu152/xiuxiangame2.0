@@ -10,9 +10,11 @@ extends CanvasLayer
 
 signal pref_changed(key: String, value: Variant)
 signal setting_confirmed(key: String, result: Dictionary)
+## 换皮（R9 W2）：只切资源包，**不写对局状态、不下发 setSetting、不碰相机**。
+signal skin_changed(pack: String)
 
 const PANEL_WIDTH: float = 420.0
-const PANEL_HEIGHT: float = 430.0
+const PANEL_HEIGHT: float = 470.0
 
 var panel: PanelContainer = null
 var title_label: Label = null
@@ -21,6 +23,7 @@ var open: bool = false
 var prefs: Dictionary = {}
 var _checks: Dictionary = {}
 var _volume: HSlider = null
+var _skin: OptionButton = null
 
 
 func setup(defaults: Dictionary) -> void:
@@ -81,6 +84,19 @@ func setup(defaults: Dictionary) -> void:
 	_volume.value_changed.connect(func(value: float) -> void: _apply("volume", value))
 	column.add_child(_volume)
 
+	column.add_child(_section("皮肤（换皮零代码）"))
+	_skin = OptionButton.new()
+	_skin.name = "SkinOption"
+	var packs: Array[String] = []
+	if Session.assets != null:
+		packs = Session.assets.available_packs()
+	for index: int in packs.size():
+		_skin.add_item(packs[index], index)
+		if packs[index] == Session.assets.active_pack:
+			_skin.selected = index
+	_skin.item_selected.connect(func(index: int) -> void: _apply_skin(_skin.get_item_text(index)))
+	column.add_child(_skin)
+
 	column.add_child(_section("快捷键"))
 	var keys: Label = Label.new()
 	keys.text = "空格 / End：结束回合　G：网格　B：宗门边框　M：小地图　Esc：关闭面板　F1：新手引导"
@@ -128,6 +144,38 @@ func _apply(key: String, value: Variant) -> void:
 	pref_changed.emit(key, value)
 	# 服务端仅确认；失败不影响本地生效（本地偏好是客户端职责）。
 	Session.request_set_setting(key, value)
+
+
+## 换皮：切 `AssetLibrary` 的皮肤包并让上层重建表现层。
+## 刻意**不**调 `setSetting`——皮肤是纯客户端表现，不该进对局状态。
+func _apply_skin(pack: String) -> void:
+	if Session.assets == null:
+		return
+	if not Session.assets.set_pack(pack):
+		if status_label != null:
+			status_label.text = "皮肤包不存在：%s（未切换）" % pack
+		return
+	if status_label != null:
+		status_label.text = "已切换皮肤「%s」（仅换资源，不写对局状态、不改视角）" % pack
+	skin_changed.emit(pack)
+
+
+## 当前选中的皮肤包名（供自动验收断言）。
+func selected_skin() -> String:
+	if _skin == null or _skin.selected < 0:
+		return ""
+	return _skin.get_item_text(_skin.selected)
+
+
+## 把下拉框同步到某个包（外部换皮后保持一致）。
+## 注意 Godot 4 的 `OptionButton` 用 `select(index)`，没有 `set_item_selected()`。
+func set_skin_selection(pack: String) -> void:
+	if _skin == null:
+		return
+	for index: int in _skin.item_count:
+		if _skin.get_item_text(index) == pack:
+			_skin.select(index)
+			return
 
 
 ## 服务端 `setSetting` 回包（`{success, key, value, applied, note}`）。
