@@ -32,8 +32,9 @@ static func build(state: GameState, config: Dictionary) -> Dictionary:
 			var node_id: String = tile_data["nodeId"]
 			var snapshot: Dictionary = player.nodeSnapshots[node_id].duplicate(true)
 			if snapshot["ownerSectId"] != player.id:
-				# 资源储量、产出、冷却是敌方/中立内部信息，不是固定地图地形。
-				for field: String in ["reserve", "output", "cooldown"]: snapshot.erase(field)
+				# 资源储量、产出、冷却与驻守编成是敌方/中立内部信息，不是固定地图地形。
+				# R5：`garrisonDiscipleIds` 一并隐藏——否则可白嫖敌节点的守军构成。
+				for field: String in ["reserve", "output", "cooldown", "garrisonDiscipleIds"]: snapshot.erase(field)
 			nodes[node_id] = snapshot
 	# 改良（R3）：与节点/灵峰同一套迷雾规则——己方/可见格实时，explored-but-not-visible 冻结为最后可见快照。
 	# 先清理已不存在于世界的旧快照（被掠夺/拆除后不留幽灵改良），再对可见格实时刷新。

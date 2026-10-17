@@ -20,6 +20,12 @@ const DAO_PANEL_WIDTH: float = 440.0
 ## R4 项目/研究队列面板（左下角，两列并排，不改相机）。
 const QUEUE_PANEL_WIDTH: float = 620.0
 const QUEUE_PANEL_HEIGHT: float = 320.0
+## R5 战斗预览/结算面板（右下角，紧贴侧栏左侧，不改相机）。
+const COMBAT_PANEL_WIDTH: float = 360.0
+const COMBAT_PANEL_HEIGHT: float = 300.0
+## R5 弟子详情面板（左下角，与城市面板互斥，不改相机）。
+const UNIT_PANEL_WIDTH: float = 400.0
+const UNIT_PANEL_HEIGHT: float = 400.0
 
 var map: HexMap = null
 var fog: Fog = null
@@ -95,9 +101,46 @@ var move_mode: bool = false
 var reachable_ids: Array[String] = []
 ## 最近一次 queryMoveRange 的逐格累计代价（侧栏 / 验收用）。
 var reachable_costs: Dictionary = {}
+## 移动高亮起点（`HexMap.render_view` 会清空高亮层，重绘时需据此还原起点色）。
+var reachable_origin: String = ""
 ## 移动模式下光标所在高亮格及其累计代价（-1 = 不在高亮内）。
 var hover_tile_id: String = ""
 var hover_cost: int = -1
+
+# --- R5 战斗 / 单位操作 ---
+## 攻击态：已选中弟子且已拿到服务端可攻击集（与移动态**并存**，两层高亮互不覆盖）。
+var attack_mode: bool = false
+## 最近一次 queryAttackable 的可攻击格（服务端权威；判定复用 preview().attackable）。
+var attackable_ids: Array[String] = []
+## 该弟子的射程（服务端下发，客户端不查表）。
+var attack_range: int = 0
+## 最近一次 queryAttackPreview 回包（悬停预览数据源）。
+var attack_preview: Dictionary = {}
+## 预览对应的目标格（避免回包错位到新悬停格）。
+var preview_tile_id: String = ""
+## 多选集合（Shift+点选己方弟子）；≥2 时点击可达格改走 batchMove。
+var selected_ids: Array[String] = []
+## 最近一次 queryDiscipleDetail 回包（详情面板数据源）。
+var disciple_detail: Dictionary = {}
+## 最近一次 queryTeleportOptions 回包。
+var teleport_options: Dictionary = {}
+## 弟子操作模式：""（无）/ "retreat"（选撤退目标格）。
+var unit_mode: String = ""
+## 撤退模式下的候选格（相邻且服务端判定可达者）。
+var unit_retreat_ids: Array[String] = []
+## 战斗/单位操作结果提示（战斗面板底部）。
+var combat_feedback: String = ""
+## 战斗面板 / 弟子详情面板。
+var combat_panel: CanvasLayer = null
+var combat_title_label: Label = null
+var combat_info_label: Label = null
+var combat_list: VBoxContainer = null
+var combat_status_label: Label = null
+var unit_panel: CanvasLayer = null
+var unit_title_label: Label = null
+var unit_info_label: Label = null
+var unit_list: VBoxContainer = null
+var unit_status_label: Label = null
 
 var _selected: String = ""
 
@@ -113,6 +156,8 @@ func _ready() -> void:
 	_build_city_panel()
 	_build_dao_panel()
 	_build_queue_panel()
+	_build_combat_panel()
+	_build_unit_panel()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -125,6 +170,11 @@ func _ready() -> void:
 	Session.r3_result_received.connect(_on_r3_result_received)
 	Session.project_queue_received.connect(_on_project_queue_received)
 	Session.r4_result_received.connect(_on_r4_result_received)
+	Session.attackable_received.connect(_on_attackable_received)
+	Session.attack_preview_received.connect(_on_attack_preview_received)
+	Session.teleport_options_received.connect(_on_teleport_options_received)
+	Session.disciple_detail_received.connect(_on_disciple_detail_received)
+	Session.r5_result_received.connect(_on_r5_result_received)
 	if not Session.current_view.is_empty():
 		_render(Session.current_view)
 	else:
@@ -134,6 +184,8 @@ func _ready() -> void:
 		_render_city_panel()
 		_render_dao_panel()
 		_render_queue_panel()
+		_render_combat_panel()
+		_render_unit_panel()
 
 
 func _process(_delta: float) -> void:
@@ -154,6 +206,9 @@ func _render(view: Dictionary) -> void:
 	var assets: AssetLibrary = Session.assets
 	fog.configure(view)
 	map.render_view(view, assets, fog)
+	# `HexMap.render_view` 会清空全部子节点（含两层高亮），故按缓存数据原样重绘，
+	# 保证「刷新 view / 移动后重查」不会让高亮凭空消失而选中态仍在。
+	_redraw_highlights()
 	units.render_view(view, map, assets, fog, selected_disciple_id)
 	sects.render_view(view, map, assets, fog)
 	sect_count = (view.get("sects", []) as Array).size()
@@ -169,6 +224,18 @@ func _render(view: Dictionary) -> void:
 	_render_city_panel()
 	_render_dao_panel()
 	_render_queue_panel()
+	_render_combat_panel()
+	_render_unit_panel()
+
+
+## 按缓存数据重绘两层高亮（移动 / 攻击），二者独立并存。
+func _redraw_highlights() -> void:
+	if map == null:
+		return
+	if move_mode and not reachable_ids.is_empty():
+		map.show_move_range(reachable_ids, reachable_costs, reachable_origin)
+	if attack_mode and not attackable_ids.is_empty():
+		map.show_attack_range(attackable_ids, _disciple_tile_id(selected_disciple_id))
 
 
 ## 从 view 缓存己方 `daoOptions` / `unlockedDaoIds`（客户端不推导任何道法规则）。
@@ -264,11 +331,26 @@ static func _list_of(data: Dictionary, key: String) -> String:
 # R2：点选 → 高亮 → 移动
 # ---------------------------------------------------------------------------
 
-## 左键点击优先级：① 移动模式下点可达格 → moveDisciple；② 城市选址/指派模式下点候选格 → foundDistrict/assignWorker；
-## ③ 点己方弟子所在格 → 选中并 queryMoveRange；④ 点己方灵峰所在格 → 打开城市面板；⑤ 否则回到 R1 的地块选择。
+## 左键点击优先级：① 撤退模式下点候选格 → retreat；② 攻击模式下点可攻击格 → attack；
+## ③ 多选（≥2）且点可达格 → batchMove；④ 移动模式下点可达格 → moveDisciple；
+## ⑤ 城市选址/指派模式下点候选格 → foundDistrict/assignWorker；
+## ⑥ 点己方弟子所在格 → 选中并 queryMoveRange（按住 Shift 追加多选）；⑦ 点己方灵峰所在格 → 打开城市面板；
+## ⑧ 否则回到 R1 的地块选择。
+##
+## 攻击与移动不冲突：服务端 `MoveRules.step_cost` 对敌方占据格返回 `IMPASSABLE`，
+## 故敌方格永不出现在可达集里，先判攻击不会抢占移动。
 func on_tile_clicked(tile_id: String) -> void:
+	if unit_mode == "retreat" and unit_retreat_ids.has(tile_id):
+		Session.request_retreat(selected_disciple_id, tile_id)
+		return
+	if attack_mode and attackable_ids.has(tile_id):
+		Session.request_attack(selected_disciple_id, tile_id)
+		return
 	if move_mode and reachable_ids.has(tile_id):
-		Session.request_move_disciple(selected_disciple_id, tile_id)
+		if selected_ids.size() >= 2:
+			Session.request_batch_move(player_sect_id(), selected_ids, tile_id)
+		else:
+			Session.request_move_disciple(selected_disciple_id, tile_id)
 		return
 	if city_mode == "district" and city_candidate_ids.has(tile_id):
 		Session.request_found_district(player_sect_id(), selected_peak_id, city_pending_district_type, tile_id)
@@ -278,47 +360,85 @@ func on_tile_clicked(tile_id: String) -> void:
 		return
 	var disciple: Dictionary = _player_disciple_at(tile_id)
 	if not disciple.is_empty():
-		select_disciple(str(disciple.get("id", "")))
+		select_disciple(str(disciple.get("id", "")), Input.is_key_pressed(KEY_SHIFT))
 		return
 	var peak_id: String = _player_peak_at(tile_id)
 	if not peak_id.is_empty():
 		select_peak(peak_id)
 		return
 	_exit_city_mode()
+	_exit_unit_mode()
 	_clear_move_state()
 	select_tile(tile_id)
 	city_improvement_tile = tile_id
 
 
-func select_disciple(disciple_id: String) -> void:
+## 选中己方弟子。`additive=true`（Shift+点选）只把该弟子追加进 `selected_ids`，
+## 不改主选中、也不重拉服务端数据——多选仅用于 batchMove。
+func select_disciple(disciple_id: String, additive: bool = false) -> void:
+	if additive:
+		if not selected_ids.has(disciple_id):
+			selected_ids.append(disciple_id)
+		_render_unit_panel()
+		_render_combat_panel()
+		return
 	selected_peak_id = ""
+	_close_r4_panels()
 	_exit_city_mode()
+	_exit_unit_mode()
+	# 弟子详情面板与城市面板同占左下角，互斥显示。
+	if city_panel != null:
+		city_panel.visible = false
 	selected_disciple_id = disciple_id
+	selected_ids.clear()
+	selected_ids.append(disciple_id)
 	move_mode = false
 	reachable_ids.clear()
 	reachable_costs.clear()
+	reachable_origin = ""
+	attack_mode = false
+	attackable_ids.clear()
+	attack_range = 0
+	attack_preview.clear()
+	preview_tile_id = ""
 	hover_tile_id = ""
 	hover_cost = -1
 	_selected = ""
 	if map != null:
 		map.clear_move_range()
+		map.clear_attack_range()
 	if units != null:
 		units.set_selected(disciple_id)
 	_set_selection(_describe_disciple(disciple_id, {}))
+	# 串行链①：可达集 →（回包后）可攻击集 →（回包后）弟子详情。
+	# `Session._request` 是单请求语义，`busy` 期间并发请求会被直接丢弃，故只能链式触发。
 	Session.request_query_move_range(disciple_id)
 
 
+## 清空移动 + 攻击 + 多选态（选中灵峰、点空地、切换面板时调用）。
 func _clear_move_state() -> void:
 	move_mode = false
+	attack_mode = false
 	selected_disciple_id = ""
+	selected_ids.clear()
 	reachable_ids.clear()
 	reachable_costs.clear()
+	reachable_origin = ""
+	attackable_ids.clear()
+	attack_range = 0
+	attack_preview.clear()
+	preview_tile_id = ""
 	hover_tile_id = ""
 	hover_cost = -1
 	if map != null:
 		map.clear_move_range()
+		map.clear_attack_range()
 	if units != null:
 		units.set_selected("")
+	unit_mode = ""
+	unit_retreat_ids.clear()
+	_render_combat_panel()
+	_render_unit_panel()
 
 
 func _on_move_range_received(result: Dictionary) -> void:
@@ -329,9 +449,12 @@ func _on_move_range_received(result: Dictionary) -> void:
 	for value: Variant in ids:
 		reachable_ids.append(str(value))
 	reachable_costs = (result.get("costs", {}) as Dictionary).duplicate()
+	reachable_origin = str(result.get("originTileId", ""))
 	move_mode = not reachable_ids.is_empty()
-	map.show_move_range(ids, result.get("costs", {}), str(result.get("originTileId", "")))
+	map.show_move_range(ids, result.get("costs", {}), reachable_origin)
 	_set_selection(_describe_disciple(selected_disciple_id, result))
+	# 串行链②：可达集到齐后再拉可攻击集（同一次点选内的第二步）。
+	Session.request_query_attackable(selected_disciple_id)
 
 
 func _on_move_result_received(result: Dictionary) -> void:
@@ -340,12 +463,13 @@ func _on_move_result_received(result: Dictionary) -> void:
 		_set_selection(str(result.get("message", "移动失败")))
 		return
 	if int(result.get("turnsRemaining", 0)) > 0:
-		# 仍有移动力：重新查询，高亮随之更新。
+		# 仍有移动力：重新查询，高亮随之更新（并再次链式拉可攻击集）。
 		Session.request_query_move_range(selected_disciple_id)
 	else:
 		move_mode = false
 		reachable_ids.clear()
 		reachable_costs.clear()
+		reachable_origin = ""
 		map.clear_move_range()
 		_set_selection(_describe_disciple(selected_disciple_id, {}))
 
@@ -388,13 +512,35 @@ func _describe_disciple(disciple_id: String, range_result: Dictionary) -> String
 	lines.append("入门 %d 回合" % int(disciple.get("turnsInSect", 0)))
 	if int(disciple.get("builderCharges", 0)) > 0:
 		lines.append("建造次数 %d" % int(disciple.get("builderCharges", 0)))
+	# R5 战绩/晋升/驻守（字段全部来自 view，客户端不推导战斗规则）。
+	lines.append("战功 %d · 战阶 %d · 晋升点 %d" % [
+		int(disciple.get("battleXp", 0)),
+		int(disciple.get("battleLevel", 0)),
+		int(disciple.get("promotionPoints", 0)),
+	])
+	var promotions: Array = disciple.get("promotions", [])
+	if not promotions.is_empty():
+		lines.append("晋升 %s" % _list_of(disciple, "promotions"))
+	if not str(disciple.get("garrisonNodeId", "")).is_empty():
+		lines.append("驻守 %s" % str(disciple.get("garrisonNodeId", "")))
+	if int(disciple.get("reclassCooldown", 0)) > 0:
+		lines.append("转职冷却 %d 回合" % int(disciple.get("reclassCooldown", 0)))
 	if not range_result.is_empty():
 		lines.append("可达格 %d" % int(range_result.get("tileCount", 0)))
+	if attack_mode:
+		lines.append("可攻击格 %d（射程 %d）" % [attackable_ids.size(), attack_range])
 	if hover_cost >= 0:
 		lines.append("光标格 %s 代价 %d" % [hover_tile_id, hover_cost])
 	if move_points <= 0:
 		lines.append("（本回合已无移动力，可选中但无可达格）")
 	return "\n".join(lines)
+
+
+## 某弟子当前所在地块（供攻击高亮层标注起点色）。
+func _disciple_tile_id(disciple_id: String) -> String:
+	if disciple_id.is_empty():
+		return ""
+	return str(_find_disciple(disciple_id).get("tileId", ""))
 
 
 ## 当前移动高亮格数（供自动验收断言）。
@@ -1315,6 +1461,536 @@ func _on_r4_result_received(command: String, result: Dictionary) -> void:
 			Session.request_query_project_queue(queue_peak_id)
 
 
+# ---------------------------------------------------------------------------
+# R5 战斗面板（悬停攻击预览 + 战斗结算反馈）
+# ---------------------------------------------------------------------------
+
+func _build_combat_panel() -> void:
+	combat_panel = CanvasLayer.new()
+	combat_panel.name = "CombatPanel"
+	combat_panel.layer = 3
+	add_child(combat_panel)
+
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = -SIDEBAR_WIDTH - COMBAT_PANEL_WIDTH
+	panel.offset_right = -SIDEBAR_WIDTH
+	panel.offset_top = -COMBAT_PANEL_HEIGHT
+	panel.offset_bottom = 0.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.94)
+	style.border_color = Color("b6ad8b")
+	style.border_width_top = 2
+	style.border_width_left = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	combat_panel.add_child(panel)
+
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+
+	combat_title_label = Label.new()
+	combat_title_label.text = "战斗预览"
+	combat_title_label.add_theme_font_size_override("font_size", 17)
+	combat_title_label.add_theme_color_override("font_color", Color("294e48"))
+	column.add_child(combat_title_label)
+
+	combat_info_label = Label.new()
+	combat_info_label.add_theme_font_size_override("font_size", 13)
+	combat_info_label.add_theme_color_override("font_color", Color("3c4b45"))
+	combat_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(combat_info_label)
+
+	column.add_child(HSeparator.new())
+
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 90)
+	column.add_child(scroll)
+	combat_list = VBoxContainer.new()
+	combat_list.add_theme_constant_override("separation", 3)
+	combat_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(combat_list)
+
+	combat_status_label = Label.new()
+	combat_status_label.add_theme_font_size_override("font_size", 12)
+	combat_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	combat_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(combat_status_label)
+
+
+## 战斗面板纯读缓存，不发任何请求。
+func _render_combat_panel() -> void:
+	if combat_title_label == null or combat_info_label == null or combat_list == null:
+		return
+	for child: Node in combat_list.get_children():
+		combat_list.remove_child(child)
+		child.queue_free()
+	if combat_status_label != null:
+		combat_status_label.text = combat_feedback
+	var has_preview: bool = not attack_preview.is_empty()
+	if combat_panel != null:
+		combat_panel.visible = has_preview or not combat_feedback.is_empty()
+	if not has_preview:
+		combat_title_label.text = "战斗预览（选中弟子后悬停可攻击格）"
+		combat_info_label.text = "可攻击格由服务端 queryAttackable 下发，与 preview().attackable 同一判定。"
+		return
+	var blocked: String = str(attack_preview.get("blockedReason", ""))
+	combat_title_label.text = "战斗预览 · 目标 %s" % str(attack_preview.get("targetTileId", ""))
+	if not blocked.is_empty():
+		combat_info_label.text = "✗ 不可攻击：%s" % blocked
+		return
+	combat_info_label.text = "\n".join(PackedStringArray([
+		"攻 %s 战力 %d · 守 %s 战力 %d" % [
+			_unit_class_label(str(attack_preview.get("attackerClass", "?"))),
+			int(attack_preview.get("attackerPower", 0)),
+			_unit_class_label(str(attack_preview.get("defenderClass", "?"))),
+			int(attack_preview.get("defenderPower", 0)),
+		],
+		"胜率 %.0f%% · 相克 ×%.2f · 反击 %d" % [
+			float(attack_preview.get("winChance", 0.0)) * 100.0,
+			float(attack_preview.get("counterMultiplier", 1.0)),
+			int(attack_preview.get("retaliationPower", 0)),
+		],
+		"距离 %d · %s · 预计战功 %d" % [
+			int(attack_preview.get("distance", 0)),
+			"远程" if bool(attack_preview.get("ranged", false)) else "近战",
+			int(attack_preview.get("xpPreview", 0)),
+		],
+	]))
+	for note: Variant in attack_preview.get("notes", []):
+		combat_list.add_child(_queue_hint(str(note)))
+	var attack_button: Button = Button.new()
+	attack_button.text = "发起攻击（%s）" % str(attack_preview.get("targetTileId", ""))
+	attack_button.tooltip_text = "attack：与预览共用同一套 matchup 构建，预览与实战不会漂移"
+	var target_tile: String = str(attack_preview.get("targetTileId", ""))
+	attack_button.pressed.connect(func() -> void: Session.request_attack(selected_disciple_id, target_tile))
+	combat_list.add_child(attack_button)
+
+
+# ---------------------------------------------------------------------------
+# R5 弟子详情面板（详情 + 撤退/传送/驻守 + 转职/晋升）
+# ---------------------------------------------------------------------------
+
+func _build_unit_panel() -> void:
+	unit_panel = CanvasLayer.new()
+	unit_panel.name = "UnitPanel"
+	unit_panel.layer = 3
+	unit_panel.visible = false
+	add_child(unit_panel)
+
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 0.0
+	panel.offset_right = UNIT_PANEL_WIDTH
+	panel.offset_top = -UNIT_PANEL_HEIGHT
+	panel.offset_bottom = 0.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.96)
+	style.border_color = Color("b6ad8b")
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	unit_panel.add_child(panel)
+
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+
+	var header: HBoxContainer = HBoxContainer.new()
+	column.add_child(header)
+	unit_title_label = Label.new()
+	unit_title_label.text = "弟子详情（点选己方弟子）"
+	unit_title_label.add_theme_font_size_override("font_size", 17)
+	unit_title_label.add_theme_color_override("font_color", Color("294e48"))
+	unit_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(unit_title_label)
+	var close: Button = Button.new()
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: _clear_move_state())
+	header.add_child(close)
+
+	unit_info_label = Label.new()
+	unit_info_label.add_theme_font_size_override("font_size", 13)
+	unit_info_label.add_theme_color_override("font_color", Color("3c4b45"))
+	unit_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(unit_info_label)
+
+	column.add_child(HSeparator.new())
+
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 150)
+	column.add_child(scroll)
+	unit_list = VBoxContainer.new()
+	unit_list.add_theme_constant_override("separation", 3)
+	unit_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(unit_list)
+
+	unit_status_label = Label.new()
+	unit_status_label.add_theme_font_size_override("font_size", 12)
+	unit_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	unit_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(unit_status_label)
+
+
+## 弟子详情面板纯读缓存（`queryDiscipleDetail` / `queryTeleportOptions` 回包），不发请求。
+func _render_unit_panel() -> void:
+	if unit_title_label == null or unit_list == null:
+		return
+	for child: Node in unit_list.get_children():
+		unit_list.remove_child(child)
+		child.queue_free()
+	if unit_status_label != null:
+		unit_status_label.text = combat_feedback
+	var active: bool = not selected_disciple_id.is_empty()
+	if unit_panel != null:
+		unit_panel.visible = active
+	if not active:
+		unit_title_label.text = "弟子详情（点选己方弟子）"
+		unit_info_label.text = "点选己方弟子查看兵种/战功/晋升，并可转职、晋升、传送、驻守、撤退。"
+		return
+	if not bool(disciple_detail.get("found", false)):
+		unit_title_label.text = "弟子详情（查询中…）"
+		unit_info_label.text = "discipleId=%s" % selected_disciple_id
+		return
+	unit_title_label.text = "弟子详情 · %s" % str(disciple_detail.get("name", selected_disciple_id))
+	unit_info_label.text = "\n".join(PackedStringArray([
+		"%s · %s · 射程 %d" % [
+			str(disciple_detail.get("unitClassName", disciple_detail.get("unitClass", "?"))),
+			str(disciple_detail.get("realmName", disciple_detail.get("realm", "?"))),
+			int(disciple_detail.get("range", 1)),
+		],
+		"战功 %d · 战阶 %d · 晋升点 %d · 转职冷却 %d" % [
+			int(disciple_detail.get("battleXp", 0)),
+			int(disciple_detail.get("battleLevel", 0)),
+			int(disciple_detail.get("promotionPoints", 0)),
+			int(disciple_detail.get("reclassCooldown", 0)),
+		],
+		"出手 %d · 移动 %d/%d · 驻守 %s" % [
+			int(disciple_detail.get("strikesLeft", 0)),
+			int(disciple_detail.get("movePoints", 0)),
+			int(disciple_detail.get("maxMovePoints", 0)),
+			"无" if str(disciple_detail.get("garrisonNodeId", "")).is_empty() else str(disciple_detail.get("garrisonNodeId", "")),
+		],
+		"已习晋升 %s" % _list_of(disciple_detail, "promotionNames"),
+	]))
+	_populate_unit_actions()
+
+
+func _populate_unit_actions() -> void:
+	# 多选（batchMove）：Shift+点选累积，≥2 时点可达格走 batchMove。
+	unit_list.add_child(_city_section_label("多选（Shift+点选己方弟子 → 点高亮格批量移动，上限 8 人）"))
+	unit_list.add_child(_queue_hint("当前已选 %d 人：%s" % [selected_ids.size(), "、".join(PackedStringArray(_names_of(selected_ids)))]))
+	# 撤退 / 驻守 / 传送
+	unit_list.add_child(_city_section_label("机动"))
+	var retreat: Button = Button.new()
+	retreat.text = "撤退（选相邻格）"
+	retreat.tooltip_text = "retreat：成功率由兵种/晋升决定，失败则被咬住并耗尽移动力"
+	retreat.pressed.connect(func() -> void: _begin_retreat())
+	unit_list.add_child(retreat)
+	var node_id: String = _node_at_disciple(selected_disciple_id)
+	var garrison: Button = Button.new()
+	garrison.text = "驻守本格节点"
+	garrison.tooltip_text = "assignGarrison：弟子须先移动到己方节点所在地块"
+	garrison.disabled = node_id.is_empty()
+	garrison.pressed.connect(func() -> void: Session.request_assign_garrison(selected_disciple_id, node_id))
+	unit_list.add_child(garrison)
+	var withdraw: Button = Button.new()
+	withdraw.text = "撤离驻守"
+	withdraw.disabled = str(disciple_detail.get("garrisonNodeId", "")).is_empty()
+	withdraw.pressed.connect(func() -> void: Session.request_withdraw_garrison(selected_disciple_id))
+	unit_list.add_child(withdraw)
+	var teleport: Button = Button.new()
+	teleport.text = "传送（列出己方灵峰）"
+	teleport.tooltip_text = "teleport：仅己方灵峰之间，消耗灵石并占用本回合传送次数"
+	teleport.pressed.connect(func() -> void: Session.request_query_teleport_options(selected_disciple_id))
+	unit_list.add_child(teleport)
+	# 传送候选（queryTeleportOptions 回包）
+	if bool(teleport_options.get("found", false)):
+		unit_list.add_child(_queue_hint("传送容量 %d/%d（已用 %d）" % [
+			int(teleport_options.get("remaining", 0)),
+			int(teleport_options.get("capacity", 0)),
+			int(teleport_options.get("capacity", 0)) - int(teleport_options.get("remaining", 0)),
+		]))
+		for option: Dictionary in teleport_options.get("options", []):
+			var option_button: Button = Button.new()
+			option_button.text = "传往 %s（%d 灵石）" % [
+				str(option.get("name", option.get("peakId", "?"))),
+				int(option.get("cost", 0)),
+			]
+			option_button.tooltip_text = "blocker：%s" % str(option.get("blocker", "无"))
+			option_button.disabled = not bool(option.get("allowed", false))
+			var peak_id: String = str(option.get("peakId", ""))
+			option_button.pressed.connect(func() -> void: Session.request_teleport(selected_disciple_id, peak_id))
+			unit_list.add_child(option_button)
+	# 转职：availableUnitClasses[] 三态由服务端判定，非法/不满足者置灰并显示 blocker。
+	unit_list.add_child(_city_section_label("转职（十兵种）"))
+	for entry: Dictionary in disciple_detail.get("availableUnitClasses", []):
+		var class_button: Button = Button.new()
+		var unit_class: String = str(entry.get("id", ""))
+		class_button.name = "Reclass_" + unit_class
+		class_button.text = "%s %s" % ["◻" if bool(entry.get("allowed", false)) else "✗", str(entry.get("name", entry.get("id", "?")))]
+		class_button.tooltip_text = "blocker：%s" % str(entry.get("blocker", "无"))
+		class_button.disabled = not bool(entry.get("allowed", false))
+		class_button.pressed.connect(func() -> void: Session.request_reclass(selected_disciple_id, unit_class))
+		unit_list.add_child(class_button)
+	# 晋升：availablePromotions[] 由服务端按战阶过滤。
+	unit_list.add_child(_city_section_label("晋升（消耗晋升点）"))
+	var promotions: Array = disciple_detail.get("availablePromotions", [])
+	if promotions.is_empty():
+		unit_list.add_child(_queue_hint("（暂无可选晋升：战阶或晋升点不足）"))
+	for entry: Dictionary in promotions:
+		var promotion_button: Button = Button.new()
+		var promotion_id: String = str(entry.get("id", ""))
+		promotion_button.name = "Promote_" + promotion_id
+		promotion_button.text = "%s（需战阶 %d）" % [
+			str(entry.get("name", entry.get("id", "?"))),
+			int(entry.get("minLevel", 0)),
+		]
+		promotion_button.tooltip_text = str(entry.get("description", ""))
+		promotion_button.disabled = int(disciple_detail.get("promotionPoints", 0)) <= 0
+		promotion_button.pressed.connect(func() -> void: Session.request_promote(selected_disciple_id, promotion_id))
+		unit_list.add_child(promotion_button)
+
+
+## 撤退模式：候选格 = 服务端可达集中**相邻**者（相邻性属纯几何，用 Hex.distance 判，
+## 不涉及任何玩法规则；能否撤退、成功率、代价一律由服务端 `retreat` 判定）。
+func _begin_retreat() -> void:
+	if selected_disciple_id.is_empty():
+		return
+	var origin: String = _disciple_tile_id(selected_disciple_id)
+	if origin.is_empty() or not map.tiles.has(origin):
+		combat_feedback = "✗ 弟子尚未落位，无法撤退"
+		_render_combat_panel()
+		_render_unit_panel()
+		return
+	var from: Dictionary = (map.tiles[origin] as Node3D).get_meta("display_data")
+	unit_retreat_ids.clear()
+	for tile_id: String in reachable_ids:
+		if not map.tiles.has(tile_id):
+			continue
+		var data: Dictionary = (map.tiles[tile_id] as Node3D).get_meta("display_data")
+		if Hex.distance(Vector2i(int(from.get("q", 0)), int(from.get("r", 0))), Vector2i(int(data.get("q", 0)), int(data.get("r", 0)))) != 1:
+			continue
+		unit_retreat_ids.append(tile_id)
+	unit_mode = "retreat"
+	if map != null:
+		map.show_move_range(unit_retreat_ids, {}, origin)
+	combat_feedback = "撤退模式：%d 个相邻候选格，点击高亮格撤退" % unit_retreat_ids.size()
+	_render_combat_panel()
+	_render_unit_panel()
+
+
+func _exit_unit_mode() -> void:
+	if unit_mode.is_empty():
+		return
+	unit_mode = ""
+	unit_retreat_ids.clear()
+	# 撤退候选与移动高亮共用同一层，退出后按缓存还原移动高亮。
+	if map != null:
+		if move_mode and not reachable_ids.is_empty():
+			map.show_move_range(reachable_ids, reachable_costs, reachable_origin)
+		else:
+			map.clear_move_range()
+	_render_unit_panel()
+
+
+## 己方节点：返回该弟子所在地块上的节点 id（非节点格返回空串）。
+func _node_at_disciple(disciple_id: String) -> String:
+	var tile_id: String = _disciple_tile_id(disciple_id)
+	if tile_id.is_empty():
+		return ""
+	for node_id: String in Session.current_view.get("nodes", {}):
+		var node: Dictionary = (Session.current_view.get("nodes", {}) as Dictionary)[node_id]
+		if str(node.get("tileId", "")) == tile_id:
+			return node_id
+	return ""
+
+
+func _names_of(ids: Array[String]) -> PackedStringArray:
+	var names: PackedStringArray = PackedStringArray()
+	for disciple_id: String in ids:
+		var disciple: Dictionary = _find_disciple(disciple_id)
+		names.append(str(disciple.get("name", disciple_id)))
+	return names
+
+
+# --- R5 服务端回包 ---
+
+func _on_attackable_received(result: Dictionary) -> void:
+	if str(result.get("discipleId", "")) != selected_disciple_id:
+		return
+	attackable_ids.clear()
+	for value: Variant in result.get("tileIds", []):
+		attackable_ids.append(str(value))
+	attack_range = int(result.get("range", 1))
+	attack_mode = not attackable_ids.is_empty()
+	if map != null:
+		if attack_mode:
+			map.show_attack_range(attackable_ids, _disciple_tile_id(selected_disciple_id))
+		else:
+			map.clear_attack_range()
+	_set_selection(_describe_disciple(selected_disciple_id, {}))
+	# 串行链③：可攻击集到齐后再拉弟子详情（第三步，同一次点选内）。
+	Session.request_query_disciple_detail(selected_disciple_id)
+
+
+func _on_attack_preview_received(result: Dictionary) -> void:
+	# 回包只认「当前悬停格」，避免慢回包把预览画到新目标上。
+	if str(result.get("targetTileId", "")) != preview_tile_id:
+		return
+	attack_preview = result.duplicate(true)
+	_render_combat_panel()
+
+
+func _on_teleport_options_received(result: Dictionary) -> void:
+	if str(result.get("discipleId", "")) != selected_disciple_id:
+		return
+	teleport_options = result.duplicate(true)
+	if not bool(result.get("enabled", false)):
+		combat_feedback = "✗ 传送网络未开启（需道法 chuan_song）"
+	_render_combat_panel()
+	_render_unit_panel()
+
+
+func _on_disciple_detail_received(result: Dictionary) -> void:
+	if str(result.get("discipleId", result.get("id", ""))) != selected_disciple_id:
+		return
+	disciple_detail = result.duplicate(true)
+	_render_unit_panel()
+
+
+func _on_r5_result_received(command: String, result: Dictionary) -> void:
+	# 只读 `query*` 的 result 不带 `success`（由各自 `*_received` 信号处理）。
+	if not result.has("success"):
+		return
+	var success: bool = bool(result.get("success", false))
+	var message: String = str(result.get("message", ""))
+	var text: String = ("✓ " if success else "✗ ") + (message if not message.is_empty() else "操作失败")
+	combat_feedback = text
+	if command == Commands.ATTACK:
+		combat_feedback = _combat_result_text(result)
+	elif command == Commands.RETREAT:
+		_exit_unit_mode()
+	_render_combat_panel()
+	_render_unit_panel()
+	if not success:
+		return
+	match command:
+		Commands.ATTACK:
+			# 战斗后位置/血量/归属可能全变：重拉选中弟子（若还活着）的三段数据。
+			if not _find_disciple(selected_disciple_id).is_empty():
+				Session.request_query_move_range(selected_disciple_id)
+			else:
+				_clear_move_state()
+		Commands.RETREAT, Commands.TELEPORT, Commands.BATCH_MOVE:
+			if not _find_disciple(selected_disciple_id).is_empty():
+				Session.request_query_move_range(selected_disciple_id)
+		Commands.RECLASS, Commands.PROMOTE:
+			# 转职/晋升会改机动上限与晋升加成，详情与高亮都要重拉。
+			Session.request_query_disciple_detail(selected_disciple_id)
+		Commands.ASSIGN_GARRISON, Commands.WITHDRAW_GARRISON:
+			Session.request_query_disciple_detail(selected_disciple_id)
+
+
+## 把 `CombatResult` 摊平成一行可读反馈（含 outcome / 伤亡 / 俘获 / notes）。
+func _combat_result_text(result: Dictionary) -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("%s %s（%d 回合 · 胜率 %.0f%%）" % [
+		"✓" if bool(result.get("attackerWon", false)) else "✗",
+		str(result.get("message", "")),
+		int(result.get("rounds", 0)),
+		float(result.get("winChance", 0.0)) * 100.0,
+	])
+	lines.append("战力 %d vs %d · 战功 +%d" % [
+		int(result.get("attackerPower", 0)),
+		int(result.get("defenderPower", 0)),
+		int(result.get("xpAwarded", 0)),
+	])
+	var casualties: Array = result.get("casualties", [])
+	if not casualties.is_empty():
+		lines.append("伤亡：%s" % "、".join(PackedStringArray(casualties)))
+	var captured: Array = result.get("capturedIds", [])
+	if not captured.is_empty():
+		lines.append("俘获：%s" % "、".join(PackedStringArray(captured)))
+	for note: Variant in result.get("notes", []):
+		lines.append("· " + str(note))
+	return "\n".join(lines)
+
+
+## 兵种 id → 中文名：名称一律取自服务端 `availableUnitClasses[]`，
+## 客户端**不内置**任何兵种表（避免与 config 漂移）。
+func _unit_class_label(unit_class: String) -> String:
+	for entry: Dictionary in disciple_detail.get("availableUnitClasses", []):
+		if str(entry.get("id", "")) == unit_class:
+			return str(entry.get("name", unit_class))
+	return unit_class
+
+
+# --- 供自动验收断言（R5）---
+
+func combat_panel_visible() -> bool:
+	return combat_panel != null and combat_panel.visible
+
+func combat_title_text() -> String:
+	return combat_title_label.text if combat_title_label != null else ""
+
+func combat_info_text() -> String:
+	return combat_info_label.text if combat_info_label != null else ""
+
+func combat_feedback_text() -> String:
+	return combat_status_label.text if combat_status_label != null else ""
+
+func combat_button_count() -> int:
+	return combat_list.get_child_count() if combat_list != null else 0
+
+func attack_highlight_count() -> int:
+	return map.attack_ids.size() if map != null else 0
+
+func unit_panel_visible() -> bool:
+	return unit_panel != null and unit_panel.visible
+
+func unit_info_text() -> String:
+	return unit_info_label.text if unit_info_label != null else ""
+
+func unit_button_count() -> int:
+	return unit_list.get_child_count() if unit_list != null else 0
+
+## 按兵种 id 找到转职按钮（按钮名 `Reclass_<unitClass>`）；未渲染返回空字典。
+func reclass_button_state(unit_class: String) -> Dictionary:
+	if unit_list == null:
+		return {}
+	var button: Button = unit_list.get_node_or_null(NodePath("Reclass_" + unit_class)) as Button
+	if button == null:
+		return {}
+	return {"disabled": button.disabled, "text": button.text, "tooltip": button.tooltip_text}
+
+
+## 按晋升 id 找到晋升按钮（按钮名 `Promote_<promotionId>`）；未渲染返回空字典。
+func promote_button_state(promotion_id: String) -> Dictionary:
+	if unit_list == null:
+		return {}
+	var button: Button = unit_list.get_node_or_null(NodePath("Promote_" + promotion_id)) as Button
+	if button == null:
+		return {}
+	return {"disabled": button.disabled, "text": button.text, "tooltip": button.tooltip_text}
+
+
 # --- 供自动验收断言 ---
 
 func dao_panel_visible() -> bool:
@@ -1372,8 +2048,8 @@ func disciple_detail_text(disciple_id: String) -> String:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		# 仅在移动模式下做悬停代价提示，避免常态下每帧射线拾取。
-		if move_mode and map != null:
+		# 仅在移动/攻击/撤退态做悬停提示，避免常态下每帧射线拾取。
+		if (move_mode or attack_mode or not unit_mode.is_empty()) and map != null:
 			var motion: InputEventMouseMotion = event
 			var hovered: String = map.pick_tile(Session.camera_rig.camera, motion.position)
 			if hovered != hover_tile_id:
@@ -1381,6 +2057,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				hover_cost = map.highlight_cost(hovered) if not hovered.is_empty() else -1
 				if not selected_disciple_id.is_empty():
 					_set_selection(_describe_disciple(selected_disciple_id, {}))
+				_update_attack_preview(hovered)
 		return
 	if not (event is InputEventMouseButton):
 		return
@@ -1393,6 +2070,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not picked.is_empty():
 		on_tile_clicked(picked)
 		get_viewport().set_input_as_handled()
+
+
+## 悬停攻击预览：只对「服务端判定可攻击」的格发请求。
+## `Session._request` 是单请求语义，busy 期间直接跳过（回包按 `preview_tile_id` 校验，不会错位）。
+func _update_attack_preview(hovered: String) -> void:
+	if not attack_mode or hovered.is_empty() or not attackable_ids.has(hovered):
+		if not preview_tile_id.is_empty():
+			preview_tile_id = ""
+			attack_preview.clear()
+			_render_combat_panel()
+		return
+	if hovered == preview_tile_id:
+		return
+	if Session.busy:
+		return
+	query_attack_preview(hovered)
+
+
+## 显式请求某格的攻击预览（悬停与自动验收共用）。
+## 先锁定 `preview_tile_id` 再发请求，故慢回包不会画到新目标上。
+func query_attack_preview(tile_id: String) -> String:
+	if selected_disciple_id.is_empty():
+		return ""
+	preview_tile_id = tile_id
+	return Session.request_query_attack_preview(selected_disciple_id, tile_id)
 
 
 # ---------------------------------------------------------------------------
@@ -1448,7 +2150,7 @@ func _build_sidebar() -> void:
 	panel.add_child(column)
 
 	var title: Label = Label.new()
-	title.text = "山河画卷 · R4"
+	title.text = "山河画卷 · R5"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color("294e48"))
 	column.add_child(title)
@@ -1485,7 +2187,7 @@ func _build_sidebar() -> void:
 	buttons.add_child(back)
 
 	var hint: Label = Label.new()
-	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 点高亮格移动/选址/指派 · 顶栏「道统」看道法树、「队列」看项目与研究 · 结束回合"
+	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 青高亮=可移动、赭红=可攻击 · 悬停可攻击格看胜率预览 · Shift+点选多选后点高亮格批量移动 · 左下弟子详情可转职/晋升/传送/驻守/撤退 · 顶栏「道统」「队列」 · 结束回合"
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color("6d7470"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

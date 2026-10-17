@@ -33,8 +33,23 @@ var tribulating: bool = false
 ## 最近一次收徒大典产出此弟子的回合（繁衍冷却记账）。
 var lastReproduceTurn: int = 0
 
+## R5 新增：战功经验（`warfare.xpPer*` 累加，`UnitRules.level_for_xp` 换算等级）。
+var battleXp: int = 0
+## R5 新增：战功等级（`warfare.levelThresholds` 下标，0 起）。
+var battleLevel: int = 0
+## R5 新增：可支配晋升点（每升 1 级给 `warfare.promotionPointsPerLevel` 点）。
+var promotionPoints: int = 0
+## R5 新增：已习得的晋升项 id（`warfare.promotions[].id`，`promote` 写入）。
+var promotions: Array[String] = []
+## R5 新增：转职冷却剩余回合（`reclass` 后置为 `reclassCooldownTurns`，回合开始递减）。
+var reclassCooldown: int = 0
+## R5 新增：驻守的节点 id（`assignGarrison` 写入，`withdrawGarrison` 清空）。
+var garrisonNodeId: String = ""
+## R5 新增：被俘前的原宗门 id（`captureChanceOnLoss` 命中时记账）。
+var capturedFromSectId: String = ""
+
 func to_dict() -> Dictionary:
-	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges}
+	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges, "battleXp": battleXp, "battleLevel": battleLevel, "promotionPoints": promotionPoints, "promotions": promotions.duplicate(), "reclassCooldown": reclassCooldown, "garrisonNodeId": garrisonNodeId}
 
 
 ## 由 `realm` 反推境界等级（1..5）；`realmLevel` 与 `realm` 必须同步。

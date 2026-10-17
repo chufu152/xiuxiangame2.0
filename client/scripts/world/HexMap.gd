@@ -11,6 +11,9 @@ var river_keys: Dictionary = {}
 var highlight_root: Node3D = null
 var highlight_ids: Array[String] = []
 var highlight_costs: Dictionary = {}
+## 攻击高亮层（R5）：与移动高亮层**完全独立**，两者可同时存在、互不覆盖。
+var attack_root: Node3D = null
+var attack_ids: Array[String] = []
 
 func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> void:
 	assets = library
@@ -19,6 +22,8 @@ func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> voi
 	highlight_root = null
 	highlight_ids.clear()
 	highlight_costs.clear()
+	attack_root = null
+	attack_ids.clear()
 	for child: Node in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -211,6 +216,49 @@ func has_highlight(tile_id: String) -> bool:
 ## 该格的累计移动代价；未高亮返回 -1。
 func highlight_cost(tile_id: String) -> int:
 	return int(highlight_costs.get(tile_id, -1))
+
+
+# ---------------------------------------------------------------------------
+# 攻击高亮层（R5）——与移动高亮层独立并存
+# ---------------------------------------------------------------------------
+
+## 在可攻击格顶面叠半透明高亮（起点另色）。可攻击集一律来自服务端 `queryAttackable`，
+## 而服务端「可攻击」判定复用 `preview().attackable`，故高亮即可打，客户端零推导。
+func show_attack_range(tile_ids: Array, origin: String) -> void:
+	clear_attack_range()
+	attack_root = Node3D.new()
+	attack_root.name = "AttackRange"
+	add_child(attack_root)
+	for value: Variant in tile_ids:
+		var tile_id: String = str(value)
+		if not tiles.has(tile_id):
+			continue
+		var disc: CylinderMesh = CylinderMesh.new()
+		disc.top_radius = 0.80
+		disc.bottom_radius = 0.80
+		disc.height = 0.02
+		disc.radial_segments = 6
+		var is_origin: bool = tile_id == origin
+		# 攻方所在格用暗金，可攻击格用赭红；抬高 0.06 叠在移动高亮之上，两者同时可见。
+		var color: Color = Color(0.85, 0.64, 0.24, 0.55) if is_origin else Color(0.72, 0.27, 0.22, 0.42)
+		var material: StandardMaterial3D = solid(color)
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var instance: MeshInstance3D = add_mesh(attack_root, "AttackHighlight", disc, top_position(tile_id) + Vector3(0, 0.06, 0), material)
+		instance.rotation.y = PI / 6.0
+		attack_ids.append(tile_id)
+
+
+func clear_attack_range() -> void:
+	if attack_root != null and is_instance_valid(attack_root):
+		remove_child(attack_root)
+		attack_root.queue_free()
+	attack_root = null
+	attack_ids.clear()
+
+
+## 该格当前是否处于攻击高亮中。
+func has_attack_highlight(tile_id: String) -> bool:
+	return attack_ids.has(tile_id)
 
 
 func pick_tile(camera: Camera3D, screen_position: Vector2) -> String:

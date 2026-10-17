@@ -38,6 +38,9 @@ var enemiesDefeated: int = 0
 var miJingExploredTotal: int = 0
 ## R4 新增（**内部记账，不下发 view**）：最近一次收徒大典入队的回合（`recruitmentBaseInterval` 冷却）。
 var lastRecruitmentTurn: int = 0
+## R5 新增（**内部记账，不下发 view**）：本回合已用传送次数（`TURN_START` 清零）。
+## 可传送次数 = `teleport.capacityBase` + 在守自有灵脉节点数 × `capacityPerOwnLingMaiNode`（封顶 `capacityMax`）。
+var teleportsUsedThisTurn: int = 0
 
 func public_info() -> Dictionary:
 	return {"id": id, "name": name, "factionType": factionType, "player": player}

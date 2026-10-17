@@ -13,7 +13,18 @@ const NUMERIC_PATHS: Array[String] = [
 	"city.startPopulation", "city.housingBase", "city.housingPerPeakLevel", "city.stabilityBase", "city.stabilityMax", "city.workRadius",
 	"policy.switchCooldownTurns", "daoTree.cangJingGePointsPerTurn", "improvement.builderCharges",
 	"combat.baseWinChance", "combat.powerRatioThreshold", "combat.realmPowerWeight", "combat.rootGradePowerWeight",
-	"victory.maxTurns", "teleport.baseStones", "road.stepCostReduction", "automation.maxActionsPerTurn", "speed.animationScale"
+	"victory.maxTurns", "teleport.baseStones", "road.stepCostReduction", "automation.maxActionsPerTurn", "speed.animationScale",
+	# R5 战斗/传送读取的数值键（`UnitRules`/`CombatResolver`/`TeleportRules` 的取值来源）。
+	"combat.injuryChanceOnLoss", "combat.fallChanceOnLoss", "combat.captureChanceOnLoss", "combat.injuryPowerPenalty",
+	"combat.heartDevilLowThreshold", "combat.heartDevilLowPenalty", "combat.heartDevilHighThreshold", "combat.heartDevilHighPenalty",
+	"combat.roundsMin", "combat.roundsMax", "combat.roundPowerNoise",
+	"warfare.attackMoveCost", "warfare.fortificationRatio", "warfare.siegeRequirement", "warfare.defenseCutPerTurn",
+	"warfare.maxDefenseCut", "warfare.supplyNeighborsRequired", "warfare.garrisonDefenseBonus", "warfare.zocExtraCost",
+	"warfare.retreatBaseChance", "warfare.retreatMoveCost", "warfare.retreatMobileBonus",
+	"warfare.xpPerVictory", "warfare.xpPerDefeat", "warfare.xpPerKill", "warfare.xpPerObjective", "warfare.promotionPointsPerLevel",
+	"teleport.stonesPerHex", "teleport.capacityBase", "teleport.capacityPerOwnLingMaiNode", "teleport.capacityMax",
+	"powerLevel.tilesPerLevel", "powerLevel.highRealmDiscipleWeight", "powerLevel.unlockedDaoWeight", "powerLevel.buildingLevelWeight",
+	"speed.batchMoveMaxTargets",
 ]
 const SETUP_NUMBERS: Array[String] = ["sectCount", "safeRadius", "maxWidth", "maxHeight", "maxTiles", "peakLevel", "peakQiYun", "nodeLevel", "rootGrade", "rootCount", "outerCount", "generation"]
 const DAO_EFFECTS: Array[String] = ["CULTIVATION_BONUS", "ECONOMY_BONUS", "COMBAT_BONUS", "MOVE_BONUS", "VISION_BONUS", "RESEARCH_BONUS", "UNLOCK_IMPROVEMENT", "UNLOCK_BUILDING", "UNLOCK_UNIT", "UNLOCK_DISTRICT", "UNLOCK_TELEPORT", "UNLOCK_POLICY"]
@@ -31,6 +42,12 @@ static func validate(config: Dictionary) -> Array[String]:
 	_scan(config, "", errors)
 	for path: String in NUMERIC_PATHS: _number(config, path, errors)
 	for key: String in ["map.baseTerrains", "map.relief", "map.features", "map.river", "map.nodeSpawnByTerrain", "map.luxuryByTerrain", "map.strategicByTerrain", "map.setup", "resources.initial.materials", "resources.initial.luxuries", "vision.discipleVisionByRealm", "warfare.unitClasses", "difficulty.levels", "improvement.byType", "faction.flavors"]: _require(config, key, TYPE_DICTIONARY, errors)
+	# R5：相克矩阵与地形防御表是字典，等级阈值表是数组；`teleport.enabled` 是布尔。
+	for key: String in ["warfare.counters", "warfare.terrainDefenseBonus"]: _require(config, key, TYPE_DICTIONARY, errors)
+	_require(config, "warfare.levelThresholds", TYPE_ARRAY, errors)
+	_require(config, "warfare.zocEnabled", TYPE_BOOL, errors)
+	_require(config, "teleport.enabled", TYPE_BOOL, errors)
+	_require(config, "teleport.requiredDaoKey", TYPE_STRING, errors)
 	_require(config, "vision.enabled", TYPE_BOOL, errors)
 	_require(config, "difficulty.defaultLevel", TYPE_STRING, errors)
 	_require(config, "map.baseTerrainAlgorithm", TYPE_STRING, errors)

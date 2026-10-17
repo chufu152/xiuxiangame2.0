@@ -51,21 +51,26 @@ func next_turn(state: GameState) -> Array[String]:
 # 各阶段
 # ---------------------------------------------------------------------------
 
-## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼）：重算视野 → 刷新道路网 →
-## 每名弟子重置出手、按公式恢复移动力（含本宗道路起点加成）、宗门停留回合 +1 → 伤愈 → 修炼。
-## **不做**：传送清零（R5）、宗主外出（R7）、自动化（R6）。
+## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零）：
+## 重算视野 → 刷新道路网 → 传送次数清零 → 每名弟子重置出手/转职冷却、按公式恢复移动力
+## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼。
+## **不做**：宗主外出（R7）、自动化（R6）。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
 	# R3 回填：道路网等级刷新（R2 留的 TODO）。
 	RoadNetworkService.refresh(state, _config)
 	# R2 无淘汰机制（R7），全部宗门都刷新。
 	for sect: Sect in state.sects:
+		# R5 回填：传送次数每回合清零（R2 留的 TODO）。
+		sect.teleportsUsedThisTurn = 0
 		for disciple: Disciple in sect.disciples:
 			disciple.attacksRemaining = int(_config["warfare"]["attacksPerTurn"])
 			var points: int = MoveRules.calculate_max_move_points(disciple, _config, state, sect)
 			disciple.maxMovePoints = points
 			disciple.movePoints = points
 			disciple.turnsInSect += 1
+			# R5：转职冷却递减（1.0 `UnitRules.beginTurn` 语义）。
+			if disciple.reclassCooldown > 0: disciple.reclassCooldown -= 1
 	# R4 回填：伤愈 + 修炼（R2 留的修炼 TODO）。顺序固定（宗门序 → 弟子序），保证同种子逐字一致。
 	for sect: Sect in state.sects:
 		for disciple: Disciple in sect.disciples:
@@ -74,16 +79,28 @@ func _run_turn_start(state: GameState) -> void:
 			DiscipleRules.advance_cultivation(state, _config, disciple)
 
 
-## SPIRIT_PEAK（R3 实做 + R4 回填研究队列）：灵峰建造项目推进 + 宗门研究队列推进（工力不足则暂停）。
-## **留空**：围城断供（R5）。
+## SPIRIT_PEAK（R3 实做 + R4 回填研究队列 + R5 回填围城断供）：
+## 灵峰建造项目推进 + 宗门研究队列推进（工力不足则暂停）→ 围城补给结算。
+##
+## **围城断供（R5 回填 R3 留的 TODO）**：补给线被切断的灵峰逐回合累计 `siegeTurns`，
+## 城防按 `min(maxDefenseCut, defenseCutPerTurn × siegeTurns)` 折减（`CombatResolver` 攻城时生效）；
+## 补给恢复则 `siegeTurns` 归零。被围期间该峰的建造项目**暂停不扣工力**，避免「围城中还在盖楼」。
 func _run_spirit_peak(state: GameState) -> void:
 	# R4 回填：`ProjectRules.advance_projects` 内部分派灵峰项目（R3 逻辑不变）与宗门研究队列。
 	ProjectRules.advance_projects(state, _config)
-	# TODO(R5): 围城断供削减。
+	# R5 回填：围城断供削减（R3 留的 TODO）。
+	for sect: Sect in state.sects:
+		for peak: SpiritPeak in sect.spiritPeaks:
+			var was_besieged: bool = peak.siegeTurns > 0
+			var besieged: bool = UnitRules.update_attrition(state, _config, peak)
+			if besieged and not was_besieged:
+				state.eventLog.append("[围城] %s 补给线被切断, 城防开始折减" % peak.name)
+			elif was_besieged and not besieged:
+				state.eventLog.append("[围城] %s 补给恢复, 城防折减清零" % peak.name)
 
 
-## SETTLEMENT（R3 实做 + R4 回填道统/心魔）：节点冷却 → 人口结算 → 经济结算（唯一入口
-## `EconomyRules.apply_settlement`）→ 道统成就 boost → 心魔结算。
+## SETTLEMENT（R3 实做 + R4 回填道统/心魔 + R5 回填视野重算）：节点冷却 → 人口结算 →
+## 经济结算（唯一入口 `EconomyRules.apply_settlement`）→ 道统成就 boost → 心魔结算 → 视野重算。
 ## **留空**：政令（R6）。
 func _run_settlement(state: GameState) -> void:
 	EconomyRules.apply_settlement(state, _config)
@@ -92,6 +109,10 @@ func _run_settlement(state: GameState) -> void:
 		DaoRules.check_boosts(state, _config, sect)
 	# R4 回填：心魔结算（超容量/受伤/叛逃）。
 	_run_heart_devil(state)
+	# R5 回填：夺峰/夺点易主后的视野重算。`CombatResolver` 在易主当下已即时重算过一次，
+	# 此处再兜一次是因为结算期还会改视野源（弟子陨落/叛逃移除、被俘改换门庭），
+	# 保证「回合结束时各宗视野与实体分布自洽」。`recalculate` 幂等，重复调用无副作用。
+	VisionCalculator.recalculate(state, _config)
 	# TODO(R6): 政令结算。
 
 

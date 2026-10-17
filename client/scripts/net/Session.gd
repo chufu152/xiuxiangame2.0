@@ -30,6 +30,18 @@ signal project_queue_received(result: Dictionary)
 ## 任一 R4 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
 signal r4_result_received(command: String, result: Dictionary)
 
+# --- R5 兵种/战斗/传送/驻守/转职（只读命令把 result 交给世界层；写命令复用 view_changed）---
+## `queryAttackPreview` 结果（`BattlePreview` 全字段 + `targetTileId`，见 PROTOCOL §3）。
+signal attack_preview_received(result: Dictionary)
+## `queryAttackable` 结果（`tileIds[]` / `range` / `tileCount`，服务端权威，客户端不本地推导）。
+signal attackable_received(result: Dictionary)
+## `queryTeleportOptions` 结果（可传送灵峰 + 花费 + 拦截原因 + 本回合余量）。
+signal teleport_options_received(result: Dictionary)
+## `queryDiscipleDetail` 结果（PROTOCOL §3 全字段 + `availablePromotions` / `availableUnitClasses`）。
+signal disciple_detail_received(result: Dictionary)
+## 任一 R5 命令（含写命令）的结果回包，供世界层做战斗提示/面板刷新（成功与业务失败都发）。
+signal r5_result_received(command: String, result: Dictionary)
+
 ## 拉起服务端后的就绪总超时。实测冷启动 2.18s / 6.49s / 19s 波动极大，故取 40s 留足余量。
 const SERVER_READY_TIMEOUT_SEC: float = 40.0
 ## 就绪轮询间隔：每 0.5s 尝试连接一次。
@@ -44,6 +56,15 @@ var status: String = "尚未连接"
 var view_revision: int = 0
 var pending: Dictionary = {}
 var busy: bool = false
+## 单请求在途期间被挡下的请求队列（FIFO，当前请求回包后自动补发）。
+##
+## 为什么需要它：`busy` 期间直接丢弃请求会**吞掉玩家的操作**。R5 起「点选弟子」是一条
+## 三段串行链（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），
+## 若玩家/自动验收在高亮刚出现时就点可达格，`moveDisciple` 会落在链路中段而被静默丢弃
+## （`R2ClientTest` 端到端实测暴露）。改为排队后语义变为「稍后执行」而不是「不做」。
+var deferred: Array[Dictionary] = []
+## 队列上限：防止连点把队列堆爆（超出部分直接丢弃并在状态栏说明）。
+const DEFERRED_MAX: int = 8
 var server_pid: int = -1
 var port: int = Msg.DEFAULT_PORT
 var connection_started: bool = false
@@ -187,10 +208,67 @@ func request_cancel_project(peak_id: String, project_id: String) -> String:
 func request_accelerate_project(peak_id: String, project_id: String, turns: int, research: bool) -> String:
 	return _request(Commands.ACCELERATE_PROJECT, {"peakId": peak_id, "projectId": project_id, "turns": turns, "research": research})
 
+# ---------------------------------------------------------------------------
+# R5：战斗 / 可攻击集 / 撤退 / 传送 / 驻守 / 转职晋升 / 批量移动（12 条）
+# ---------------------------------------------------------------------------
+
+## 批量移动（写）。`disciple_ids` 上限为 `speed.batchMoveMaxTargets`=8（服务端校验）。
+func request_batch_move(sect_id: String, disciple_ids: Array[String], target_tile_id: String) -> String:
+	return _request(Commands.BATCH_MOVE, {"sectId": sect_id, "discipleIds": disciple_ids, "targetTileId": target_tile_id})
+
+## 发起攻击（写）。result 为 `CombatResult`（PROTOCOL §3）。
+func request_attack(disciple_id: String, target_tile_id: String) -> String:
+	return _request(Commands.ATTACK, {"discipleId": disciple_id, "targetTileId": target_tile_id})
+
+## 查询攻击预览（只读）→ `attack_preview_received`。
+## 服务端 `preview()` 与 `attack()` 共用同一套 matchup 构建，故预览与实战不会漂移。
+func request_query_attack_preview(disciple_id: String, target_tile_id: String) -> String:
+	return _request(Commands.QUERY_ATTACK_PREVIEW, {"discipleId": disciple_id, "targetTileId": target_tile_id})
+
+## 查询可攻击格（只读）→ `attackable_received`。判定复用 `preview().attackable`，
+## 故「高亮即可打」由服务端保证。
+func request_query_attackable(disciple_id: String) -> String:
+	return _request(Commands.QUERY_ATTACKABLE, {"discipleId": disciple_id})
+
+## 主动撤退（写）。result 形状同 `CombatResult`。
+func request_retreat(disciple_id: String, to_tile_id: String) -> String:
+	return _request(Commands.RETREAT, {"discipleId": disciple_id, "toTileId": to_tile_id})
+
+## 传送至己方灵峰（写）。`target_peak_id` 取自 `queryTeleportOptions.options[].peakId`。
+func request_teleport(disciple_id: String, target_peak_id: String) -> String:
+	return _request(Commands.TELEPORT, {"discipleId": disciple_id, "targetPeakId": target_peak_id})
+
+## 查询可传送灵峰（只读）→ `teleport_options_received`。
+func request_query_teleport_options(disciple_id: String) -> String:
+	return _request(Commands.QUERY_TELEPORT_OPTIONS, {"discipleId": disciple_id})
+
+## 指派驻守己方节点（写）。弟子须先移动到节点所在地块。
+func request_assign_garrison(disciple_id: String, node_id: String) -> String:
+	return _request(Commands.ASSIGN_GARRISON, {"discipleId": disciple_id, "nodeId": node_id})
+
+## 撤回驻守（写）。
+func request_withdraw_garrison(disciple_id: String) -> String:
+	return _request(Commands.WITHDRAW_GARRISON, {"discipleId": disciple_id})
+
+## 转职（写）。`unit_class` ∈ `Enums.UnitClass.ALL`；非法值服务端回 `BAD_PARAMS`（不静默回退）。
+func request_reclass(disciple_id: String, unit_class: String) -> String:
+	return _request(Commands.RECLASS, {"discipleId": disciple_id, "unitClass": unit_class})
+
+## 晋升（写）。`promotion_id` 取自 `queryDiscipleDetail.availablePromotions[].id`。
+func request_promote(disciple_id: String, promotion_id: String) -> String:
+	return _request(Commands.PROMOTE, {"discipleId": disciple_id, "promotionId": promotion_id})
+
+## 查询弟子详情（只读）→ `disciple_detail_received`。
+func request_query_disciple_detail(disciple_id: String) -> String:
+	return _request(Commands.QUERY_DISCIPLE_DETAIL, {"discipleId": disciple_id})
+
 ## 「结束回合」顺序封装：**先 finishTurn，收到响应后再 beginPlayerTurn**
 ## （与 1.0 GUI 手动结束回合一致）。期间 busy；最终以 beginPlayerTurn 的 view 渲染。
 func request_end_turn_sequence() -> String:
-	if end_turn_pending:
+	# 结束回合是「两步序列」，**不能**走排队语义：若 finishTurn 被排队，
+	# `_abort_end_turn_sequence` 已把 `end_turn_pending` 清掉，后续 beginPlayerTurn 不会再发。
+	# 故在途期间直接拒绝（UI 侧「结束回合」按钮本就在 busy 时禁用）。
+	if end_turn_pending or busy:
 		return ""
 	end_turn_pending = true
 	var sent: String = request_finish_turn()
@@ -199,14 +277,30 @@ func request_end_turn_sequence() -> String:
 	return sent
 
 func _request(command: String, params: Dictionary) -> String:
-	if busy or not supports(command):
+	if not supports(command):
 		_set_status("服务端未就绪或不支持 " + command)
+		return ""
+	if busy:
+		# 在途期间**排队**而不是丢弃（见 `deferred` 注释）。返回空串表示「未立即发出」。
+		if deferred.size() >= DEFERRED_MAX:
+			_set_status("操作过于频繁，" + command + " 已忽略")
+			return ""
+		deferred.append({"command": command, "params": params})
+		_set_status("排队 " + command + "…")
 		return ""
 	busy = true
 	var request_id: String = net.send_command(command, params)
 	pending[request_id] = command
 	_set_status("请求 " + command + "…")
 	return request_id
+
+
+## 空闲时补发队首请求（每次回包收尾调用一次；`busy` 期间不动，避免并发）。
+func _flush_deferred() -> void:
+	if busy or deferred.is_empty():
+		return
+	var next: Dictionary = deferred.pop_front()
+	_request(str(next.get("command", "")), next.get("params", {}) as Dictionary)
 
 func accept_view(view: Dictionary) -> void:
 	current_view = view.duplicate(true)
@@ -217,7 +311,14 @@ func _on_hello(payload: Dictionary) -> void:
 	hello = payload.duplicate(true)
 	_set_status("本地服务端已就绪 · 协议 %s" % str(hello.get("protocolVersion", "?")))
 
+## 回包入口：先处理本次回包（可能触发后续请求），再补发排队请求。
+## 顺序不能反——否则排队请求会插到「本回包引发的链式请求」之前，打乱三段串行链。
 func _on_response(response: Dictionary) -> void:
+	_handle_response(response)
+	_flush_deferred()
+
+
+func _handle_response(response: Dictionary) -> void:
 	var request_id: String = str(response.get("id", ""))
 	var command: String = str(pending.get(request_id, ""))
 	pending.erase(request_id)
@@ -228,6 +329,8 @@ func _on_response(response: Dictionary) -> void:
 			r3_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if _is_r4_command(command):
 			r4_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
+		if _is_r5_command(command):
+			r5_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -240,6 +343,8 @@ func _on_response(response: Dictionary) -> void:
 			r3_result_received.emit(command, result)
 		if _is_r4_command(command):
 			r4_result_received.emit(command, result)
+		if _is_r5_command(command):
+			r5_result_received.emit(command, result)
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -263,10 +368,20 @@ func _on_response(response: Dictionary) -> void:
 		improvement_options_received.emit(result)
 	elif command == Commands.QUERY_PROJECT_QUEUE:
 		project_queue_received.emit(result)
+	elif command == Commands.QUERY_ATTACK_PREVIEW:
+		attack_preview_received.emit(result)
+	elif command == Commands.QUERY_ATTACKABLE:
+		attackable_received.emit(result)
+	elif command == Commands.QUERY_TELEPORT_OPTIONS:
+		teleport_options_received.emit(result)
+	elif command == Commands.QUERY_DISCIPLE_DETAIL:
+		disciple_detail_received.emit(result)
 	if _is_r3_command(command):
 		r3_result_received.emit(command, result)
 	if _is_r4_command(command):
 		r4_result_received.emit(command, result)
+	if _is_r5_command(command):
+		r5_result_received.emit(command, result)
 	_set_status("已同步服务端 view")
 	_advance_end_turn_sequence(command)
 
@@ -287,6 +402,17 @@ func _is_r4_command(command: String) -> bool:
 	return command in [
 		Commands.RESEARCH_DAO, Commands.HOLD_RECRUITMENT, Commands.QUERY_PROJECT_QUEUE,
 		Commands.CANCEL_PROJECT, Commands.ACCELERATE_PROJECT,
+	]
+
+
+## 是否为 R5 战斗/单位命令（12 条）。
+func _is_r5_command(command: String) -> bool:
+	return command in [
+		Commands.BATCH_MOVE, Commands.ATTACK, Commands.QUERY_ATTACK_PREVIEW,
+		Commands.QUERY_ATTACKABLE, Commands.RETREAT, Commands.TELEPORT,
+		Commands.QUERY_TELEPORT_OPTIONS, Commands.ASSIGN_GARRISON,
+		Commands.WITHDRAW_GARRISON, Commands.RECLASS, Commands.PROMOTE,
+		Commands.QUERY_DISCIPLE_DETAIL,
 	]
 
 
@@ -347,6 +473,7 @@ func _await_server_ready() -> void:
 func _on_disconnected(_code: int, reason: String) -> void:
 	hello.clear()
 	pending.clear()
+	deferred.clear()
 	busy = false
 	_abort_end_turn_sequence()
 	_set_status("连接已断开：" + reason)

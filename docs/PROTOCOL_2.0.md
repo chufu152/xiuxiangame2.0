@@ -127,18 +127,18 @@
 |---|---|---|---|---|---|
 | `moveDisciple` | 单位 | R2 | 是 | 否 | 已实现（R2） |
 | `queryMoveRange` | 单位 | R2 | 否 | 是 | 已实现（R2） |
-| `batchMove` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `attack` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `queryAttackPreview` | 单位 | R5 | 否 | 是 | 待实现（R5） |
-| `queryAttackable` | 单位 | R5 | 否 | 是 | 待实现（R5） |
-| `retreat` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `teleport` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `queryTeleportOptions` | 单位 | R5 | 否 | 是 | 待实现（R5） |
-| `assignGarrison` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `withdrawGarrison` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `reclass` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `promote` | 单位 | R5 | 是 | 否 | 待实现（R5） |
-| `queryDiscipleDetail` | 单位 | R5 | 否 | 是 | 待实现（R5） |
+| `batchMove` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `attack` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `queryAttackPreview` | 单位 | R5 | 否 | 是 | 已实现（R5） |
+| `queryAttackable` | 单位 | R5 | 否 | 是 | 已实现（R5） |
+| `retreat` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `teleport` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `queryTeleportOptions` | 单位 | R5 | 否 | 是 | 已实现（R5） |
+| `assignGarrison` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `withdrawGarrison` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `reclass` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `promote` | 单位 | R5 | 是 | 否 | 已实现（R5） |
+| `queryDiscipleDetail` | 单位 | R5 | 否 | 是 | 已实现（R5） |
 | `foundSpiritPeak` | 单位 | R3 | 是 | 否 | 已实现（R3） |
 | `appointBuilder` | 单位 | R3 | 是 | 否 | 已实现（R3） |
 | `rally` | 单位 | R6 | 是 | 否 | 待实现（R6） |
@@ -466,7 +466,7 @@
 - **events**：迷雾刷新等。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `attack`
@@ -484,7 +484,7 @@
 - **events**：战斗事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2；`COMMAND_MAP.md` §2；2.0 PRD §5.2 #1（2.0 默认可直接攻击，不再要求先宣战）。
 
 ### `queryAttackPreview`
@@ -502,7 +502,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2、§11.4；`COMMAND_MAP.md` §2。
 
 ### `queryAttackable`
@@ -519,7 +519,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2；`COMMAND_MAP.md` §2。
 
 ### `retreat`
@@ -537,7 +537,7 @@
 - **events**：撤退事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `teleport`
@@ -555,7 +555,7 @@
 - **events**：传送事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `queryTeleportOptions`
@@ -572,7 +572,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5。
 
 ### `assignGarrison`
@@ -590,7 +590,7 @@
 - **events**：驻守事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2；`COMMAND_MAP.md` §2。
 
 ### `withdrawGarrison`
@@ -607,7 +607,7 @@
 - **events**：撤回事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2；`COMMAND_MAP.md` §2。
 
 ### `reclass`
@@ -625,7 +625,7 @@
 - **events**：转职事件。
 - **errorCode**：`BAD_PARAMS`（兵种名非法，须严格比对枚举、不得借道 `UnitClass.from` 静默回退）、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `promote`
@@ -643,7 +643,7 @@
 - **events**：晋升事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `queryDiscipleDetail`
@@ -661,7 +661,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R5。
-- **状态**：待实现（R5）。
+- **状态**：已实现（R5）。
 - **出处**：1.0 `PROTOCOL.md` §11.2、§11.5；`COMMAND_MAP.md` §2。
 
 ### `foundSpiritPeak`
@@ -1516,18 +1516,19 @@
 | 22 | `holdRecruitment` 落成人数公式 | 1.0 `completeRecruitment`：`recruitmentBaseCount + peak.level × recruitmentPerLevel`（1 级峰 = 3 人） | 2.0 按 R4 提示词取 **`recruitmentBaseCount + recruitmentPerLevel × (峰级 − 1)`**（1 级峰 = 2 人）。与 1.0 相差 1 人/次，属里程碑规格明示的差异，登记备查 | R4 提示词自动验收 #5；1.0 `BuildAction.completeRecruitment` |
 | 23 | 道统成就「初探秘境」的判定语义 | 1.0 以「已探索地块中存在秘境节点」计数（`sect.exploredTiles` 含秘境节点所在格即算达成） | 该口径在 2.0 会**开局即成立**：出生点视野内常含秘境节点，导致第 1 回合白送 30 道点、且成就永久失效（R4 客户端端到端实测暴露，见 `R4_CLIENT_FAIL: 开局无任何 AVAILABLE 道法`）。故 2.0 改为**成功探索秘境次数** `Sect.miJingExploredTotal`（内部记账，不下发 view）：`exploreMiJing` 成功才递增，R5 落地该命令时回填；R4 期间恒为 `0`，成就不可触发。`ownLingMai`/`recruited`/`enemyDefeated` 三个成就的计数口径不受影响 | PRD §4.9「道统成就 boost（一次性道点奖励）」；2.0 代码 `DaoRules._boost_progress` |
 | 24 | 三流派特性的落地口径 | 1.0 `GameConfig` 声明了 `faction.zongMen.*` / `jiaZu.*` / `guoJia.*` 全套字段，但**业务代码零引用**（`grep` 全仓仅命中 `GameConfig.java` 的 getter/setter）——即 1.0 从未实现流派特性 | 2.0 按 PRD §1.1 原文落地其中**口径明确**的 6 项，统一由 `FactionRules` 出口：① `zongMen.buildSpeedBonus` 营造工期 ×(1−0.3) 下限 1（「营造 +30%」）；② `zongMen.subPeakCostReduction` 4 种 `*_FEN_FENG` 造价 ×0.8（「副峰花费 −20%」）；③ `zongMen.uniqueBuildingDefenseBonus` 护山剑阵落成防御 +25（「落成防御 +25」）；④ `jiaZu.peakBuildCostPenalty` 建筑造价 ×1.5（「建峰花费 +50%」）；⑤ `jiaZu.bloodLineSpeedBonus` 血脉弟子修炼 ×1.4（「血脉修炼 +40%」）；⑥ `jiaZu.zuCiCultivationBonus` 本宗有祖祠时血脉弟子再 ×1.25（「祖祠修炼 +25%」）。**`zongMen.buildSpeedBonus` 与 `jiaZu.peakBuildCostPenalty` 互斥**（一宗一流派，用 if/elif 不累乘）；**开峰造价不叠乘**——`spiritPeak.foundCost` 表已内建流派差异（宗门 500 / 家族 800 / 国家 350），故 `jiaZu.foundCostPenalty`、`guoJia.foundCostReduction` 属**冗余键**，若再乘一次会双重计费 | PRD §1.1、§4.3 L348；2.0 代码 `FactionRules`、`CityAction`、`CityRules.can_build`、`DiscipleRules.cultivation_speed` |
+| 25 | 地形防御 / 高台 / 河流三处「1.0 有实现但键名口径不同」的判定 | 1.0 各有一份实现，但都建立在**中文地形名**之上：① `CombatCalculator` 查 `terrainDefenseBonus{平原,险地}`（中文键）；② 高台加成判「攻方站在 `danger` 格」这一布尔；③ 河流减益判「地形名 ∈ `riverTerrains`」 | 2.0 的地形 id 是**英文枚举**（`FLAT/HILL/MOUNTAIN`、`SPIRIT_FOREST/MIRE`），1.0 的中文表**无法复用**，故三处一律改为读 2.0 自己的分层配置，并各自登记为语义差异：① **地形防御** = `map.relief[].defenseBonus` + `map.features[].defenseBonus` 累加，`danger` 格再取 `max(累加值, warfare.terrainDefenseBonus.danger)`（`UnitRules.terrain_defense_bonus`）；② **高台** 改判**海拔比较**（`map.relief[].height`：`FLAT` 1.0 / `HILL` 1.7 / `MOUNTAIN` 3.0），攻方海拔严格高于守方才加成（`UnitRules.high_ground_bonus`），不再是「站险地即加成」；③ **河流减益** 判**边**而非地形：读 `HexTile.riverEdges` 并经 `MoveRules.crosses_river` 判「攻方与守方之间是否隔河」（`UnitRules.river_penalty`）。三处均为 `CombatResolver._build_matchup` 的唯一来源，`preview()` 与 `attack()` 共用，故「预览=实战」结构性成立（R5 裁决三） | 2.0 `data/gameConfig.json` `map.relief`/`map.features`/`warfare.terrainDefenseBonus`；2.0 代码 `UnitRules`、`CombatResolver`、`MoveRules.crosses_river` |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
 | # | 项 | 现状 | 需要什么 |
 |---|---|---|---|
-| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | `TODO(需核对)`：回 1.0 `bridge/CommandDispatcher.java` 或对应门面类核对字段后再补 |
+| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | **`TrainingResult` 已回填（R5）**：1.0 `TrainingResult.java` 实际字段恰为 `{success, message, unitClass}`，故 `reclass`/`promote` 的 result 按此三字段落地（`unitClass` 返回**改后**的兵种）。其余三个仍 `TODO(需核对)` |
 | 2 | `NodeInfo`（`queryJiYuanInfo`/`queryMiJingInfo` 的 `info`） | 1.0 仅给类型名 | `TODO(需核对)`：同上 |
 | 3 | `queryVictoryProgress.routes[].goals` 内部形状 | 1.0 只给到 `goals` 一层 | `TODO(需核对)` |
 | 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | `TODO(需核对)` |
 | 5 | 地形 blocker 的归属 | PRD §6.7 末注：山岳不可建城/不可通行、雾泽、缺水由 `querySpiritPeakBlocker` / `queryBuildOptions` / `queryMoveRange` 返回 | `TODO(需核对)`：`querySpiritPeakBlocker` **不在 69 条命令清单内**（PRD §6.7 未登记），需确认它是否为新增命令或应并入 `queryBuildOptions`；本文**不新增命令**，故仅在 `foundSpiritPeak`/`queryMoveRange` 的说明中引用该语义 |
 | 6 | `awaitInput.options` 的 `routeId`/`description` 之外是否另有字段 | PRD §6.3 给出 `routeId`/`description` | 已按 PRD §6.3 落地，无 TODO |
-| 7 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | `TODO(需核对)`：掠夺触发点在移动路径（R2 `MoveAction`）与攻击路径（R5 `attack`），**R3 未接线**；待对应里程碑落地时调用，避免提前改动已验证的移动规则 |
+| 7 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | **攻击路径已接线（R5）**：`CombatResolver.resolve_attack` 在 `attackerWon` 时对目标格调用 `ImprovementRules.apply_pillage(state, config, tile, 1.0, "battle")`（战火打残改良、产出停摆待修缮）。**移动路径仍未接线**（`pillageChanceOnMove` 0.35 未被读取）：1.0 在移动途中按概率掠夺，2.0 R2 的移动规则已验证稳定，故 R5 不改动移动路径，留待 R6 探索/劫掠一并回填 |
 | 8 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
 | 9 | 灵泉衰减/修缮恢复的生效口径 | 配置含 `economy.lingQuanDecayRate` 0.02 / `lingQuanMinOutput` 3 / `improvement.lingQuanRestorePerTurn` 0.05，PRD §4.4 记「灵泉修缮：灵泉每回合恢复 5%」；但 2.0 配置**无 `lingQuanBaseOutput`**（1.0 有，值 15），而 2.0 节点产出改由 `city.workYieldByNode.LING_QUAN`（`spiritPower:6`）给出，衰减下限 `minFactor` 的分母无权威取值 | `TODO(需核对)`：1.0 `EconomyCalculator.settleLingQuanDecay()` 以 `lingQuanMinOutput / lingQuanBaseOutput` 求下限、以 `node.decayRate` 乘算产出；2.0 改用 `workYieldByNode` 后分母应取哪个键未定。**R3 未实现衰减与恢复**（灵泉枯竭属 PRD §5.1「灾劫」，归 R6 判定），待 R6 落地时一并回填，避免臆造系数 |
 | 10 | 前期「道点不可得」的跨里程碑断层 | PRD §5.1 L345 初始资源为 灵力400/灵石300/工力120/声望0，**无道点**；PRD §4.9 L455 道点来源为藏经阁（+2/回合）、灵脉/机缘/秘境节点、道统成就 boost。而 `sendToJiYuan`（机缘，成功 +20 道点）与 `exploreMiJing`（秘境，富裕 +40 道点）属 **R5**，节点占领亦无对应命令 | 结果为 R4 实测：开局 21 条道法**全部 `BLOCKED`**（`tu_na` blocker =「道点不足: 需要 20, 当前 0」），必须先建藏经阁（250 灵力 / 4 回合）再等 10 回合，最早**第 15 回合**才有第一条可研究道法（`R4ClientTest` 端到端实测：14 回合后道点 20）。**不属缺陷、不改配置**（与 1.0 一致，1.0 亦有 `daoPoints = 0` 初值），但 R5 落地机缘/秘境后应复查该节奏是否达到设计预期 | PRD §5.1 L345、§4.9 L455；2.0 实测 `R4ClientTest` |
@@ -1621,6 +1622,12 @@
 | `researchQueue` | `Sect` | 研究队列（道法研究）；R4 `queryProjectQueue.researchQueue[]` 才下发 |
 | `boostFlags` / `recruitedTotal` / `enemiesDefeated` / `miJingExploredTotal` / `lastRecruitmentTurn` | `Sect` | 成就 boost 一次性标志、累计招募/击败/成功探索秘境数、收徒冷却记账（R4 落地；`miJingExploredTotal` 语义见 §11.1 #23） |
 | `discipleSeq` | `GameState` | 弟子 id 单调序号（R4 落地） |
+| `capturedFromSectId` | `Disciple` | 被俘来源宗门 id（R5 落地）；仅在 `queryDiscipleDetail` 内下发，`view.disciples[]` 不含——避免暴露「某弟子原是敌方谁的人」这一情报 |
+| `siegeTurns` | `SpiritPeak` | 围城已持续回合数（R5 落地）；`UnitRules.update_attrition` 的断粮计数中间态，仅内部推进 |
+| `teleportsUsedThisTurn` | `Sect` | 本回合已用传送次数（R5 落地）；回合开始清零，余量由 `queryTeleportOptions.remaining` 表达 |
+
+> R5 补充：`GameNode.garrisonDiscipleIds` 在**己方**节点正常下发（`view.nodes[nodeId]`），
+> 对敌方/中立节点由 `StateView.build` 整字段 `erase`（§12.3），否则可白嫖敌节点守军构成。
 
 > 出处：1.0 `PROTOCOL.md` §5.1；2.0 `StateView.build` 未输出上述字段（R1 已实证）。
 

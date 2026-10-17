@@ -63,10 +63,23 @@ class Position:
 
 class SpiritRootType:
 	const ALL: Array[String] = ["JIN", "MU", "SHUI", "HUO", "TU", "FENG", "LEI", "ZA"]
+	## R5 新增：灵根显示名（纯文案，供 `queryDiscipleDetail.spiritRootNames` 使用）。
+	const NAMES: Dictionary = {"JIN": "金", "MU": "木", "SHUI": "水", "HUO": "火", "TU": "土", "FENG": "风", "LEI": "雷", "ZA": "杂"}
 
 class UnitClass:
 	const PU_TONG: String = "PU_TONG"
-	const ALL: Array[String] = [PU_TONG, "JIAN_XIU", "FA_XIU", "TI_XIU", "QI_JI", "FU_XIU", "JI_GUAN", "JIAN_ZHEN_SHI", "XUE_MAI_XIU_SHI", "JI_GUAN_JUN_TUAN"]
+	## R5 新增：补齐其余 9 个具名常量（与 `Building`/`DistrictType` 同一惯例）。
+	## 此前只有 `PU_TONG` + `ALL`，业务与测试只能写裸字符串，容易拼错且无法被解析器校验。
+	const JIAN_XIU: String = "JIAN_XIU"
+	const FA_XIU: String = "FA_XIU"
+	const TI_XIU: String = "TI_XIU"
+	const QI_JI: String = "QI_JI"
+	const FU_XIU: String = "FU_XIU"
+	const JI_GUAN: String = "JI_GUAN"
+	const JIAN_ZHEN_SHI: String = "JIAN_ZHEN_SHI"
+	const XUE_MAI_XIU_SHI: String = "XUE_MAI_XIU_SHI"
+	const JI_GUAN_JUN_TUAN: String = "JI_GUAN_JUN_TUAN"
+	const ALL: Array[String] = [PU_TONG, JIAN_XIU, FA_XIU, TI_XIU, QI_JI, FU_XIU, JI_GUAN, JIAN_ZHEN_SHI, XUE_MAI_XIU_SHI, JI_GUAN_JUN_TUAN]
 	const KINDS: Array[String] = ["MELEE", "RANGED", "ANTI_CAVALRY", "CAVALRY", "SUPPORT", "SIEGE"]
 
 class Building:
@@ -115,6 +128,22 @@ class TurnPhase:
 
 class Instruction:
 	const ALL: Array[String] = ["IDLE", "GARRISON", "CULTIVATE", "BUILD", "EXPLORE"]
+
+## 战斗结局（R5，出处 1.0 `CombatResult.Outcome`，8 值一字不增不减）。
+## 前 4 个是**败方结局**（`combat.fallChanceOnLoss` / `injuryChanceOnLoss` / `captureChanceOnLoss` 掷骰），
+## 后 4 个是**目标性质结局**（夺峰/夺点各自的胜与败）。
+class CombatOutcome:
+	const REPEL: String = "REPEL"
+	const SERIOUS_INJURY: String = "SERIOUS_INJURY"
+	const CAPTURED: String = "CAPTURED"
+	const FALL: String = "FALL"
+	const SIEGE_OCCUPIED: String = "SIEGE_OCCUPIED"
+	const SIEGE_REPELLED: String = "SIEGE_REPELLED"
+	const CONTEST_WON: String = "CONTEST_WON"
+	const CONTEST_LOST: String = "CONTEST_LOST"
+	const ALL: Array[String] = [REPEL, SERIOUS_INJURY, CAPTURED, FALL, SIEGE_OCCUPIED, SIEGE_REPELLED, CONTEST_WON, CONTEST_LOST]
+	## 展示名（出处 1.0 `CombatResult.Outcome` 的 `displayName`）。
+	const NAMES: Dictionary = {"REPEL": "击退", "SERIOUS_INJURY": "重伤", "CAPTURED": "俘虏", "FALL": "陨落", "SIEGE_OCCUPIED": "攻方占领", "SIEGE_REPELLED": "守方击退", "CONTEST_WON": "争夺胜利", "CONTEST_LOST": "争夺失败"}
 
 class Difficulty:
 	const ALL: Array[String] = ["easy", "normal", "hard"]

@@ -53,6 +53,19 @@ func _init(config: Dictionary = {}) -> void:
 	_handlers[Commands.QUERY_PROJECT_QUEUE] = Callable(self, "_handle_query_project_queue")
 	_handlers[Commands.CANCEL_PROJECT] = Callable(self, "_handle_cancel_project")
 	_handlers[Commands.ACCELERATE_PROJECT] = Callable(self, "_handle_accelerate_project")
+	# R5：战斗/批量移动/撤退 + 传送/驻守 + 转职晋升 + 弟子详情
+	_handlers[Commands.BATCH_MOVE] = Callable(self, "_handle_batch_move")
+	_handlers[Commands.ATTACK] = Callable(self, "_handle_attack")
+	_handlers[Commands.QUERY_ATTACK_PREVIEW] = Callable(self, "_handle_query_attack_preview")
+	_handlers[Commands.QUERY_ATTACKABLE] = Callable(self, "_handle_query_attackable")
+	_handlers[Commands.RETREAT] = Callable(self, "_handle_retreat")
+	_handlers[Commands.TELEPORT] = Callable(self, "_handle_teleport")
+	_handlers[Commands.QUERY_TELEPORT_OPTIONS] = Callable(self, "_handle_query_teleport_options")
+	_handlers[Commands.ASSIGN_GARRISON] = Callable(self, "_handle_assign_garrison")
+	_handlers[Commands.WITHDRAW_GARRISON] = Callable(self, "_handle_withdraw_garrison")
+	_handlers[Commands.RECLASS] = Callable(self, "_handle_reclass")
+	_handlers[Commands.PROMOTE] = Callable(self, "_handle_promote")
+	_handlers[Commands.QUERY_DISCIPLE_DETAIL] = Callable(self, "_handle_query_disciple_detail")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -512,3 +525,152 @@ func _require_own_disciple(request_id: String, params: Dictionary) -> Dictionary
 	if disciple.sectId != state.playerSectId:
 		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "只能操作己方弟子")}
 	return {"ok": true, "value": disciple.id}
+
+
+# ---------------------------------------------------------------------------
+# 处理器（R5：战斗/批量移动/撤退 + 传送/驻守 + 转职晋升 + 弟子详情）
+# ---------------------------------------------------------------------------
+# 只读命令（`queryAttackPreview`/`queryAttackable`/`queryTeleportOptions`/`queryDiscipleDetail`）
+# → `Dto.ok_response(id, [], null, result)`（view=null）；
+# 写命令 → `Dto.ok_response(id, events, StateView.build(...), result)`，events = 本命令期间新增日志。
+# 业务失败（不在射程/已出手/灵石不足/晋升点不足…）一律 `ok:true + result.success:false + message`；
+# 只有参数缺失/类型错/枚举非法才 `BAD_PARAMS`。
+
+func _handle_batch_move(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var list_check: Dictionary = _require_string_array(params, "discipleIds")
+	if not bool(list_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(list_check["message"]))
+	var tile_check: Dictionary = _require_nonempty(params, "targetTileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	if not state.tiles.has(str(tile_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + str(tile_check["value"]))
+	if state.phase != Enums.TurnPhase.PLAYER_ACTION: return Dto.error_response(request_id, Msg.ERR_BAD_REQUEST, "当前阶段不可移动：" + state.phase)
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CombatAction.batch_move(state, _config, str(sect_check["value"]), list_check["value"], str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_attack(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "targetTileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	if not state.tiles.has(str(tile_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + str(tile_check["value"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CombatAction.attack(state, _config, str(disciple_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_attack_preview(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "targetTileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	if not state.tiles.has(str(tile_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + str(tile_check["value"]))
+	return Dto.ok_response(request_id, [], null, CombatAction.query_attack_preview(state, _config, str(disciple_check["value"]), str(tile_check["value"])))
+
+
+func _handle_query_attackable(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	return Dto.ok_response(request_id, [], null, CombatAction.query_attackable(state, _config, str(disciple_check["value"])))
+
+
+func _handle_retreat(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var tile_check: Dictionary = _require_nonempty(params, "toTileId")
+	if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+	if not state.tiles.has(str(tile_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + str(tile_check["value"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = CombatAction.retreat(state, _config, str(disciple_check["value"]), str(tile_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_teleport(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	# 裁决五：`teleport` 用 `targetPeakId`，不得使用 `peakId`。
+	var peak_check: Dictionary = _require_nonempty(params, "targetPeakId")
+	if not bool(peak_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(peak_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = UnitAction.teleport(state, _config, str(disciple_check["value"]), str(peak_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_teleport_options(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	return Dto.ok_response(request_id, [], null, UnitAction.query_teleport_options(state, _config, str(disciple_check["value"])))
+
+
+func _handle_assign_garrison(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var node_check: Dictionary = _require_nonempty(params, "nodeId")
+	if not bool(node_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(node_check["message"]))
+	if not state.nodes.has(str(node_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "节点不存在：" + str(node_check["value"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = UnitAction.assign_garrison(state, _config, str(disciple_check["value"]), str(node_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_withdraw_garrison(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = UnitAction.withdraw_garrison(state, _config, str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## 转职：`unitClass` **严格比对 `Enums.UnitClass.ALL`**，非法值回 `BAD_PARAMS`，
+## 不得借道枚举 `from` 静默回退（PROTOCOL §3 `reclass` 明列）。
+func _handle_reclass(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var class_check: Dictionary = _require_enum(params, "unitClass", Enums.UnitClass.ALL)
+	if not bool(class_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(class_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = UnitAction.reclass(state, _config, str(disciple_check["value"]), str(class_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_promote(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var promotion_check: Dictionary = _require_nonempty(params, "promotionId")
+	if not bool(promotion_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(promotion_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = UnitAction.promote(state, _config, str(disciple_check["value"]), str(promotion_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## 弟子详情：只读。允许查看任意可见弟子的详情（`view` 本就把可见格上的敌方弟子下发）。
+func _handle_query_disciple_detail(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var check: Dictionary = _require_nonempty(params, "discipleId")
+	if not bool(check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(check["message"]))
+	return Dto.ok_response(request_id, [], null, UnitAction.query_disciple_detail(state, _config, str(check["value"])))
+
+
+## 校验字符串数组参数；返回 {ok, value, message}。
+func _require_string_array(params: Dictionary, key: String) -> Dictionary:
+	var raw: Variant = params.get(key)
+	if typeof(raw) != TYPE_ARRAY: return {"ok": false, "message": "%s 必须是字符串数组" % key}
+	var values: Array = []
+	for entry: Variant in raw:
+		if typeof(entry) != TYPE_STRING or String(entry).is_empty():
+			return {"ok": false, "message": "%s 的每一项都必须是非空字符串" % key}
+		values.append(String(entry))
+	return {"ok": true, "value": values}
