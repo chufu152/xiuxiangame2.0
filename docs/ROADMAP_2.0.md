@@ -32,7 +32,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅ ← 当�
   - R3 前置修复 `b0a9e41 fix(config): correct dangling improvement requiredDaoKey (lingtian_ti -> ling_tian_nong)`
   - R3 `b036bb4 feat(r3): economy settlement, spirit peak city, buildings districts workers improvements roads`
   - R3 收尾 `e18db84 fix(r3): wire relief and river yield bonuses into tile output`
-  - R4 `feat(r4): dao tree research, cultivation breakthrough tribulation, project queue, recruitment`（见 §4.3）
+  - R4 `15cc845 feat(r4): dao tree research, cultivation breakthrough tribulation, project queue, recruitment`（见 §4.3）
 
 ### 1.2 已交付并验证的资产
 
