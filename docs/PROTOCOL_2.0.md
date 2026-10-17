@@ -1507,6 +1507,8 @@
 
 > `ping` 不属玩法命令，未计入 88 条。
 
+> **R8 落实**：R8「表现与 UI 打磨」要求「69 命令全入口」，但**明确不给上表 19 条裁剪命令造任何 UI 入口**（连置灰按钮都不造）。客户端 `World._register_r8_commands()` 的入口表恒为 70 条（69 + `ping`），测试用 `commands.gd` 的常量全集反向核对，若有人误加裁剪命令的入口会立刻失败。
+
 ---
 
 ## 11. 冲突与待办清单
@@ -1564,6 +1566,21 @@
 | 9 | 灵泉衰减/修缮恢复的生效口径 | 配置含 `economy.lingQuanDecayRate` 0.02 / `lingQuanMinOutput` 3 / `improvement.lingQuanRestorePerTurn` 0.05，PRD §4.4 记「灵泉修缮：灵泉每回合恢复 5%」；但 2.0 配置**无 `lingQuanBaseOutput`**（1.0 有，值 15），而 2.0 节点产出改由 `city.workYieldByNode.LING_QUAN`（`spiritPower:6`）给出，衰减下限 `minFactor` 的分母无权威取值 | `TODO(需核对)`：1.0 `EconomyCalculator.settleLingQuanDecay()` 以 `lingQuanMinOutput / lingQuanBaseOutput` 求下限、以 `node.decayRate` 乘算产出；2.0 改用 `workYieldByNode` 后分母应取哪个键未定。**R3 未实现衰减与恢复**（灵泉枯竭属 PRD §5.1「灾劫」，归 R6 判定），待 R6 落地时一并回填，避免臆造系数 |
 | 10 | 前期「道点不可得」的跨里程碑断层 | PRD §5.1 L345 初始资源为 灵力400/灵石300/工力120/声望0，**无道点**；PRD §4.9 L455 道点来源为藏经阁（+2/回合）、灵脉/机缘/秘境节点、道统成就 boost。而 `sendToJiYuan`（机缘，成功 +20 道点）与 `exploreMiJing`（秘境，富裕 +40 道点）属 **R5**，节点占领亦无对应命令 | 结果为 R4 实测：开局 21 条道法**全部 `BLOCKED`**（`tu_na` blocker =「道点不足: 需要 20, 当前 0」），必须先建藏经阁（250 灵力 / 4 回合）再等 10 回合，最早**第 15 回合**才有第一条可研究道法（`R4ClientTest` 端到端实测：14 回合后道点 20）。**不属缺陷、不改配置**（与 1.0 一致，1.0 亦有 `daoPoints = 0` 初值），但 R5 落地机缘/秘境后应复查该节奏是否达到设计预期 | PRD §5.1 L345、§4.9 L455；2.0 实测 `R4ClientTest` |
 | 11 | 三流派特性中**未能落地**的键 | `faction` 块共 46 个叶子键，R3/R4 已落地 6 项（§11.1 #24）。剩余未读键分三类：**① 属后续里程碑**：`guoJia.territoryPowerWeight`（R7 胜负）、`zongMen.exploreSuccessBonus`（R5/R6 探索）、`jiaZu.zuCiReproduceCostReduction` + `bloodline.*` 全套（R7 繁衍）、`guoJia.rareMaterialPenalty`（R5/R6 资源）、`appointment.*` 7 键（R7 任命）、`bloodLinePenalty`（语义未明，PRD §1.1 宗门流条目未提）。**② PRD 未给可计算口径**：`guoJia.expansionCostReduction`（「扩张 −20%」未定义扩张指建区还是气运吞并）、`guoJia.diDuGrowthBonus`（「帝都人口增长 +50%」缺 `building` 侧住房/增长配置，且 `building.housingBonus` 键不存在）。**③ 展示用文案**：`flavors.*.tendency/uniqueAbilityName/...`（R8 UI 打磨才需要） | `TODO(需核对)`：②类需回 PRD/1.0 补齐口径后再实现；①类随对应里程碑落地。**禁止**按字面猜「扩张」「增长 +50%」的具体公式——与 R3 灵泉衰减同一处理原则（不臆造系数） | PRD §1.1、§4.3；2.0 死键审计（`FactionRules` 注释列明已落地项） |
+
+### 11.3 R8 服务端零改动（口径锁定）
+
+R8 是**纯表现层**里程碑，`commands.gd`、`CommandDispatcher`、`StateView`、`TurnProcessor`、`data/gameConfig.json` **一行未改**。具体口径：
+
+| 项 | R8 的处理 |
+|---|---|
+| 命令数 | 恒为 **70 条（69 + `ping`）**。R8 不新增、不删除、不重命名任何命令；`hello.implementedCommands` 长度不变 |
+| 错误码 | 恒为 8 个（`BAD_JSON`/`NO_ID`/`BAD_REQUEST`/`UNKNOWN_COMMAND`/`NOT_IMPLEMENTED`/`BAD_PARAMS`/`NO_GAME`/`INTERNAL`），R8 未新增 |
+| `setSetting` | 仍按 §7 语义：服务端只做 `{success, key, value, applied:false, note}` 确认，**不下发 view**；`gridVisible`/`factionBorders`/`dayNight`/`ambientParticles`/`animation`/`volume` 全部是**客户端本地偏好**，服务端不落库、不进存档 |
+| 网格 / 宗门色边框 / 小地图 | **纯显示层**：网格线由客户端按 `view.tiles[]` 的 `q`/`r` 现算；边框由 `view.tiles[].ownerSectId` + `view.sects[].color` 现算；小地图按 `view.tiles[]` 缩略。三者不产生任何协议交互 |
+| 昼夜 / 粒子 / 泼墨转场 | 客户端 `Decorations` 内部计时器（`DAY_CYCLE_SECONDS=180`）与 `_fog_states` 前后帧比对，**不读写服务端状态**；转场只由 view 中 `tile.fogState` 的变化触发 |
+| `nextTurn` | R8 前服务端已实现但客户端无入口；R8 只补 `Session.request_next_turn()` + 底栏按钮，**服务端零改动** |
+
+> 验证方式：`R8ClientTest` 端到端断言 `hello` 声明支持全部 70 条，并断言 `JSON.stringify(view)` **不含** `gridVisible`（本地偏好未泄漏进 view）。
 
 ---
 

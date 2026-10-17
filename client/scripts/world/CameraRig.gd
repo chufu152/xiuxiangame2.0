@@ -42,6 +42,19 @@ func zoom_at(screen_position: Vector2, factor: float) -> void:
 func pan_between(previous: Vector2, current: Vector2) -> void:
 	camera.global_position += ground_point(previous) - ground_point(current)
 
+## 平移到指定地面点（小地图跳转用）：**只平移**，不改 `rotation`、不改 `size`。
+## 这是 R8 相机铁律的显式实现——任何「跳转」都不得顺手重置取景。
+func pan_to(target: Vector3) -> void:
+	var current_center: Vector3 = camera.global_position - camera.global_basis.z * 70.0
+	camera.global_position += Vector3(target.x - current_center.x, 0.0, target.z - current_center.z)
+
+## 当前取景中心（地面点），供小地图画视口框。
+func view_center() -> Vector3:
+	return camera.global_position - camera.global_basis.z * 70.0
+
+func view_size() -> float:
+	return camera.size
+
 func _input(event: InputEvent) -> void:
 	# 按键释放即便落在侧栏也结束拖拽，避免镜头继续跟随。
 	if event is InputEventMouseButton and not event.pressed and event.button_index == drag_button:

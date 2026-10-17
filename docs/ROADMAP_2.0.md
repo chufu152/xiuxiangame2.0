@@ -12,11 +12,11 @@
 ### 1.1 总体位置
 
 ```
-R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5 ✅   ┃ R6 ✅   ┃ R7 ✅   ┃ R8 🔶 ← 当前位置 ┃ R9
-骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 道统与修炼 ┃ 兵种与战斗 ┃ 探索/政令/自动化 ┃ 任命/渡劫/AI/胜负/存档 ┃ 表现与UI打磨（前置资源包已交付 `8f96a6e`） ┃ 未开始
+R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5 ✅   ┃ R6 ✅   ┃ R7 ✅   ┃ R8 ✅   ┃ R9 🔶 ← 当前位置
+骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 道统与修炼 ┃ 兵种与战斗 ┃ 探索/政令/自动化 ┃ 任命/渡劫/AI/胜负/存档 ┃ 表现与UI打磨 ┃ 未开始
 ```
 
-**当前位置：R8「表现与 UI 打磨」进行中**——§3.2 的硬门禁「最小水墨资源包」已交付并验收（`ASSETVERIFY_OK covered=52 warned=0`，提交 `8f96a6e`），正式打磨项已开工。
+**当前位置：R8「表现与 UI 打磨」已交付**——§3.2 硬门禁「最小水墨资源包」（52 个文件，`ASSETVERIFY_OK covered=52 warned=0`，提交 `8f96a6e`）+ 70 条命令全入口 + 六项表现层（昼夜/网格/宗门色边框/粒子/泼墨转场/小地图）+ 设置/引导/Toast。`R8_CLIENT_RESULT=OK checks=44`（单元）/ `checks=59`（端到端），服务端**零改动**。交付纪要见 §4.8。
 
 > R7 之后 **69 条命令 + `ping` 全部落地**（`implemented_commands()` 共 70 项，PROTOCOL §1 已无「待实现」），
 > 故 R8 的任务是「给每一条已实现命令补 UI 入口 + 打磨表现」，不再新增命令。
@@ -57,20 +57,20 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 | 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算、移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机；**R3 新增**：`EconomyRules`（地块/灵峰产出、维护、安定、产出系数、粮食、`apply_settlement` 唯一入口、气运满溢吞并与灵峰晋升）、`CityRules`（工作半径/指派/住房/容量/区域产出与邻接/建城与建筑可建判定）、`ImprovementRules`（地形与道法/区域/节点门控、产出、洞府住房、道路机动、掠夺、修缮）、`RoadNetworkService`（路网连通度/减耗/起始格加成）、`CityAction`（开峰/建筑/洞府/加固/区域/劳力/项目队列推进/只读查询）、`ImprovementAction`（任命建造者/修筑/修缮/查询）；**R3 回填 R2 空钩子**：`MoveRules.step_cost` 与 `calculate_max_move_points` 改调 `RoadNetworkService`，`TurnProcessor` 的 `TURN_START` 调 `RoadNetworkService.refresh()`、`SPIRIT_PEAK` 推项目队列、`SETTLEMENT` 调 `EconomyRules.apply_settlement()`；**R4 新增**：`DaoRules`（21 道法查找/时代门控/前置链/费用与工期/`effect_sum` 唯一汇总出口/成就 boost）、`DiscipleRules`（修炼速度/进度上限/突破/渡劫/心魔/伤愈/洞府判定）、`ProjectRules`（逐回合工力摊销、研究推进与落成）、`DaoAction`（5 条命令的规则实现）；**R4 回填**：`ImprovementRules._has_unlocked_dao`（查 `unlockedDaoIds`）、`MoveRules` 接 `MOVE_BONUS`、`VisionCalculator` 接 `VISION_BONUS`、`CityAction._complete_project` 增 `TYPE_RECRUITMENT` + `complete_project_now()`、`TurnProcessor` 三阶段接修炼/项目推进/成就与心魔；**R5 新增**：`UnitRules`（十兵种战术数值**唯一出口**：相克/射程/攻城/机动/视野/反击/地形防御/高台/河流/驻守/补给/断粮/撤退概率/战阶与晋升/转职校验/解锁判定，共 27 个静态函数）、`CombatResolver`（**战斗唯一结算入口**：`preview` 与 `attack` 共用 `_build_matchup`，故「预览=实战」结构性成立；含野战/攻城/夺节点三种结算 + 俘虏/伤亡/心魔反噬/战功）、`CombatAction`（`attack`/`queryAttackPreview`/`queryAttackable`/`retreat`/`batchMove`）、`UnitAction`（`teleport`/`queryTeleportOptions`/`assignGarrison`/`withdrawGarrison`/`reclass`/`promote`/`queryDiscipleDetail`）、`TeleportRules`（传送网络开启/容量/余量/花费/拦截）；**R6 新增**：`ExploreRules`（机缘/秘境：`NodeInfo` 九字段、成功率三段加成、失败三分支、秘境成本与人数、`Reward` 四类型）、`PolicyRules`（3 政体 × 8 卡、时代/道法门控、槽位裁剪、切换冷却、`effect_sum` 唯一出口、`process_settlement` 安定叠加与威望累积）、`AutomationRules`（自动修缮/改良/修路三趟 + 逐峰项目 + 立即探索 + 集结/回防，预算 = `maxActionsPerTurn`）、`ExploreAction`/`PolicyAction`/`AutomationAction`（三条命令族薄门面）；**R6 回填**：`TurnProcessor._run_turn_start` 末尾接 `AutomationRules.run_turn`（R2 留的 TODO）、`TurnProcessor._run_settlement` 在 `EconomyRules.apply_settlement` **之后**接 `PolicyRules.process_settlement`；**R5 回填**：`MoveRules.step_cost` 接 ZOC 附加代价与敌方占格阻挡、`calculate_max_move_points` 接晋升 `MOVE_BONUS`，`TurnProcessor` 的 `TURN_START` 清零传送次数并递减转职冷却、`SPIRIT_PEAK` 接断粮削减、`SETTLEMENT` 补一次 `VisionCalculator.recalculate`；**R7 新增**：`AppointmentRules`（7 岗位最低境界/长老名额/峰主驻留与宗主坐镇加成/原峰主降亲传）、`VictoryRules`（`refresh_power_level` 五来源、四路线 `progress_of`、`achieved_routes`、`check_defeat`、`collapse_sect` 清算、`process_victory_check` **`VICTORY_CHECK` 唯一入口**）、`BloodlineRules`（联姻/繁衍/品级抖动/灵根继承/族人死亡安定 −5）、`AIController`（反应式八段决策，攻击双门 `winChance` + 战力比）、`save/SaveManager`（全量序列化 + 版本兼容 + 自动存档槽 0）、`AppointmentAction`/`VictoryAction`/`SaveAction`（三条命令族薄门面）；**R7 回填**：`TurnProcessor` 的 `AI_ACTION` 接 `AIController.run_turn`（其后重算 AI 视野）、`VICTORY_CHECK` 接 `VictoryRules.process_victory_check`、`TURN_START` 末尾接宗主外出状态检查（两处 `# TODO(R7)` 销账）；`EconomyRules.apply_settlement` 接宗主坐镇 ×1.2、`peak_output` 接峰主驻留灵力/气运加成、`DiscipleRules.cultivation_speed` 接长老修炼加成 |
 | 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`**；**R3 新增 `Project`/`District`/`Improvement`**，`SpiritPeak` 增 `food`/`foodProgress`/`freeWorkers`/`workedTileIds`/`projectQueue`、`Sect` 增 `improvements`/`improvementSnapshots`、`Disciple` 增 `builderCharges`、`GameState` 增 `projectSeq`/`improvementSeq`；**R4 新增 `Dao`/`ResearchProject`**，`Disciple` 增 `realmLevel`/`breakthroughPending`/`tribulating`/`lastReproduceTurn`、`Sect` 增 `unlockedDaoIds`/`researchQueue`/`boostFlags`/`recruitedTotal`/`enemiesDefeated`/`miJingExploredTotal`/`lastRecruitmentTurn`、`Project` 增 `TYPE_RECRUITMENT`、`GameState` 增 `discipleSeq`；**R5 新增**：`Disciple` 增 `battleXp`/`battleLevel`/`promotionPoints`/`promotions`/`reclassCooldown`/`garrisonNodeId`/`capturedFromSectId`、`SpiritPeak` 增 `siegeTurns`、`Sect` 增 `teleportsUsedThisTurn`、`GameNode` 增 `garrisonDiscipleIds`；**R6 新增**：`GameNode` 增 `name`（节点显示名，只进 `NodeInfo.name`，不进 view）、`Sect` 增 `governmentId`/`enactedPolicies`/`policyCarry`/`lastPolicySwitchTurn`/`automationToggles`/`autoProjectByPeak`、`Disciple` 增 `missionNodeId`（与 `garrisonNodeId` 互斥）；**R7 新增 `SaveInfo`**（7 字段与 1.0 逐字一致），`GameState` 增 `winType`/`winnerSectId`/`pendingVictoryChoices`，`Sect` 增 `powerLevel`/`defeated`/`lastAutoSaveTurn`/`zongZhuOutside`，`Disciple` 增 `ascended`/`spouseId`/`fatherId`/`motherId` |
 | 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出；**R2 起 `map.dangerTileMoveCost = 1`**（险地附加，裁决二）；**R3 未新增顶层块**（`spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources` 均复用） |
-| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料；**R4 新增**：`DaoPanel`（左侧竖排，按 `eraIndex` 分 5 列 + 三态标记 + `blocker` tooltip + 点击研究）、`QueuePanel`（左下，`projects[]`/`researchQueue[]` 两列并排不混池 + 回合数输入/加速/取消）、侧栏弟子详情追加修炼进度/心魔/伤势/入门回合/灵根品阶，三个面板互斥且均不触碰相机；**R5 新增**：`CombatPanel`（右下，悬停攻击预览：攻守战力/胜率/相克/反击/距离/notes + 不可攻击时显 `blockedReason` + `CombatResult` 结算反馈）、`UnitPanel`（左下，与城市面板互斥：战功/战阶/晋升点/出手 + 撤退/传送/驻守/撤离按钮 + 十兵种转职候选置灰与 blocker tooltip + 晋升候选）、**攻击高亮层**（`HexMap.show_attack_range`，与移动高亮层**完全独立并存**，清一层不影响另一层）、`UnitView` 十兵种占位剪影（prism/box/sphere/cylinder/cone 各按兵种取值，正式模型缺失时仍可区分）、Shift+点选多选 → `batchMove`；**R6 新增**：`ExplorePanel`（节点冷却/奖励预览/派弟子/秘境多选）、`PolicyPanel`（当前政体 + 效果合计 + 3 政体按钮 + 8 卡按钮三态 + 槽位占用）、`AutomationPanel`（4 开关 + 逐峰自动项目 + 立即探索/集结/回防 + 本地设置），三面板左侧竖排**互斥**且均不触碰相机；TopBar 追加 政令 / 自动 入口；**节点点击优先级提到弟子点击之前**（秘境要求全员已站在节点格，否则面板永远打不开）；**R7 新增**：`VictoryPanel`（三路线 `stage`/`ratio`/`summary`/`score` + 逐 goal 9 键行 + 择定按钮）、`SavesPanel`（槽 0–4 存入/读取 + `listSaves` 刷新）、`GameOverPanel`（`winType`/`winnerSectId`/本宗达成路线/覆灭判定）、`ChoicePanel`（居中 `layer=5` 待抉择弹窗，按 `options[].index` 发 `resolveChoice`）、侧栏**事件栏**（回包 `events[]` 保留 12 条，AI 行动占位展示）、弟子详情追加「任命峰主/长老/宗主」「渡劫飞升」四入口；TopBar 追加 胜负 / 存档 / 结局 入口；`MainMenu` 追加「读取存档」（`listSaves` → `loadGame`，与 `newGame` 共用 `game_started` 路径）；四面板与 R3–R6 面板**全局互斥**且均不触碰相机 |
-| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command`；**R5 新增**：12 条 `request_*` 包装 + 5 个信号（`attackPreview`/`attackable`/`teleportOptions`/`discipleDetail`/`r5Result`）+ `_is_r5_command`；**R6 新增**：16 条 `request_*` 包装 + 5 个信号（`ji_yuan_info_received`/`mi_jing_info_received`/`policy_options_received`/`automation_state_received`/`r6_result_received`）+ `_is_r6_command`；**点选弟子改为三段串行链**（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），因 `_request` 是单请求语义、并发会被静默丢弃；**R7 新增**：14 条 `request_*` 包装 + 6 个信号（`victory_progress_received`/`victory_choice_received`/`saves_received`/`await_input`/`events_received`/`r7_result_received`）+ `_is_r7_command`；`NetClient.server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）；`loadGame` 与 `newGame` 同样触发 `game_started` |
+| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料；**R4 新增**：`DaoPanel`（左侧竖排，按 `eraIndex` 分 5 列 + 三态标记 + `blocker` tooltip + 点击研究）、`QueuePanel`（左下，`projects[]`/`researchQueue[]` 两列并排不混池 + 回合数输入/加速/取消）、侧栏弟子详情追加修炼进度/心魔/伤势/入门回合/灵根品阶，三个面板互斥且均不触碰相机；**R5 新增**：`CombatPanel`（右下，悬停攻击预览：攻守战力/胜率/相克/反击/距离/notes + 不可攻击时显 `blockedReason` + `CombatResult` 结算反馈）、`UnitPanel`（左下，与城市面板互斥：战功/战阶/晋升点/出手 + 撤退/传送/驻守/撤离按钮 + 十兵种转职候选置灰与 blocker tooltip + 晋升候选）、**攻击高亮层**（`HexMap.show_attack_range`，与移动高亮层**完全独立并存**，清一层不影响另一层）、`UnitView` 十兵种占位剪影（prism/box/sphere/cylinder/cone 各按兵种取值，正式模型缺失时仍可区分）、Shift+点选多选 → `batchMove`；**R6 新增**：`ExplorePanel`（节点冷却/奖励预览/派弟子/秘境多选）、`PolicyPanel`（当前政体 + 效果合计 + 3 政体按钮 + 8 卡按钮三态 + 槽位占用）、`AutomationPanel`（4 开关 + 逐峰自动项目 + 立即探索/集结/回防 + 本地设置），三面板左侧竖排**互斥**且均不触碰相机；TopBar 追加 政令 / 自动 入口；**节点点击优先级提到弟子点击之前**（秘境要求全员已站在节点格，否则面板永远打不开）；**R7 新增**：`VictoryPanel`（三路线 `stage`/`ratio`/`summary`/`score` + 逐 goal 9 键行 + 择定按钮）、`SavesPanel`（槽 0–4 存入/读取 + `listSaves` 刷新）、`GameOverPanel`（`winType`/`winnerSectId`/本宗达成路线/覆灭判定）、`ChoicePanel`（居中 `layer=5` 待抉择弹窗，按 `options[].index` 发 `resolveChoice`）、侧栏**事件栏**（回包 `events[]` 保留 12 条，AI 行动占位展示）、弟子详情追加「任命峰主/长老/宗主」「渡劫飞升」四入口；TopBar 追加 胜负 / 存档 / 结局 入口；`MainMenu` 追加「读取存档」（`listSaves` → `loadGame`，与 `newGame` 共用 `game_started` 路径）；四面板与 R3–R6 面板**全局互斥**且均不触碰相机；**R8 新增**：`world/Decorations.gd`（昼夜 180 秒循环 / 六边形网格开关 / 宗门色边框 / 灵气粒子 / 飞鸟 / 三态迷雾泼墨转场，五层子节点互不干扰）、`ui/ActionBar.gd`（底栏 + **70 条命令入口登记表**，四类 button/panel/gesture/auto）、`ui/Minimap.gd`（三态配色 + 视口框 + 点击跳转**只发信号不碰相机**）、`ui/SettingsPanel.gd`（6 项本地偏好，`setSetting` 仅作确认）、`ui/GuideOverlay.gd`（6 步引导，不阻塞输入）、`ui/Toast.gd`（轻提示，只显 `✗` 状态与 `events[]`）；TopBar 资源文本改 **13 项图标化 `ResourceChips`**（`topbar_resource_label` 保留为 `visible=false` 文本镜像，不破坏 R2 既有断言），7 个面板按钮下沉到底栏；补 8 条此前无 UI 入口的命令（`foundSpiritPeak`/`appointBuilder`/`openCave`/`fortifyPeak`/`repairImprovement`/`queryVictoryChoice`/`nextTurn`/`finishTurn`）；快捷键 `空格`/`End`/`G`/`B`/`M`/`F1`/`Esc`；`world/CameraRig.gd` 新增 `pan_to()`（**只平移**，显式不改 `rotation`/`size`）、`view_center()`、`view_size()` |
+| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command`；**R5 新增**：12 条 `request_*` 包装 + 5 个信号（`attackPreview`/`attackable`/`teleportOptions`/`discipleDetail`/`r5Result`）+ `_is_r5_command`；**R6 新增**：16 条 `request_*` 包装 + 5 个信号（`ji_yuan_info_received`/`mi_jing_info_received`/`policy_options_received`/`automation_state_received`/`r6_result_received`）+ `_is_r6_command`；**点选弟子改为三段串行链**（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），因 `_request` 是单请求语义、并发会被静默丢弃；**R7 新增**：14 条 `request_*` 包装 + 6 个信号（`victory_progress_received`/`victory_choice_received`/`saves_received`/`await_input`/`events_received`/`r7_result_received`）+ `_is_r7_command`；`NetClient.server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）；`loadGame` 与 `newGame` 同样触发 `game_started`；**R8 新增**：`request_next_turn()`（`nextTurn` 此前服务端已实现、客户端无入口，R8「70 条全入口」才暴露） |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
 | 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R7 起 69 条 + `ping` 全部标「已实现」**（`implemented_commands()` 共 70 项；**无「待实现」**）；`TODO(需核对)` 降至 **7 处**（R7 回填 §11.2 #1 `AppointmentResult` 与 #3 `goals` 9 键，§3 `tribulate`/`appoint*` 的 result 展开）；校验脚本 **38/38** 全绿（新增「已实现 = 70」全量断言与 `awaitInput` 转正断言）、69 分组点数不变 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **23 阶段**（`[0/23]`–`[22/23]`），含 R0–R7 全量断言 + 协议契约校验（**147/147** 全绿） |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **24 阶段**（`[0/24]`–`[23/24]`），含 R0–R8 全量断言 + 协议契约校验（**175/175** 全绿） |
 
 ### 1.3 遗留缺口（进入 R5 前需知悉，不阻塞 R5）
 
-1. **美术资源实体文件为 0**（`assets/` 下除 `manifest.json` 外无实体文件）。**这是计划内状态**，不是缺陷：
-   - `AssetLibrary` 对 manifest 里 60+ 逻辑 ID 缺失时**全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**。
-   - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/14]` 断言 `同一缺失 logicalID 只 WARN 一次`。
+1. **美术资源：R8 前置已交付 52 个实体文件，其余仍为 0**（`assets/art/default/**` 下现有 32 个 `.png` + 20 个 `.glb`，覆盖 `terrain`/`units`/`buildings`/`resources`/`realms`/`factions` 六组；`districts`/`improvements`/`features`/`audio`/`fonts` 五组共 25 个 ID 仍缺，见 §3.2.1）。缺的部分**是计划内状态**，不是缺陷：
+   - `AssetLibrary` 对 manifest 里缺失的逻辑 ID **全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**；R8 的 `R8ClientTest` 已双向断言「最小包 52 个 ID 零 WARN」+「未覆盖 ID 仍 WARN 一次」。
+   - 回退行为有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」；R8 起由 `R8ClientTest._assert_asset_fallback` 接续双向覆盖。
    - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 9 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R6 已回填 #1 的 `ExploreResult`/`PolicyResult`、#2 `NodeInfo`、#4 `effects{}`/`slots{}`；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → R4 未增 → **R3/R4 收尾补做 +1 为 12 处 → R6 回填 3 处降为 9 处**）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）；**R4 后新增**：三流派特性中未能落地的键（§11.2 #11，`guoJia.expansionCostReduction`/`diDuGrowthBonus` 缺可计算口径）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层；**R3/R4 收尾另登记** §11.1 #24 三流派特性落地口径（6 项已实现）。**不阻塞 R5**，随对应里程碑逐条补齐。
+2. **协议契约仍有 7 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2，`check_protocol.ps1` 实测统计；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → R4 未增 → R3/R4 收尾补做 +1 为 12 处 → R6 回填 3 处降为 9 处 → **R7 回填 2 处降为 7 处**）：`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的移动路径接线点、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径；**R4 后新增**：三流派特性中未能落地的键（§11.2 #11，`guoJia.expansionCostReduction`/`diDuGrowthBonus` 缺可计算口径）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）；③ `TrainingResult`/`ExploreResult`/`PolicyResult`/`AppointmentResult`/`NodeInfo`/`goals` 九键 均已在 R5–R7 回填。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层；**R3/R4 收尾另登记** §11.1 #24 三流派特性落地口径（6 项已实现）。**不阻塞 R9**，随对应里程碑逐条补齐。
 3. **R5–R9 提示词已预生成**（草案）；`R5_*.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
@@ -142,7 +142,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - **生成方式**：`client/tools/AssetGen.gd`（`res://tools/AssetGen.tscn`）**程序化生成**——固定 seed 的哈希值噪声 + 低模图元拼装，**零外部依赖、确定性可复现**。真实美术介入时同名文件覆盖即可，`manifest.json` 与代码均无需改动。
 - **验收工具**：`client/tools/AssetVerify.gd` 用客户端 `AssetLibrary` 逐 ID 取资源，输出 **`ASSETVERIFY_OK covered=52 warned=0`**；`client/tools/AssetPreview.gd` 用 CPU 等距光栅化把模型/图标/材质拼成联络表（`outputs/r8_asset_*.png`，不入库）供人工核验。
 - **仍未覆盖**（计划内，`AssetLibrary` 继续回退占位并 WARN 一次，裁决二）：`districts` 6、`improvements` 8、`features`/`node` 8、`audio` 1、`fonts` 2 —— 共 25 个 ID。
-- **回归**：`tools/check.ps1` 仍 **147/147 `CHECK_RESULT=OK`**（23 阶段，R0–R7 断言无回归）；无残留 godot 进程、无 `.java`。
+- **回归**：`tools/check.ps1` 现 **175/175 `CHECK_RESULT=OK`**（24 阶段，R0–R8 断言无回归）；无残留 godot 进程、无 `.java`。
 
 ---
 
@@ -395,6 +395,67 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - **客户端「多路线待决」用注入而非真打**：`pendingVictoryChoices` 只能由服务端 `VICTORY_CHECK` 在「同回合达成 ≥2 条路线」时写入，**任何协议命令都无法置位**；要在客户端验收里跑到那个状态，只能 240 回合或构造齐备局。故 `R7ClientTest` 把一条**形状完全合规**的 `awaitInput` 注入到 `Session._on_server_message`（与服务端推送**同一条下游链路**：主动消息 → `await_input` → 弹窗 → `resolveChoice`），并顺势断言「服务端此刻无待决 → `BAD_PARAMS` → 弹窗保留」（正是裁决七要的行为）。服务端侧的真待决路径由 `R7Test._test_victory_choice` 用构造局覆盖。
 - **三处既有测试被后续里程碑打破的过期断言，已按「新语义」修正而非放宽**：`R6Test` 的「已登记命令 56 条」→ `>= 56`（R7 后 70）；`R4Test` 的「`tribulate` 未登记」→ `Commands.TRIBULATE == "tribulate"`；`R3Test` 的赤字夹具改为逐座加建筑（R7 峰主灵力加成让写死的 20 座建筑构造不出赤字）。
 - **客户端路线显示名用本地对照表**：`routes[]` 只下发路线 id（PROTOCOL §2），故 `World.ROUTE_LABELS` 保留四路线 id → `winType` 中文名。**纯文案映射，不含任何规则**（比例/达成/评分全部来自服务端）。
+
+### 4.8 R8 实际交付（表现与 UI 打磨）
+
+**Step 0 · 前置门禁（§3.2）已先行交付**：`8f96a6e` / `59a7bee` 提交了 52 个程序化水墨资源（`assets/art/default/**`）+ 三个可复现工具（`AssetGen` 生成 / `AssetVerify` 逐 ID 验收 / `AssetPreview` CPU 等距联络表）。验收口径 `ASSETVERIFY_OK covered=52 warned=0`，即 §3.2 八类（3 基底顶面 + 3 海拔含 `MOUNTAIN_TOP` + 河流 + 险地 + 三态迷雾 + 10 单位 `.glb` + 10 建筑 `.glb` + 21 UI 图标）全部命中，`AssetLibrary.resource_for()` 对这 52 个 ID **零 WARN**。`districts`/`improvements`/`features`/`audio`/`fonts` 五组共 25 个 ID **刻意不覆盖**——保留裁决二「资源缺失只 WARN 不崩」的活体验收路径。
+
+**Step 1 · 新建 6 个表现层模块（服务端零改动）**
+
+| 文件 | 职责 | 关键设计 |
+|---|---|---|
+| `world/Decorations.gd`（~330 行） | 昼夜 / 网格 / 宗门色边框 / 环境粒子 / 飞鸟 / 泼墨转场 | 五层子节点（`GridLayer`/`BorderLayer`/`AmbientLayer`/`BirdLayer`/`InkLayer`）互不干扰；`DAY_CYCLE_SECONDS=180` 纯本地计时，相位→太阳高度角/能量/环境色/背景色；`build_grid` 每格只画唯一一条相邻边（`drawn`/`reverse` 去重，352 格 → 1131 条线）；`build_borders` 按 `tile.ownerSectId` + `sect.color` 生成 `CylinderMesh` 无盖环；`play_ink_transitions` 从 `scale(0.35,1,0.35)`+alpha 0.86 tween 到 1.0+alpha 0 |
+| `ui/ActionBar.gd`（~180 行） | 底部操作栏 + **70 条命令入口登记表** | `entries: Dictionary` 四类 `button`/`gesture`/`auto`；`add_plain()` 专供显示开关（**不进命令表**，故「网格/边框/小地图/引导」不会被误算成命令入口）；`state_of(command)` 返回 `{registered,kind,label,exists,enabled,text,tooltip}` 供机检 |
+| `ui/Toast.gd`（~70 行） | 业务/事件轻提示 | `DEFAULT_SECONDS=3.2`，最后 0.6 秒淡出；只显示 `Session.status` 以 `✗` 开头者与回包 `events[]`，不弹模态框 |
+| `ui/Minimap.gd`（~180 行） | 小地图 + 视口框 + 点击跳转 | 三态迷雾配色 + 宗门色 `lightened(0.35)`；`_gui_input` 命中 6px 内最近点 → `tile_picked` 信号；**只发信号，不碰相机** |
+| `ui/SettingsPanel.gd`（~200 行） | 6 项显示/音频偏好 | 5 个 `CheckButton`（`gridVisible`/`factionBorders`/`dayNight`/`ambientParticles`/`animation`）+ `VolumeSlider`；`_apply` 本地立即生效，`Session.request_set_setting()` **仅作确认**；`on_setting_confirmed` 处理 `{success,key,value,applied:false,note}`（`applied` 恒 false 是正确行为） |
+| `ui/GuideOverlay.gd`（~170 行） | 6 步新手引导 | 看地图 → 选弟子 → 打与守 → 建与治 → 势力与胜负 → 常用键；不阻塞输入、不改相机 |
+
+**Step 2 · 修改 3 个既有文件**
+
+| 文件 | 增量 |
+|---|---|
+| `world/CameraRig.gd` | 新增 `pan_to()`（**只平移**，显式不改 `rotation`/`size`）、`view_center()`、`view_size()`。`pan_to` 是相机铁律在 R8 的显式实现 |
+| `net/Session.gd` | 新增 `request_next_turn()`——`nextTurn` 此前**服务端已实现、客户端无入口**（R8「70 条全入口」才暴露出来） |
+| `scenes/World.gd`（3542 → 4204 行） | `_build_r8()` 装配全部 R8 模块；`_refresh_r8(view)` 挂在 `_render()` 与空 view 分支末尾；顶栏资源文本改 13 项图标化 `ResourceChips`（`topbar_resource_label` 保留为 `visible=false` 文本镜像，**不破坏 R2 既有断言**），7 个面板按钮下沉到 `ActionBar`；补 8 条此前无 UI 入口的命令（`foundSpiritPeak`/`appointBuilder`/`openCave`/`fortifyPeak`/`repairImprovement`/`queryVictoryChoice`/`nextTurn`/`finishTurn`）；`_unhandled_input` 前置 `_handle_r8_shortcut`（`空格`/`End`/`G`/`B`/`M`/`F1`/`Esc`） |
+
+**Step 3 · 70 条命令入口覆盖表（四类之和 = 70）**
+
+| 类型 | 条数 | 内容 |
+|---|---|---|
+| `button`（底栏真按钮） | **5** | `getState` 刷新 / `beginPlayerTurn` 开始回合 / `nextTurn` 下一回合 / `setSetting` 设置 / `finishTurn` 结束回合 |
+| `panel`（面板内按钮） | **43** | 城市面板 9（建造/建区/撤劳力/指派/改良查询/建改良/修缮/开洞府/加固灵峰/任命建造者）· 弟子详情 12（开峰/撤退/传送/传送候选/驻守/撤驻守/转职/晋升/渡劫/任命峰主/长老/宗主）· 道统 2 · 队列 2 · 自动化 6 · 探索 2 · 政令 3 · 存档 2 · 胜负 2 · 待抉择 1 · 新局 1 |
+| `gesture`（地图手势） | **5** | `moveDisciple` 点高亮格 / `batchMove` Shift 多选 / `attack` 点赭红格 / `queryAttackPreview` 悬停预览 / `assignWorker` 劳力模式点候选格 |
+| `auto`（随 view 或面板打开触发） | **17** | `ping` + 16 条只读 `query*`/`listSaves`/`checkVictory`/`checkDefeat`（面板打开或选中对象后链式查询） |
+
+> 机检锚点：`R8ClientTest` 用 `commands.gd` 的 `get_script_constant_map()` 反向遍历（**不硬编码命令名**，天然防漂移），断言每条都有入口且总数 = 70。19 条裁剪命令**不造任何入口**（PROTOCOL §10 已登记该口径）。
+
+**Step 4 · 六条裁决的落地对照**
+
+| 裁决 | 落地位置 |
+|---|---|
+| ① 相机禁旋转（锁 45° 正交，禁一切旋转输入） | `CameraRig` 无任何旋转代码路径；`pan_to` 只改 `global_position`；`World._on_minimap_picked()` 在平移后**主动恢复** `camera.size` 与 `camera.rotation`（防御性冗余） |
+| ② 资源缺失只 WARN 不崩 | `AssetLibrary.resource_for()` 命中失败 → `_warn_once()` + 占位（texture 2×2 白块 / model `PrismMesh`+`Label3D` 带 `placeholder` meta / font ThemeDB 回退 / material `StandardMaterial3D`）；`World._build_r8()` 读 `bgm.main` 失败静默 |
+| ③ 19 条裁剪命令不造入口、`awaitInput` 仅 `victoryChoice` | 入口表恒 70 条；`R8ClientTest` 反向核对；`resolveChoice` 仍只认 `req_victory_*` |
+| ④ 网格 / 边框纯显示层 | `Decorations` 只读 `view.tiles[]`/`view.sects[]`，不产生协议交互；`setSetting` 不下发 view |
+| ⑤ 不改玩法与数值 | `data/gameConfig.json`、`commands.gd`、`CommandDispatcher`、`TurnProcessor`、`StateView` **一行未改**（PROTOCOL §11.3 已锁定） |
+| ⑥ 不做多皮肤切换 | 只有 `default` 一套；`assets/manifest.json` 的 `skin` 字段未被新增分支消费 |
+
+**Step 5 · 验收数字**
+- `R8_CLIENT_RESULT=OK checks=44 failures=0`（单元：HUD 七模块 / 70 入口 / 置灰+blocker / 网格 / 边框 / 小地图 / 设置 / 引导 6 步 / Toast / 相机铁律 / 资源回退）
+- `R8_CLIENT_RESULT=OK checks=59 failures=0`（端到端：hello 70 条 → 装饰层按真 view 生成 1131 条网格线 + 1 圈边框 + 352 个缩略点 → 小地图只平移 → 泼墨/存读档/结束回合/getState 全序列相机不变 → `setSetting` 不进 view → 资源栏 13 项有值）
+- `ASSETVERIFY_OK covered=52 warned=0`（前置资源包）
+- 回归全绿：服务端 `R1 79458` / `R2 220` / `R3 297` / `R4 174` / `R5 453` / `R6 317` / `R7 211`（`R7_IMPLEMENTED=70`）；客户端 `R1 58` / `R2 36` / `R3 43` / `R4 69` / `R5 95` / `R6 59` / `R7 77`
+- `tools/check.ps1` 扩为 **24 阶段 175/175**（新增 `[21/24]` 客户端 R8 单元 + 端到端，原仓库扫描/协议契约顺延为 `[22/24]`/`[23/24]`），`check_protocol.ps1` 仍 **38/38**、`TODO(需核对)` 仍 **7 处**（L5/L1517/L1554/L1562/L1565/L1566/L1568）、69 分组点数不变
+
+**偏差与未做项（诚实登记）**
+- **昼夜是客户端本地计时，不与服务端回合同步**：R8 裁决五禁止改数值，回合数也不下发时间戳，故 `DAY_CYCLE_SECONDS=180` 是一个纯观感常量。副作用：读档/刷新 view **不会**重置昼夜相位（这是有意的——否则每次操作画面都会跳一下）。若后续要「昼夜跟着回合走」，需要服务端在 view 里补一个时间字段，属**协议变更**，不在 R8 范围。
+- **泼墨转场首帧不播**：`_refresh_r8` 用 `_fog_states` 与上一帧比对，首次渲染时把当前三态全部记为基线而不播转场。否则一开局 352 格会同时泼墨，观感是「屏幕被糊住」而不是「迷雾揭开」。
+- **网格重建有节流**：只在 `tiles.size() != _grid_tile_count` 时重建。否则每次 view 刷新都要销毁重建上千个节点（352 格 × 3 条边），R7 的 `endTurn` 序列会明显卡顿。
+- **飞鸟/粒子是三角函数，不是物理**：`_animate_birds` 用纯 `sin`/`cos` 绕圈，不接 `RngService`。它们**不影响任何游戏状态**，也**不参与确定性断言**（`check.ps1` 的双跑 SHA256 只比服务端导出的权威地图）。
+- **小地图点击跳转只平移、不居中到格心**：`pan_to` 把目标地面点平移到当前视口中心，但因为正交 45° 视角的「视口中心地面点」与「格心」在 y 方向有偏移，实际落点会略偏。**有意不修**——任何「顺手修正」都容易变成改 `rotation`/`size` 的借口，而相机铁律优先级更高。
+- **设置项 `applied` 恒为 `false` 是正确的**：`setSetting` 的回包语义是「服务端收到了、但不改服务端状态」，客户端不应等 `applied=true` 才生效，否则设置面板会永远显示「未生效」。`SettingsPanel.on_setting_confirmed` 据此只更新状态文案。
+- **资源包是程序化生成的「占位级美术」**：可复现、可审阅、零外部依赖，但**不是**成品美术。真实美术同名覆盖 `assets/art/default/**` 即可生效，无需改任何代码（`assets/README.md` 已写明覆盖方式与再生成命令）。
 
 ---
 

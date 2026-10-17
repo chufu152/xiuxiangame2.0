@@ -149,6 +149,12 @@ func request_finish_turn() -> String:
 func request_begin_player_turn() -> String:
 	return _request(Commands.BEGIN_PLAYER_TURN, {})
 
+## R8 补口：`nextTurn` 此前只在服务端实现、客户端无入口（R1–R7 的回合推进走
+## `request_end_turn_sequence()` 内部两步）。R8「69 命令全入口」要求单列入口，
+## 故补这一条；它只是 `_request` 的一层薄封装，不改变任何回合语义。
+func request_next_turn() -> String:
+	return _request(Commands.NEXT_TURN, {})
+
 # ---------------------------------------------------------------------------
 # R3：城市 / 区域 / 劳力 / 改良（15 条）
 # ---------------------------------------------------------------------------

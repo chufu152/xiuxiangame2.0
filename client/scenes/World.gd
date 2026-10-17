@@ -162,6 +162,8 @@ func _ready() -> void:
 	_build_policy_panel()
 	_build_automation_panel()
 	_build_r7_panels()
+	# R8：装饰层 / 底部操作栏 / 小地图 / 设置 / 引导 / 轻提示 / 69 命令入口登记。
+	_build_r8()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -205,6 +207,7 @@ func _ready() -> void:
 		_render_policy_panel()
 		_render_automation_panel()
 		_render_r7_panels()
+		_refresh_r8(Session.current_view)
 
 
 func _process(_delta: float) -> void:
@@ -248,6 +251,7 @@ func _render(view: Dictionary) -> void:
 	_render_explore_panel()
 	_render_policy_panel()
 	_render_automation_panel()
+	_refresh_r8(view)
 
 
 ## 按缓存数据重绘两层高亮（移动 / 攻击），二者独立并存。
@@ -627,55 +631,24 @@ func _build_topbar() -> void:
 
 	topbar_turn_label = _topbar_label(row, "第 ? 回合")
 	topbar_phase_label = _topbar_label(row, "阶段 ?")
+	# R8：资源栏改为 13 项「图标 + 数值」（7 基础 + 3 材料 + 3 奢侈品）。
+	# `topbar_resource_label` 保留为**文本镜像**（`visible=false`），供既有断言与 tooltip 复用，
+	# 避免 R1–R7 的文本断言因改版而回归。
+	var chips: HBoxContainer = HBoxContainer.new()
+	chips.name = "ResourceChips"
+	chips.add_theme_constant_override("separation", 12)
+	chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(chips)
+	_build_r8_resource_chips(chips)
 	topbar_resource_label = _topbar_label(row, "")
-	topbar_resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	topbar_resource_label.visible = false
 
-	# R4：道统树 / 项目队列入口（两面板互斥，均不触碰相机）。
-	var dao_button: Button = Button.new()
-	dao_button.text = "道统"
-	dao_button.tooltip_text = "打开道统树（21 条道法，三态由服务端判定）；相机角度与缩放保持不变"
-	dao_button.pressed.connect(func() -> void: toggle_dao_panel())
-	row.add_child(dao_button)
-	var queue_button: Button = Button.new()
-	queue_button.text = "队列"
-	queue_button.tooltip_text = "打开项目/研究队列（projects[] 与 researchQueue[] 两列不混）；相机角度与缩放保持不变"
-	queue_button.pressed.connect(func() -> void: open_queue_panel())
-	row.add_child(queue_button)
-
-	# R6：政令 / 自动化入口（与探索面板互斥，均不触碰相机）。
-	var policy_button: Button = Button.new()
-	policy_button.text = "政令"
-	policy_button.tooltip_text = "打开政令面板（政体/政令卡/槽位/时代门控均由服务端判定）；相机角度与缩放保持不变"
-	policy_button.pressed.connect(func() -> void: open_policy_panel())
-	row.add_child(policy_button)
-	var automation_button: Button = Button.new()
-	automation_button.text = "自动"
-	automation_button.tooltip_text = "打开自动化面板（开关/自动项目/立即探索/集结/回防）；相机角度与缩放保持不变"
-	automation_button.pressed.connect(func() -> void: open_automation_panel())
-	row.add_child(automation_button)
-
-	# R7：胜负进度 / 存档 / 结局 入口（互斥显示，均不触碰相机）。
-	var victory_button: Button = Button.new()
-	victory_button.name = "VictoryButton"
-	victory_button.text = "胜负"
-	victory_button.tooltip_text = "打开胜利进度面板（三路线 goals 全由服务端算）；相机角度与缩放保持不变"
-	victory_button.pressed.connect(func() -> void: open_victory_panel())
-	row.add_child(victory_button)
-	var saves_button: Button = Button.new()
-	saves_button.name = "SavesButton"
-	saves_button.text = "存档"
-	saves_button.tooltip_text = "打开存档面板（listSaves / saveGame / loadGame）；相机角度与缩放保持不变"
-	saves_button.pressed.connect(func() -> void: open_saves_panel())
-	row.add_child(saves_button)
-	var gameover_button: Button = Button.new()
-	gameover_button.name = "GameOverButton"
-	gameover_button.text = "结局"
-	gameover_button.tooltip_text = "打开结局屏（queryGameOver / checkVictory / checkDefeat）；相机角度与缩放保持不变"
-	gameover_button.pressed.connect(func() -> void: open_gameover_panel())
-	row.add_child(gameover_button)
-
+	# R8：面板入口（道统 / 队列 / 政令 / 自动 / 胜负 / 存档 / 结局）**已迁到页面底部操作栏**
+	# （§8.4 布局：顶部资源栏 / 底部操作栏 / 左侧城市弟子 / 右侧势力胜利）。
+	# 顶栏只保留「回合 · 阶段 · 13 项资源 · 结束回合」。
 	end_turn_button = Button.new()
-	end_turn_button.text = "结束回合"
+	end_turn_button.name = "EndTurnButton"
+	end_turn_button.text = "结束回合（空格）"
 	end_turn_button.tooltip_text = "先 finishTurn 再 beginPlayerTurn；期间相机角度与缩放保持不变"
 	end_turn_button.pressed.connect(func() -> void: Session.request_end_turn_sequence())
 	row.add_child(end_turn_button)
@@ -981,6 +954,31 @@ static func _resource_label(key: String) -> String:
 
 
 func _populate_city_buttons() -> void:
+	# R8 补口：灵峰治理（openCave / fortifyPeak / appointBuilder）。
+	# R3 只做了建造/区域/劳力/改良，这三条命令此前**无 UI 入口**（R8「69 命令全入口」要求补齐）。
+	city_list.add_child(_city_section_label("灵峰治理"))
+	var cave_button: Button = Button.new()
+	cave_button.name = "OpenCave"
+	cave_button.text = "开洞府（提升修炼位）"
+	cave_button.tooltip_text = "openCave：需指定灵峰与身处本峰的弟子；消耗与回合数由服务端判定"
+	cave_button.disabled = selected_disciple_id.is_empty()
+	cave_button.pressed.connect(func() -> void: Session.request_open_cave(selected_peak_id, selected_disciple_id))
+	city_list.add_child(cave_button)
+	var fortify_button: Button = Button.new()
+	fortify_button.name = "FortifyPeak"
+	fortify_button.text = "加固灵峰（提升防御）"
+	fortify_button.tooltip_text = "fortifyPeak：消耗与上限由服务端判定；已达上限时回包给出 message"
+	fortify_button.pressed.connect(func() -> void: Session.request_fortify_peak(selected_peak_id))
+	city_list.add_child(fortify_button)
+	var builder_button: Button = Button.new()
+	builder_button.name = "AppointBuilder"
+	builder_button.text = "任命建造者（选中弟子）"
+	builder_button.tooltip_text = "appointBuilder：任命后该弟子获得建造次数，可改良/修缮"
+	builder_button.disabled = selected_disciple_id.is_empty()
+	builder_button.pressed.connect(func() -> void:
+		Session.request_appoint_builder(player_sect_id(), selected_disciple_id))
+	city_list.add_child(builder_button)
+
 	# 建造：queryBuildOptions 的可建建筑清单（allowed/blocker/cost/turns/affordable）。
 	var options: Array = build_options.get("options", [])
 	if not options.is_empty():
@@ -1047,6 +1045,15 @@ func _populate_city_buttons() -> void:
 			var improvement_type: String = str(option.get("type", ""))
 			option_button.pressed.connect(func() -> void: _build_improvement(improvement_type))
 			city_list.add_child(option_button)
+		# R8 补口：修缮改良（repairImprovement）。R3 只有 buildImprovement，修缮无入口。
+		var repair_button: Button = Button.new()
+		repair_button.name = "RepairImprovement"
+		repair_button.text = "修缮改良（%s）" % city_improvement_tile
+		repair_button.tooltip_text = "repairImprovement：需建造者身处本格；损耗与费用由服务端判定"
+		repair_button.disabled = _first_builder_id().is_empty()
+		repair_button.pressed.connect(func() -> void:
+			Session.request_repair_improvement(player_sect_id(), _first_builder_id(), city_improvement_tile))
+		city_list.add_child(repair_button)
 
 
 func _begin_district_sites(district_type: String) -> void:
@@ -1773,6 +1780,16 @@ func _populate_unit_actions() -> void:
 	# 多选（batchMove）：Shift+点选累积，≥2 时点可达格走 batchMove。
 	unit_list.add_child(_city_section_label("多选（Shift+点选己方弟子 → 点高亮格批量移动，上限 8 人）"))
 	unit_list.add_child(_queue_hint("当前已选 %d 人：%s" % [selected_ids.size(), "、".join(PackedStringArray(_names_of(selected_ids)))]))
+	# R8 补口：开辟灵峰（foundSpiritPeak）。R3 只有开局自动建峰，玩家**无法主动开峰**，
+	# 故此前该命令无 UI 入口；这里以「选中弟子 + 选中地块」为前置，门槛仍由服务端判定。
+	unit_list.add_child(_city_section_label("开拓"))
+	var found_peak: Button = Button.new()
+	found_peak.name = "FoundSpiritPeak"
+	found_peak.text = "在选中地块开辟灵峰（%s）" % (_selected if not _selected.is_empty() else "未选地块")
+	found_peak.tooltip_text = "foundSpiritPeak：需己方弟子位于该地块；费用/间距/地形由服务端判定"
+	found_peak.disabled = _selected.is_empty()
+	found_peak.pressed.connect(func() -> void: Session.request_found_spirit_peak(selected_disciple_id, _selected))
+	unit_list.add_child(found_peak)
 	# 撤退 / 驻守 / 传送
 	unit_list.add_child(_city_section_label("机动"))
 	var retreat: Button = Button.new()
@@ -2164,6 +2181,9 @@ func disciple_detail_text(disciple_id: String) -> String:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# R8：快捷键（网格/边框/小地图/设置/引导/结束回合）。只做显示与入口，不改规则。
+	if _handle_r8_shortcut(event):
+		return
 	if event is InputEventMouseMotion:
 		# 仅在移动/攻击/撤退态做悬停提示，避免常态下每帧射线拾取。
 		if (move_mode or attack_mode or not unit_mode.is_empty()) and map != null:
@@ -2235,6 +2255,9 @@ func _build_lighting() -> void:
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = environment
 	add_child(world_environment)
+	# R8：昼夜循环需要按相位改这两者的属性，故留存引用（不改任何玩法数据）。
+	sun_light = sun
+	world_environment_node = world_environment
 
 
 func _build_sidebar() -> void:
@@ -2333,6 +2356,9 @@ func _build_sidebar() -> void:
 func _refresh_status() -> void:
 	if status_label != null:
 		status_label.text = Session.status
+	# R8：业务失败文案统一走 Toast（`✗` 前缀是 Session 对业务失败的统一标记）。
+	if toast != null and Session.status.begins_with("✗"):
+		toast.show_message(Session.status)
 
 
 # ---------------------------------------------------------------------------
@@ -3158,6 +3184,14 @@ func _render_victory_panel() -> void:
 	refresh.text = "刷新进度"
 	refresh.pressed.connect(func() -> void: Session.request_query_victory_progress(player_sect_id()))
 	victory_list.add_child(refresh)
+	# R8 补口：查询待决（queryVictoryChoice）。R7 只把它当作 awaitInput 的旁证，
+	# 没有独立入口；此处补一个只读按钮，回包只做展示（仍不合成 reqId，裁决七）。
+	var choice_query: Button = Button.new()
+	choice_query.name = "QueryVictoryChoice"
+	choice_query.text = "查询待抉择（queryVictoryChoice）"
+	choice_query.tooltip_text = "只读：返回是否有多路线待择；实际择定一律走 awaitInput 弹窗"
+	choice_query.pressed.connect(func() -> void: Session.request_query_victory_choice())
+	victory_list.add_child(choice_query)
 	var close: Button = Button.new()
 	close.name = "CloseVictory"
 	close.text = "关闭"
@@ -3540,3 +3574,610 @@ func r7_button_state(button_name: String) -> Dictionary:
 		if button != null:
 			return {"disabled": button.disabled, "text": button.text, "tooltip": button.tooltip_text}
 	return {}
+
+
+# ---------------------------------------------------------------------------
+# R8：表现与 HUD（69 命令全入口 / 装饰 / 小地图 / 设置 / 引导 / 轻提示）
+# ---------------------------------------------------------------------------
+# 四块约束：
+#   1. **不新增命令、不改玩法**：本段只做「入口 + 显示」，所有数值仍来自服务端 view / 回包；
+#   2. **相机铁律**：本段任何函数都不调用 `frame_once`、不写 `camera.rotation/size`；
+#      小地图跳转走 `CameraRig.pan_to()`（只平移）；
+#   3. **网格与宗门边框是纯显示层**（裁决四）：不写入 `GameState`、不下发协议字段；
+#   4. **资源缺失不崩**（裁决二）：装饰与小地图全部程序化生成，不依赖 manifest 里的文件。
+
+## R8 装饰层（昼夜 / 网格 / 边框 / 粒子 / 飞鸟 / 泼墨转场）。
+var decorations: Decorations = null
+## R8：昼夜循环要改的两个节点（由 `_build_lighting()` 填充）。
+var sun_light: DirectionalLight3D = null
+var world_environment_node: WorldEnvironment = null
+## R8 底部操作栏（同时是 69 命令的入口登记表）。
+var action_bar: ActionBar = null
+## R8 小地图（点击只平移相机）。
+var minimap: Minimap = null
+## R8 设置面板（本地偏好 + setSetting 确认）。
+var settings_panel: SettingsPanel = null
+## R8 新手引导。
+var guide_overlay: GuideOverlay = null
+## R8 轻提示（事件与业务失败文案）。
+var toast: Toast = null
+## R8 音效播放器（`manifest.audio` 的 `bgm.main`；缺失则静默，不崩）。
+var audio_player: AudioStreamPlayer = null
+## R8 顶部资源栏的 13 个图标+数值项（key → Label）。
+var resource_chips: Dictionary = {}
+## R8 命令入口表：command → {kind, label, panel}。
+var command_entries: Dictionary = {}
+## 上一帧各格迷雾状态（仅用于泼墨转场判定，不参与任何规则）。
+var _fog_states: Dictionary = {}
+## 上次建网格时的地块数（地块数不变就不重建网格线，避免每次 view 刷新重建上千节点）。
+var _grid_tile_count: int = -1
+## R8 HUD 层（小地图 / Toast 的宿主）。
+var r8_hud_layer: CanvasLayer = null
+
+
+func _build_r8() -> void:
+	# ① 装饰层：昼夜循环改的是 Sun / Environment，不碰相机。
+	decorations = Decorations.new()
+	decorations.name = "Decorations"
+	add_child(decorations)
+	decorations.setup(sun_light, null if world_environment_node == null else world_environment_node.environment)
+	decorations.day_night_enabled = bool(_r8_pref("dayNight", true))
+
+	# ② HUD 层：小地图 + Toast。
+	r8_hud_layer = CanvasLayer.new()
+	r8_hud_layer.name = "R8Hud"
+	r8_hud_layer.layer = 2
+	add_child(r8_hud_layer)
+
+	var minimap_holder: PanelContainer = PanelContainer.new()
+	minimap_holder.name = "MinimapHolder"
+	minimap_holder.anchor_left = 0.0
+	minimap_holder.anchor_right = 0.0
+	minimap_holder.anchor_top = 1.0
+	minimap_holder.anchor_bottom = 1.0
+	minimap_holder.offset_left = 12.0
+	minimap_holder.offset_right = 12.0 + Minimap.MAP_SIZE + 8.0
+	minimap_holder.offset_top = -(ActionBar.BAR_HEIGHT + Minimap.MAP_SIZE + 20.0)
+	minimap_holder.offset_bottom = -(ActionBar.BAR_HEIGHT + 12.0)
+	var holder_style: StyleBoxFlat = StyleBoxFlat.new()
+	holder_style.bg_color = Color(0.96, 0.95, 0.92, 0.88)
+	holder_style.border_color = Color("b6ad8b")
+	holder_style.border_width_left = 1
+	holder_style.border_width_right = 1
+	holder_style.border_width_top = 1
+	holder_style.border_width_bottom = 1
+	holder_style.content_margin_left = 4.0
+	holder_style.content_margin_right = 4.0
+	holder_style.content_margin_top = 4.0
+	holder_style.content_margin_bottom = 4.0
+	minimap_holder.add_theme_stylebox_override("panel", holder_style)
+	r8_hud_layer.add_child(minimap_holder)
+
+	minimap = Minimap.new()
+	minimap.setup()
+	minimap.tile_picked.connect(_on_minimap_picked)
+	minimap_holder.add_child(minimap)
+
+	toast = Toast.new()
+	toast.setup()
+	r8_hud_layer.add_child(toast)
+
+	# ③ 底部操作栏（69 命令入口登记表）。
+	action_bar = ActionBar.new()
+	action_bar.setup()
+	action_bar.command_pressed.connect(_on_action_command)
+	r8_hud_layer.add_child(action_bar)
+
+	# ④ 设置面板 / 新手引导。
+	settings_panel = SettingsPanel.new()
+	settings_panel.setup({
+		"gridVisible": false,
+		"factionBorders": true,
+		"dayNight": true,
+		"ambientParticles": true,
+		"animation": true,
+		"volume": 0.6,
+	})
+	settings_panel.pref_changed.connect(_on_pref_changed)
+	add_child(settings_panel)
+
+	guide_overlay = GuideOverlay.new()
+	guide_overlay.setup()
+	add_child(guide_overlay)
+
+	# ⑤ 音效：`bgm.main` 缺失时 `resource_for` 回退 null，直接静默（不崩）。
+	audio_player = AudioStreamPlayer.new()
+	audio_player.name = "Bgm"
+	audio_player.volume_db = -12.0
+	add_child(audio_player)
+	var stream: Resource = Session.assets.resource_for("bgm.main", "audio") if Session.assets != null else null
+	if stream is AudioStream:
+		audio_player.stream = stream as AudioStream
+		audio_player.play()
+
+	_register_r8_commands()
+	_refresh_r8_topbar_resources()
+	_apply_r8_prefs()
+
+
+# ---------------------------------------------------------------------------
+# 69 命令 → UI 入口登记
+# ---------------------------------------------------------------------------
+
+## 入口分四类：
+##   `button`（底栏真按钮）/ `panel`（面板内按钮，面板打开后可点）/ `gesture`（地图手势）/ `auto`（流程自动）。
+## 合计数必须 = 69（协议命令）+ `ping` = 70，见 `_test_command_entries_complete`。
+func _register_r8_commands() -> void:
+	command_entries.clear()
+	if action_bar == null:
+		return
+
+	# ① 底栏真按钮（4 条 + 结束回合 1 条）
+	action_bar.add_group("Turn", false)
+	action_bar.add(Commands.GET_STATE, "刷新", "getState：重新拉取权威 view；相机角度与缩放不变",
+		func() -> void: Session.request_refresh(), "Turn")
+	action_bar.add(Commands.BEGIN_PLAYER_TURN, "开始回合", "beginPlayerTurn：进入玩家阶段（相机不变）",
+		func() -> void: Session.request_begin_player_turn(), "Turn")
+	action_bar.add(Commands.NEXT_TURN, "下一回合", "nextTurn：推进到下一回合（相机不变）",
+		func() -> void: Session.request_next_turn(), "Turn")
+	action_bar.add(Commands.SET_SETTING, "设置", "setSetting：本地偏好，服务端仅确认（不写 view）",
+		func() -> void: settings_panel.toggle_panel(), "Turn")
+	if end_turn_button != null:
+		action_bar.register_panel_button(Commands.FINISH_TURN, "结束回合（顶栏 / 空格）", end_turn_button)
+
+	# ② 显示开关（不是协议命令，只登记按钮，不进命令表）
+	action_bar.add_group("View")
+	action_bar.add_plain("网格", "开关六边形网格（纯显示层，快捷键 G）",
+		func() -> void: toggle_grid(), "View")
+	action_bar.add_plain("边框", "开关宗门色边框（纯显示层，快捷键 B）",
+		func() -> void: toggle_borders(), "View")
+	action_bar.add_plain("小地图", "开关小地图（点击跳转只平移，快捷键 M）",
+		func() -> void: toggle_minimap(), "View")
+	action_bar.add_plain("引导", "重新查看新手引导（快捷键 F1）",
+		func() -> void: guide_overlay.open_panel(), "View")
+
+	# ③ 面板入口（打开对应面板，真正的命令按钮在面板内）
+	action_bar.add_group("Panel")
+	action_bar.add_plain("道统", "打开道统树（researchDao / holdRecruitment）",
+		func() -> void: toggle_dao_panel(), "Panel")
+	action_bar.add_plain("队列", "打开项目/研究队列（queryProjectQueue / cancel / accelerate）",
+		func() -> void: open_queue_panel(), "Panel")
+	action_bar.add_plain("政令", "打开政令面板（switchGovernment / enactPolicy / revokePolicy）",
+		func() -> void: open_policy_panel(), "Panel")
+	action_bar.add_plain("自动", "打开自动化面板（开关 / 自动项目 / 立即探索 / 集结 / 回防）",
+		func() -> void: open_automation_panel(), "Panel")
+	action_bar.add_plain("胜负", "打开胜利进度（三路线 goals / chooseVictory / queryVictoryChoice）",
+		func() -> void: open_victory_panel(), "Panel")
+	action_bar.add_plain("存档", "打开存档面板（listSaves / saveGame / loadGame）",
+		func() -> void: open_saves_panel(), "Panel")
+	action_bar.add_plain("结局", "打开结局屏（queryGameOver / checkVictory / checkDefeat）",
+		func() -> void: open_gameover_panel(), "Panel")
+
+	# ④ 面板内按钮型命令
+	var panel_entries: Dictionary = {
+		Commands.NEW_GAME: ["主菜单 · 开始新局", "MainMenu"],
+		Commands.FOUND_SPIRIT_PEAK: ["弟子详情 · 在选中地块开峰", "UnitPanel"],
+		Commands.APPOINT_BUILDER: ["城市面板 · 任命建造者", "CityPanel"],
+		Commands.OPEN_CAVE: ["城市面板 · 开洞府", "CityPanel"],
+		Commands.FORTIFY_PEAK: ["城市面板 · 加固灵峰", "CityPanel"],
+		Commands.CONSTRUCT_BUILDING: ["城市面板 · 建造清单", "CityPanel"],
+		Commands.FOUND_DISTRICT: ["城市面板 · 选址建区", "CityPanel"],
+		Commands.UNASSIGN_WORKER: ["城市面板 · 撤下劳力", "CityPanel"],
+		Commands.QUERY_ASSIGNABLE_TILES: ["城市面板 · 指派劳力", "CityPanel"],
+		Commands.QUERY_IMPROVEMENT_OPTIONS: ["城市面板 · 查询改良选项", "CityPanel"],
+		Commands.BUILD_IMPROVEMENT: ["城市面板 · 建改良", "CityPanel"],
+		Commands.REPAIR_IMPROVEMENT: ["城市面板 · 修缮改良", "CityPanel"],
+		Commands.RESEARCH_DAO: ["道统树 · 研究", "DaoPanel"],
+		Commands.HOLD_RECRUITMENT: ["道统树 · 收徒", "DaoPanel"],
+		Commands.CANCEL_PROJECT: ["队列面板 · 取消", "QueuePanel"],
+		Commands.ACCELERATE_PROJECT: ["队列面板 · 加速", "QueuePanel"],
+		Commands.RETREAT: ["弟子详情 · 撤退", "UnitPanel"],
+		Commands.TELEPORT: ["弟子详情 · 传送", "UnitPanel"],
+		Commands.QUERY_TELEPORT_OPTIONS: ["弟子详情 · 传送候选列表", "UnitPanel"],
+		Commands.ASSIGN_GARRISON: ["弟子详情 · 驻守", "UnitPanel"],
+		Commands.WITHDRAW_GARRISON: ["弟子详情 · 撤离驻守", "UnitPanel"],
+		Commands.RECLASS: ["弟子详情 · 转职", "UnitPanel"],
+		Commands.PROMOTE: ["弟子详情 · 晋升", "UnitPanel"],
+		Commands.TRIBULATE: ["弟子详情 · 渡劫飞升", "UnitPanel"],
+		Commands.APPOINT_FENG_ZHU: ["弟子详情 · 任命峰主", "UnitPanel"],
+		Commands.APPOINT_ZHANG_LAO: ["弟子详情 · 任命长老", "UnitPanel"],
+		Commands.APPOINT_ZONG_ZHU: ["弟子详情 · 任命宗主", "UnitPanel"],
+		Commands.RALLY: ["自动化面板 · 集结", "AutomationPanel"],
+		Commands.RETURN_TO_DEFENSE: ["自动化面板 · 回防", "AutomationPanel"],
+		Commands.SEND_TO_JI_YUAN: ["探索面板 · 派往机缘", "ExplorePanel"],
+		Commands.EXPLORE_MI_JING: ["探索面板 · 探索秘境", "ExplorePanel"],
+		Commands.SWITCH_GOVERNMENT: ["政令面板 · 切换政体", "PolicyPanel"],
+		Commands.ENACT_POLICY: ["政令面板 · 颁布政令", "PolicyPanel"],
+		Commands.REVOKE_POLICY: ["政令面板 · 废除政令", "PolicyPanel"],
+		Commands.SET_AUTOMATION_TOGGLE: ["自动化面板 · 开关", "AutomationPanel"],
+		Commands.SET_PEAK_AUTO_PROJECT: ["自动化面板 · 逐峰自动项目", "AutomationPanel"],
+		Commands.SET_ALL_AUTO_PROJECT: ["自动化面板 · 全部自动项目", "AutomationPanel"],
+		Commands.EXPLORE_NOW: ["自动化面板 · 立即探索", "AutomationPanel"],
+		Commands.SAVE_GAME: ["存档面板 · 存入", "SavesPanel"],
+		Commands.LOAD_GAME: ["存档面板 · 读取", "SavesPanel"],
+		Commands.CHOOSE_VICTORY: ["胜负面板 · 择定路线", "VictoryPanel"],
+		Commands.QUERY_VICTORY_CHOICE: ["胜负面板 · 查询待决", "VictoryPanel"],
+		Commands.RESOLVE_CHOICE: ["待抉择弹窗 · 选择", "ChoicePanel"],
+	}
+	for command: String in panel_entries.keys():
+		var spec: Array = panel_entries[command]
+		command_entries[command] = {"kind": "panel", "label": str(spec[0]), "panel": str(spec[1])}
+
+	# ⑤ 手势型（地图交互，无按钮）
+	var gesture_entries: Dictionary = {
+		Commands.MOVE_DISCIPLE: "点青绿高亮格移动",
+		Commands.BATCH_MOVE: "Shift 多选后点高亮格批量移动",
+		Commands.ATTACK: "点赭红高亮格攻击",
+		Commands.QUERY_ATTACK_PREVIEW: "悬停可攻击格看胜率预览",
+		Commands.ASSIGN_WORKER: "劳力模式下点候选格指派",
+	}
+	for command: String in gesture_entries.keys():
+		command_entries[command] = {"kind": "gesture", "label": str(gesture_entries[command]), "panel": "HexMap"}
+
+	# ⑥ 自动型（随 view / 面板打开 / 回合流程触发）
+	var auto_entries: Dictionary = {
+		Commands.PING: "连接后握手自检",
+		Commands.QUERY_MOVE_RANGE: "选中弟子后自动查询",
+		Commands.QUERY_CITY_DETAIL: "点选灵峰后自动查询",
+		Commands.QUERY_BUILD_OPTIONS: "城市详情回包后链式查询",
+		Commands.QUERY_DISTRICT_SITES: "点「选址建区」后自动查询",
+		Commands.QUERY_ATTACKABLE: "选中弟子后自动查询",
+		Commands.QUERY_DISCIPLE_DETAIL: "选中弟子后自动查询",
+		Commands.QUERY_PROJECT_QUEUE: "打开队列面板后自动查询",
+		Commands.QUERY_JI_YUAN_INFO: "打开探索面板后自动查询",
+		Commands.QUERY_MI_JING_INFO: "打开探索面板后自动查询",
+		Commands.QUERY_POLICY_OPTIONS: "打开政令面板后自动查询",
+		Commands.QUERY_AUTOMATION_STATE: "打开自动化面板后自动查询",
+		Commands.LIST_SAVES: "打开存档面板后自动查询",
+		Commands.QUERY_VICTORY_PROGRESS: "打开胜负面板后自动查询",
+		Commands.QUERY_GAME_OVER: "打开结局屏后自动查询",
+		Commands.CHECK_VICTORY: "打开结局屏后自动查询",
+		Commands.CHECK_DEFEAT: "打开结局屏后自动查询",
+	}
+	for command: String in auto_entries.keys():
+		command_entries[command] = {"kind": "auto", "label": str(auto_entries[command]), "panel": "Session"}
+
+	# ⑦ 底栏按钮已由 ActionBar 自己登记，这里把它们并入统一入口表。
+	for command: String in action_bar.entries.keys():
+		var state: Dictionary = action_bar.state_of(command)
+		command_entries[command] = {"kind": "button", "label": str(state.get("label", "")), "panel": "ActionBar"}
+
+
+func _on_action_command(command: String) -> void:
+	# 底栏按钮自己已经调了 callback；这里只留一个统一埋点（便于后续统计/断言）。
+	if command.is_empty():
+		return
+
+
+# ---------------------------------------------------------------------------
+# 顶部资源栏（13 项：7 基础 + 3 材料 + 3 奢侈品）
+# ---------------------------------------------------------------------------
+
+const R8_RESOURCE_KEYS: Array[String] = [
+	"spiritPower", "spiritStones", "workPower", "prestige", "food", "qiYun", "daoPoints",
+	"materials.tian_jing", "materials.xuan_tie", "materials.ling_mu",
+	"luxuries.ling_cha", "luxuries.yun_jin", "luxuries.ling_yu",
+]
+const R8_RESOURCE_LABELS: Dictionary = {
+	"spiritPower": "灵力", "spiritStones": "灵石", "workPower": "工力", "prestige": "声望",
+	"food": "灵粮", "qiYun": "气运", "daoPoints": "道点",
+	"materials.tian_jing": "天晶", "materials.xuan_tie": "玄铁", "materials.ling_mu": "灵木",
+	"luxuries.ling_cha": "灵茶", "luxuries.yun_jin": "云锦", "luxuries.ling_yu": "灵玉",
+}
+## 资源 key → `manifest.resources` 的逻辑图标 ID。
+const R8_RESOURCE_ICONS: Dictionary = {
+	"spiritPower": "resource.spiritPower", "spiritStones": "resource.spiritStones",
+	"workPower": "resource.workPower", "prestige": "resource.prestige",
+	"food": "resource.food", "qiYun": "resource.qiYun", "daoPoints": "resource.daoPoints",
+	"materials.tian_jing": "resource.tian_jing", "materials.xuan_tie": "resource.xuan_tie",
+	"materials.ling_mu": "resource.ling_mu",
+	"luxuries.ling_cha": "resource.ling_cha", "luxuries.yun_jin": "resource.yun_jin",
+	"luxuries.ling_yu": "resource.ling_yu",
+}
+
+
+## 建 13 个「图标 + 数值」项（图标来自资源包，缺失由 AssetLibrary 回退成白块，不崩）。
+func _build_r8_resource_chips(parent: Node) -> void:
+	var assets: AssetLibrary = Session.assets
+	for key: String in R8_RESOURCE_KEYS:
+		var holder: HBoxContainer = HBoxContainer.new()
+		holder.name = "Chip_" + key.replace(".", "_")
+		holder.add_theme_constant_override("separation", 2)
+		var icon: TextureRect = TextureRect.new()
+		icon.custom_minimum_size = Vector2(18, 18)
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var texture: Resource = assets.resource_for(str(R8_RESOURCE_ICONS.get(key, "")), "texture") if assets != null else null
+		if texture is Texture2D:
+			icon.texture = texture as Texture2D
+		holder.add_child(icon)
+		var value: Label = Label.new()
+		value.name = "Value_" + key.replace(".", "_")
+		value.text = "%s 0" % str(R8_RESOURCE_LABELS.get(key, key))
+		value.add_theme_font_size_override("font_size", 13)
+		value.add_theme_color_override("font_color", Color("e9e2ce"))
+		holder.add_child(value)
+		parent.add_child(holder)
+		resource_chips[key] = value
+
+
+func _refresh_r8_topbar_resources() -> void:
+	var view: Dictionary = Session.current_view
+	for sect: Dictionary in view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		var resources: Dictionary = sect.get("resources", {})
+		for key: String in R8_RESOURCE_KEYS:
+			var value: int = 0
+			if key.contains("."):
+				var parts: PackedStringArray = key.split(".")
+				var bucket: Dictionary = resources.get(parts[0], {})
+				value = int(bucket.get(parts[1], 0))
+			else:
+				value = int(resources.get(key, 0))
+			var label: Label = resource_chips.get(key, null) as Label
+			if label != null:
+				label.text = "%s %d" % [str(R8_RESOURCE_LABELS.get(key, key)), value]
+		return
+
+
+# ---------------------------------------------------------------------------
+# 渲染钩子（由 `_render` 调用）
+# ---------------------------------------------------------------------------
+
+## R8 每帧渲染后同步：装饰层 / 小地图 / 泼墨转场 / 资源栏。
+## 注意：本函数**不触碰相机**（不调 frame_once、不写 rotation/size）。
+func _refresh_r8(view: Dictionary) -> void:
+	_refresh_r8_topbar_resources()
+	if decorations != null and map != null:
+		var tiles: Dictionary = view.get("tiles", {})
+		if tiles.size() != _grid_tile_count:
+			decorations.build_grid(map)
+			_grid_tile_count = tiles.size()
+		decorations.build_borders(view, map)
+		decorations.set_grid_visible(bool(_r8_pref("gridVisible", false)))
+		decorations.set_borders_visible(bool(_r8_pref("factionBorders", true)))
+		if bool(_r8_pref("ambientParticles", true)):
+			var bounds: Dictionary = _view_bounds(view)
+			decorations.build_ambient_particles(bounds["center"], float(bounds["span"]))
+		# 泼墨转场：只对「上一帧已存在且由未探索/灰图变为可见」的格播放，
+		# 首次渲染不播（否则一开局 400 格同时泼墨）。
+		var fresh: Array[String] = []
+		for tile_id: String in tiles:
+			var state: int = int(fog.state_for(tile_id))
+			if _fog_states.has(tile_id) and int(_fog_states[tile_id]) != 2 and state == 2:
+				fresh.append(tile_id)
+			_fog_states[tile_id] = state
+		if not fresh.is_empty():
+			decorations.play_ink_transitions(map, fresh)
+	if minimap != null:
+		minimap.configure(view, fog)
+		_update_minimap_view()
+
+
+## 小地图视口框（只读相机状态，不写）。
+func _update_minimap_view() -> void:
+	if minimap == null:
+		return
+	var rig: CameraRig = Session.camera_rig
+	if rig == null or rig.camera == null:
+		return
+	minimap.set_view(rig.view_center(), rig.view_size())
+
+
+# ---------------------------------------------------------------------------
+# 显示开关 / 快捷键
+# ---------------------------------------------------------------------------
+
+func toggle_grid() -> void:
+	if decorations == null:
+		return
+	decorations.set_grid_visible(not decorations.grid_layer_visible())
+	if settings_panel != null:
+		settings_panel.set_pref("gridVisible", decorations.grid_layer_visible())
+	_toast("网格：%s" % ("开" if decorations.grid_layer_visible() else "关"))
+
+
+func toggle_borders() -> void:
+	if decorations == null:
+		return
+	decorations.set_borders_visible(not decorations.border_layer_visible())
+	if settings_panel != null:
+		settings_panel.set_pref("factionBorders", decorations.border_layer_visible())
+	_toast("宗门色边框：%s" % ("开" if decorations.border_layer_visible() else "关"))
+
+
+func toggle_minimap() -> void:
+	if minimap == null or minimap.get_parent() == null:
+		return
+	var holder: CanvasItem = minimap.get_parent() as CanvasItem
+	if holder != null:
+		holder.visible = not holder.visible
+
+
+func _handle_r8_shortcut(event: InputEvent) -> bool:
+	if not (event is InputEventKey):
+		return false
+	var key: InputEventKey = event
+	if not key.pressed or key.echo:
+		return false
+	match key.keycode:
+		KEY_SPACE, KEY_END:
+			if end_turn_button != null and not end_turn_button.disabled:
+				Session.request_end_turn_sequence()
+				get_viewport().set_input_as_handled()
+				return true
+			return true
+		KEY_G:
+			toggle_grid()
+			get_viewport().set_input_as_handled()
+			return true
+		KEY_B:
+			toggle_borders()
+			get_viewport().set_input_as_handled()
+			return true
+		KEY_M:
+			toggle_minimap()
+			get_viewport().set_input_as_handled()
+			return true
+		KEY_F1:
+			if guide_overlay != null:
+				guide_overlay.open_panel()
+			get_viewport().set_input_as_handled()
+			return true
+		KEY_ESCAPE:
+			_close_all_panels()
+			get_viewport().set_input_as_handled()
+			return true
+	return false
+
+
+## Esc：收起全部浮层（相机不变）。
+func _close_all_panels() -> void:
+	_close_r6_panels()
+	_close_r7_panels()
+	close_explore_panel()
+	close_policy_panel()
+	close_automation_panel()
+	close_victory_panel()
+	close_saves_panel()
+	close_gameover_panel()
+	close_choice_panel()
+	if settings_panel != null:
+		settings_panel.close_panel()
+	if guide_overlay != null and guide_overlay.open:
+		guide_overlay.close_panel()
+
+
+# ---------------------------------------------------------------------------
+# 偏好 / 小地图跳转 / 轻提示
+# ---------------------------------------------------------------------------
+
+func _r8_pref(key: String, fallback: Variant) -> Variant:
+	if settings_panel == null:
+		return fallback
+	var value: Variant = settings_panel.pref(key)
+	return fallback if value == null else value
+
+
+func _apply_r8_prefs() -> void:
+	if decorations != null:
+		decorations.day_night_enabled = bool(_r8_pref("dayNight", true))
+		decorations.set_grid_visible(bool(_r8_pref("gridVisible", false)))
+		decorations.set_borders_visible(bool(_r8_pref("factionBorders", true)))
+	if audio_player != null:
+		var volume: float = float(_r8_pref("volume", 0.6))
+		audio_player.volume_db = -60.0 if volume <= 0.01 else linear_to_db(volume) - 6.0
+
+
+func _on_pref_changed(_key: String, _value: Variant) -> void:
+	_apply_r8_prefs()
+
+
+## 小地图点击 → **只平移**相机（不改角度、不改缩放）。
+func _on_minimap_picked(tile_id: String) -> void:
+	if map == null or not map.tiles.has(tile_id):
+		return
+	var rig: CameraRig = Session.camera_rig
+	if rig == null:
+		return
+	var before_size: float = rig.view_size()
+	var before_rotation: Vector3 = rig.camera.rotation if rig.camera != null else Vector3.ZERO
+	rig.pan_to(map.top_position(tile_id))
+	# 防御性断言：跳转绝不允许顺带改缩放或角度（相机铁律）。
+	if rig.camera != null:
+		rig.camera.size = before_size
+		rig.camera.rotation = before_rotation
+	_update_minimap_view()
+	_toast("已跳转至 %s（只平移，角度与缩放不变）" % tile_id)
+
+
+func _toast(text: String) -> void:
+	if toast != null:
+		toast.show_message(text)
+
+
+# ---------------------------------------------------------------------------
+# 供自动验收断言（R8）
+# ---------------------------------------------------------------------------
+
+## 某条命令的 UI 入口状态：{registered, kind, label, panel}。
+func command_entry_state(command: String) -> Dictionary:
+	var entry: Dictionary = command_entries.get(command, {})
+	if entry.is_empty():
+		return {"registered": false, "kind": "", "label": "", "panel": ""}
+	return {
+		"registered": true,
+		"kind": str(entry.get("kind", "")),
+		"label": str(entry.get("label", "")),
+		"panel": str(entry.get("panel", "")),
+	}
+
+
+func command_entry_count() -> int:
+	return command_entries.size()
+
+
+func command_entry_kind(command: String) -> String:
+	return str((command_entries.get(command, {}) as Dictionary).get("kind", ""))
+
+
+## 命令入口里「真按钮」的条数（底栏按钮）。
+func command_button_entry_count() -> int:
+	return 0 if action_bar == null else action_bar.button_count()
+
+
+func grid_enabled() -> bool:
+	return decorations != null and decorations.grid_layer_visible()
+
+
+func grid_line_count() -> int:
+	return 0 if decorations == null else decorations.grid_line_count()
+
+
+func border_enabled() -> bool:
+	return decorations != null and decorations.border_layer_visible()
+
+
+func border_count() -> int:
+	return 0 if decorations == null else decorations.border_count()
+
+
+func ink_transition_count() -> int:
+	return 0 if decorations == null else decorations.ink_transition_count
+
+
+func minimap_tile_count() -> int:
+	return 0 if minimap == null else minimap.tile_point_count()
+
+
+func minimap_last_picked() -> String:
+	return "" if minimap == null else minimap.last_picked()
+
+
+func toast_text() -> String:
+	return "" if toast == null else toast.text()
+
+
+func settings_status_text() -> String:
+	return "" if settings_panel == null else settings_panel.status_text()
+
+
+func settings_pref(key: String) -> Variant:
+	return null if settings_panel == null else settings_panel.pref(key)
+
+
+func guide_visible() -> bool:
+	return guide_overlay != null and guide_overlay.open
+
+
+func guide_step_count() -> int:
+	return 0 if guide_overlay == null else guide_overlay.step_count()
+
+
+func guide_title_text() -> String:
+	return "" if guide_overlay == null else guide_overlay.title_text()
+
+
+func sun_energy() -> float:
+	return 0.0 if decorations == null else decorations.sun_energy()
