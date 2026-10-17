@@ -50,6 +50,8 @@ static func move_disciple(state: GameState, config: Dictionary, disciple_id: Str
 	var cost: int = int(costs[target_tile_id])
 	disciple.tileId = target_tile_id
 	disciple.movePoints -= cost
+	# 离开机缘/秘境所在地块即视为任务结束（1.0 `MoveAction.clearMissionIfLeft`）。
+	clear_mission_if_left(state, disciple)
 	# 迷雾随移动刷新：新位置揭示、旧位置降级为已探索。
 	VisionCalculator.recalculate(state, config)
 	state.eventLog.append("弟子 %s 移动至 %s（耗 %d 移动力）" % [disciple.name, target_tile_id, cost])
@@ -60,6 +62,19 @@ static func move_disciple(state: GameState, config: Dictionary, disciple_id: Str
 		"turnsRemaining": disciple.movePoints,
 		"triggeredEvent": "",
 	}
+
+
+## 弟子离开机缘/秘境所在地块后清空 `missionNodeId`（1.0 `MoveAction.clearMissionIfLeft`）。
+## 节点已被移除（不应发生）也一并清空，避免 `queryDiscipleDetail` 挂着一个不存在的节点名。
+static func clear_mission_if_left(state: GameState, disciple: Disciple) -> void:
+	if disciple == null or disciple.missionNodeId.is_empty():
+		return
+	if not state.nodes.has(disciple.missionNodeId):
+		disciple.missionNodeId = ""
+		return
+	var node: GameNode = state.nodes[disciple.missionNodeId]
+	if node.tileId != disciple.tileId:
+		disciple.missionNodeId = ""
 
 
 static func _failure(disciple: Disciple, message: String) -> Dictionary:

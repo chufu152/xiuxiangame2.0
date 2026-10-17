@@ -119,6 +119,21 @@ static func assign_garrison(state: GameState, config: Dictionary, disciple_id: S
 static func withdraw_garrison(state: GameState, config: Dictionary, disciple_id: String) -> Dictionary:
 	var disciple: Disciple = MoveAction.find_disciple(state, disciple_id)
 	if disciple == null: return _move_fail("", 0, "弟子不存在：" + disciple_id)
+	# 任务节点优先于驻守（1.0 `MoveAction.withdrawGarrison` 同序）：站在机缘/秘境上的弟子
+	# 也要有办法「撤回任务」，否则 `missionNodeId` 只能靠走开或陨落清除。
+	if not disciple.missionNodeId.is_empty():
+		var mission_name: String = disciple.missionNodeId
+		if state.nodes.has(disciple.missionNodeId):
+			mission_name = (state.nodes[disciple.missionNodeId] as GameNode).name
+		disciple.missionNodeId = ""
+		state.eventLog.append("[任务] %s 撤回 %s 任务" % [disciple.name, mission_name])
+		return {
+			"success": true,
+			"message": "%s 已撤回机缘/秘境任务" % disciple.name,
+			"reachedTileId": disciple.tileId,
+			"turnsRemaining": disciple.movePoints,
+			"triggeredEvent": "",
+		}
 	if disciple.garrisonNodeId.is_empty():
 		return _move_fail(disciple.tileId, disciple.movePoints, "该弟子未驻守任何节点")
 	var node_id: String = disciple.garrisonNodeId
@@ -264,7 +279,7 @@ static func query_disciple_detail(state: GameState, config: Dictionary, disciple
 		"currentPeakId": "" if current_peak == null else current_peak.id,
 		"currentPeakName": "" if current_peak == null else current_peak.name,
 		"garrisonNodeId": disciple.garrisonNodeId,
-		"garrisonNodeName": "" if garrison_node == null else garrison_node.id,
+		"garrisonNodeName": "" if garrison_node == null else garrison_node.name,
 		"missionNodeId": disciple.missionNodeId,
 		"missionNodeName": "" if mission_node == null else mission_node.name,
 		"injured": disciple.injured,

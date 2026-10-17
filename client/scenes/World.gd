@@ -341,6 +341,16 @@ static func _list_of(data: Dictionary, key: String) -> String:
 	return "、".join(parts)
 
 
+## 节点类字段的展示串：优先服务端下发的显示名，缺失时退回 id，都没有则「无」。
+## （R6 起 `GameNode.name` 由 `MapGenerator` 生成，`garrisonNodeName`/`missionNodeName` 才有意义。）
+static func _node_label_of(data: Dictionary, id_key: String, name_key: String) -> String:
+	var name: String = str(data.get(name_key, ""))
+	if not name.is_empty():
+		return name
+	var node_id: String = str(data.get(id_key, ""))
+	return "无" if node_id.is_empty() else node_id
+
+
 # ---------------------------------------------------------------------------
 # R2：点选 → 高亮 → 移动
 # ---------------------------------------------------------------------------
@@ -1719,11 +1729,12 @@ func _render_unit_panel() -> void:
 			int(disciple_detail.get("promotionPoints", 0)),
 			int(disciple_detail.get("reclassCooldown", 0)),
 		],
-		"出手 %d · 移动 %d/%d · 驻守 %s" % [
+		"出手 %d · 移动 %d/%d · 驻守 %s · 任务 %s" % [
 			int(disciple_detail.get("strikesLeft", 0)),
 			int(disciple_detail.get("movePoints", 0)),
 			int(disciple_detail.get("maxMovePoints", 0)),
-			"无" if str(disciple_detail.get("garrisonNodeId", "")).is_empty() else str(disciple_detail.get("garrisonNodeId", "")),
+			_node_label_of(disciple_detail, "garrisonNodeId", "garrisonNodeName"),
+			_node_label_of(disciple_detail, "missionNodeId", "missionNodeName"),
 		],
 		"已习晋升 %s" % _list_of(disciple_detail, "promotionNames"),
 	]))
@@ -2453,6 +2464,11 @@ func _on_mi_jing_info_received(result: Dictionary) -> void:
 
 
 ## 探索面板纯读缓存 + 弟子列表（弟子来自 view，客户端不算任何成功率）。
+##
+## 为什么面板里**没有**「成功率」这一行：`NodeInfo`（1.0 `entity/NodeInfo.java` 九字段）不含成功率，
+## 客户端也不许算（硬约束 2「客户端零规则」），凭空加字段又被裁决三禁止——见 PROTOCOL §11.1 #30。
+## 因此面板只展示服务端下发的 `cooldown` / `rewardPreview` / `requiredRealmLevel` / `cost` / `maxParticipants`，
+## 成败由服务端 `sendToJiYuan` / `exploreMiJing` 判定，结果落在 `ExploreResult` 回包里。
 func _render_explore_panel() -> void:
 	_sync_r6_visibility()
 	if explore_info_label == null:

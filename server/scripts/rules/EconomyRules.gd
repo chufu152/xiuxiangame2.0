@@ -260,6 +260,11 @@ static func apply_settlement(state: GameState, config: Dictionary) -> Array[Stri
 			per_peak.append(out)
 			add_yield(totals, out)
 		var upkeep: Dictionary = sect_upkeep(state, config, sect)
+		# 政令产出乘区（R6）：`1 + outputBonus + spiritPowerBonus`，只作用灵力总产出。
+		# 未颁加成卡时恒 ×1.0，故不改变 R3 已验收的任何数值。
+		var policy_multiplier: float = PolicyRules.output_multiplier(state, config, sect)
+		if not is_equal_approx(policy_multiplier, 1.0):
+			totals["spiritPower"] = int(round(float(totals["spiritPower"]) * policy_multiplier))
 		var deficit: bool = int(sect.resources.get("spiritPower", 0)) + int(totals["spiritPower"]) < int(upkeep["spiritPower"])
 		settle_city(state, config, sect, deficit)
 		_apply_economy(state, config, sect, totals, per_peak, upkeep, deficit)

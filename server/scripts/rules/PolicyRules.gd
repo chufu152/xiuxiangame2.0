@@ -181,6 +181,25 @@ static func effect_sum(state: GameState, config: Dictionary, sect: Sect) -> Dict
 	return sum
 
 
+## 灵力产出乘区：`1 + outputBonus + spiritPowerBonus`（1.0 `EconomyCalculator` 同一公式，
+## 只作用于**灵力总产出**，不作用于灵石/道点）。未颁任何加成卡时恒为 `1.0`。
+## 这是 `outputBonus` / `spiritPowerBonus` 的唯一消费口——`effect_sum` 汇总出来的四个百分比乘区
+## 必须各自落到自己的消费点，否则「灵田制 产出+15%」颁了也等于没颁。
+static func output_multiplier(state: GameState, config: Dictionary, sect: Sect) -> float:
+	var effects: Dictionary = effect_sum(state, config, sect)
+	return 1.0 + float(effects["outputBonus"]) + float(effects["spiritPowerBonus"])
+
+
+## 修炼加成：并入 `DiscipleRules.cultivation_speed` 的加性池（1.0 `DiscipleManager` 乘 `1 + cultivationBonus`）。
+static func cultivation_bonus(state: GameState, config: Dictionary, sect: Sect) -> float:
+	return float(effect_sum(state, config, sect)["cultivationBonus"])
+
+
+## 战力加成：`CombatResolver.compute_power` 末尾乘 `1 + combatBonus`（1.0 `CombatResolver` 同口径）。
+static func combat_bonus(state: GameState, config: Dictionary, sect: Sect) -> float:
+	return float(effect_sum(state, config, sect)["combatBonus"])
+
+
 ## 每回合结算：安定（小数累积 → 叠加到各峰 `stability`）与声望（小数累积 → `resources.prestige`）。
 ## 返回本次新增的 `state.eventLog` 条目。
 static func process_settlement(state: GameState, config: Dictionary) -> Array[String]:

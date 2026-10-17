@@ -274,7 +274,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 
 **Step 4 · 客户端表现**：`Session` 16 条 `request_*` 包装 + 5 个信号 + `_is_r6_command`；`World` 三个左侧竖排面板（探索 / 政令 / 自动化）互斥显示，TopBar 追加「政令」「自动」入口。**客户端零规则**：成功率、槽位、`blocker`、自动化摘要全部由服务端算好。**相机不重置**：`R6ClientTest` 逐项断言 transform/size 不变。
 
-**Step 5 · 验收**：`R6_PASS checks=288`（11 个测试组，含 8 步命令脚本的确定性双跑逐字节比对）、`R6_CLIENT_RESULT=OK checks=59`；`R1 79458`/`R2 220`/`R3 297`/`R4 174`/`R5 453`/`R1_CLIENT 58`/`R2_CLIENT 36`/`R3_CLIENT 43`/`R4_CLIENT 69`/`R5_CLIENT 95` 无回归；`tools/check.ps1` 扩为 **21 阶段 130/130**（新增 `[17/21]` 服务端 R6、`[18/21]` 客户端 R6，原仓库扫描/协议契约顺延为 `[19/21]`/`[20/21]`），`check_protocol.ps1` **35/35**、69 分组点数不变。已提交 `a0c72c8` 并推送。
+**Step 5 · 验收**：`R6_PASS checks=317`（13 个测试组，含 8 步命令脚本的确定性双跑逐字节比对）、`R6_CLIENT_RESULT=OK checks=59`；`R1 79458`/`R2 220`/`R3 297`/`R4 174`/`R5 453`/`R1_CLIENT 58`/`R2_CLIENT 36`/`R3_CLIENT 43`/`R4_CLIENT 69`/`R5_CLIENT 95` 无回归；`tools/check.ps1` 扩为 **21 阶段 130/130**（新增 `[17/21]` 服务端 R6、`[18/21]` 客户端 R6，原仓库扫描/协议契约顺延为 `[19/21]`/`[20/21]`），`check_protocol.ps1` **35/35**、69 分组点数不变。已提交 `a0c72c8` 并推送。
 
 **R5 遗留回填情况**（R6 提示词要求的两项 + 一项自查）
 - ✅ `Sect.miJingExploredTotal` 由 `exploreMiJing` 递增 → 成就 `boost_first_mijing` **已可达**（§11.1 #23 语义按 1.0 口径落地）；
@@ -286,6 +286,28 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - **政令安定不能照抄 1.0**：2.0 的 `SpiritPeak.stability` 是 `EconomyRules.stability_of()` 每回合**派生**的值，1.0 那套「每回合 mutate loyalty」无法移植。改为把政令安定累加进 `Sect.policyCarry["stabilityBonus"]`（整数），在 `apply_settlement` **之后**叠加到各峰 `stability` 上——这样既不改 R3 已验证的安定/产出公式，又能让「+1 安定/回合」真实生效。`R6Test` 用「开政令 vs `policy.enabled=false`」两局对照验证，避免用被测函数当自己的 oracle。
 - **客户端节点点击优先级调整**：原本「先判弟子、后判节点」，导致秘境格（要求全员已站在节点格）永远打不开探索面板。已把节点分支提到弟子分支之前，Shift 仍可绕过；`R6ClientTest` 对此有专门断言。
 - **R6 未新增配置块**：`explore`/`policy`/`automation`/`qiYun` 全部只读复用，`ConfigValidator` 未新增键。
+
+#### 4.6.1 交付后审计（自查发现并修掉的 4 个洞）
+
+交付后逐条对照提示词的 9 条硬约束、7 条裁决、12 条验收项重查了一遍，发现 4 个真问题——都不是「测试没覆盖」，而是「测试覆盖了却断言不出东西」：
+
+| # | 问题 | 后果 | 修法 |
+|---|---|---|---|
+| 1 | `ExploreRules` 里 `missionNodeId` **设完立刻清空**（两个探索函数末尾各一行 `= ""`） | `queryDiscipleDetail.missionNodeId/missionNodeName` 恒为空——字段存在但永远没值，`R6Test` 原先那条「失败后已清空」是**空断言**（本来就恒空） | 删掉两处清空；按 1.0 `MoveAction.clearMissionIfLeft` 在移动到达后清、`withdrawGarrison` 优先判任务节点。新增 `_test_mission_marker` 7 项钉住完整生命周期 |
+| 2 | `effect_sum` 汇总出的 4 个百分比乘区（`outputBonus`/`spiritPowerBonus`/`cultivationBonus`/`combatBonus`）**没有任何消费点** | 8 张政令卡里 6 张的主效果（产出+15%、灵力+10%、修炼+10%/+15%、战力+10%/+5%）颁了等于没颁，只有 `stabilityPerTurn`/`prestigePerTurn` 生效 | 按 1.0 三处接线：`EconomyRules.apply_settlement`（灵力总产出 ×`1+output+spiritPower`，且在 deficit 判定前）、`DiscipleRules.cultivation_speed`（并入加性池）、`CombatResolver.compute_power`（末尾乘法）。未颁卡时恒为恒等元，R3/R4/R5 数值零变化（回归实测 297/174/453 全绿） |
+| 3 | PROTOCOL §11.2 #4 把槽位键写成 `{economy, military, culture}` | 实际配置键是 **`governance`**（PRD §4.13「原外交槽 2.0 改治理」）。文档错会诱导后来者按 `culture` 取槽位，导致 `used_slots` 恒 0、治理卡永远「槽位已满」 | 文档改 `governance`；`R6Test` 增两条断言（`slots` 含 `governance` 且 `zong_fa` 治理槽 = 1） |
+| 4 | `queryDiscipleDetail.garrisonNodeName` 返回的是 **id 不是 name**（R5 遗留，当时 `GameNode` 还没有 `name` 字段） | 弟子详情里「驻守」显示的是 `node_37` 这类内部 id | 改为 `garrison_node.name`；客户端改用新增的 `_node_label_of()`（优先显示名、缺失退回 id），并同时展示「任务」节点 |
+
+**另外两处「提示词自身互斥」的处理（不改实现，登记入 PROTOCOL §11.1）**：
+
+- **验收 11 要求「`queryJiYuanInfo` 显示成功率」做不到**：1.0 `NodeInfo` 九字段不含成功率，硬约束 2 禁止客户端算，裁决三禁止凭空加字段——三者互斥。取约束优先：面板只显示 `cooldown`/`rewardPreview`/`requiredRealmLevel`/`cost`/`maxParticipants`，成功率由服务端在 `sendToJiYuan` 内判定（§11.1 #30）。
+- **`missionNodeId` 在 1.0 是死字段**（`clearMissionIfLeft`/`withdrawGarrison` 两条清理规则都写好了，但全仓没有 setter 调用）。2.0 让它真正有值，并沿用 1.0 的两条清理规则（§11.1 #29）。
+
+**顺带发现但**未**修（属 R4/R5 既有行为，改动会推翻已验收数值，留待对应里程碑复查）**：
+
+- `DaoRules.economy_bonus()` **从未被调用**——5 条道法（`ling_tian_nong` +5%、`ju_ling_zhen` +10%、`cang_shu` +5%、`shi_jie` +10%、`di_wang_zhu_shu` +5%）的 `ECONOMY_BONUS` 目前对产出无影响。1.0 在 `EconomyCalculator` 里是 `total *= 1 + ECONOMY_BONUS`。R6 只接了政令乘区（未颁卡时恒等元），没顺手接这条，因为一接就会改动 R3 已验收的灵力产出数值、必须同步改 `R3Test` 期望值（与「勿改动 R1–R5 测试」冲突）。**建议 R7 前单独开一次「道法经济加成接线」收尾**。
+- `CombatResolver.compute_power` 里道法 `COMBAT_BONUS` 用的是**加法**（`power += 0.05`），1.0 是**乘法**（`power *= 1 + 0.05`）。战力基数只有个位到几十，加 0.05 实际等于没有。同理未改（`R5Test` 在无道法加成下断言战力，改动不影响测试，但会改变 R5 已验收的战斗平衡口径）。
+
 
 ---
 

@@ -34,6 +34,9 @@ static func compute_power(state: GameState, config: Dictionary, disciple: Discip
 	var sect: Sect = _sect_of(state, disciple.sectId)
 	if sect != null:
 		power += float(DaoRules.effect_sum(state, config, sect).get("COMBAT_BONUS", 0.0))
+		# 政令战力加成（R6）：`tie_lv_jun_gui` +10% / `yi_zhan_yang_zhan` +5% / `jun_quan` +10%。
+		# 按 1.0 `CombatResolver` 口径是**乘法**（`power *= 1 + combatBonus`），未颁卡时 ×1.0。
+		power *= 1.0 + PolicyRules.combat_bonus(state, config, sect)
 	if disciple.injured:
 		power *= 1.0 - float(combat["injuryPowerPenalty"])
 	if disciple.heartDevil >= int(combat["heartDevilHighThreshold"]):

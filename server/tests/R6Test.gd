@@ -67,6 +67,8 @@ func _ready() -> void:
 	_test_rally()
 	_test_set_setting()
 	_test_backfill()
+	_test_policy_effects()
+	_test_mission_marker()
 	_test_determinism()
 	_finished = true
 	if _failures.is_empty():
@@ -495,6 +497,10 @@ func _test_policy_options() -> void:
 	for key: String in ["id", "name", "description", "current", "allowed", "blocker", "slots", "effectsText"]:
 		_check(gov.has(key), "governments[] 含 %s" % key)
 	_check((gov["slots"] as Dictionary).size() == 3, "zong_fa slots 三键（经济/军事/治理）")
+	# 槽位类目键必须是 config 原样的 `governance`（PRD §4.13「原外交槽 2.0 改治理」），
+	# 不是 `culture`——用错键会让 `used_slots` 恒 0、治理卡永远「槽位已满」。
+	_check((gov["slots"] as Dictionary).has("governance"), "slots 类目键为 governance（非 culture）")
+	_check(int((gov["slots"] as Dictionary).get("governance", -1)) == 1, "zong_fa 治理槽 = 1（读 config）")
 	var card: Dictionary = (options["cards"] as Array)[0]
 	for key: String in ["id", "name", "category", "categoryLabel", "description", "unlockEra", "enacted", "allowed", "blocker", "usedSlots", "effectsText"]:
 		_check(card.has(key), "cards[] 含 %s" % key)
@@ -777,6 +783,120 @@ func _test_determinism() -> void:
 	for disciple: Disciple in _player(right).disciples:
 		right_disciple.append([disciple.id, disciple.tileId, disciple.heartDevil, disciple.movePoints])
 	_check(JSON.stringify(left_disciple) == JSON.stringify(right_disciple), "弟子位置/心魔/移动力逐字一致")
+
+
+# ---------------------------------------------------------------------------
+# 12. 政令乘区接线：`effect_sum` 的四个百分比乘区必须各自有消费点
+# ---------------------------------------------------------------------------
+
+## 为什么单独一组：`effect_sum` 汇总出来的是 `outputBonus / spiritPowerBonus / cultivationBonus /
+## combatBonus / stabilityPerTurn / prestigePerTurn` 六个键，若只消费后两个，前四个（即 8 张卡里
+## 6 张的主效果）颁了也等于没颁。这组把每个乘区钉到它的消费点上逐一验证。
+func _test_policy_effects() -> void:
+	var dispatcher: CommandDispatcher = _new_game("6090")
+	var state: GameState = dispatcher.state
+	var sect: Sect = _player(dispatcher)
+	# 12.1 未颁任何加成卡：三个乘区恒为恒等元——这也是「不改变 R3/R4/R5 已验收数值」的结构性保证。
+	_check(is_equal_approx(PolicyRules.output_multiplier(state, _config, sect), 1.0), "默认政体：灵力乘区 = 1.0")
+	_check(is_equal_approx(PolicyRules.cultivation_bonus(state, _config, sect), 0.0), "默认政体：修炼加成 = 0")
+	_check(is_equal_approx(PolicyRules.combat_bonus(state, _config, sect), 0.0), "默认政体：战力加成 = 0")
+
+	# 12.2 灵田制「产出 +15%」→ 灵力总产出 ×1.15（只作用灵力，不碰灵石/道点）。
+	_check(bool(_result(dispatcher, Commands.ENACT_POLICY, {"sectId": sect.id, "cardId": "ling_tian_zhi"})["success"]),
+		"夹具：颁行灵田制")
+	_check(is_equal_approx(PolicyRules.output_multiplier(state, _config, sect), 1.15), "灵田制 → 灵力乘区 1.15")
+	var income: int = 0
+	for peak: SpiritPeak in sect.spiritPeaks:
+		income += int(EconomyRules.peak_output(state, _config, peak)["spiritPower"])
+	var upkeep: int = int(EconomyRules.sect_upkeep(state, _config, sect)["spiritPower"])
+	_check(income - upkeep > 0, "夹具：结算前灵力为正收入（%d − %d）" % [income, upkeep])
+	var power_before: int = int(sect.resources.get("spiritPower", 0))
+	EconomyRules.apply_settlement(state, _config)
+	_check(int(sect.resources["spiritPower"]) - power_before == int(round(float(income) * 1.15)) - upkeep,
+		"灵田制落地：灵力增量 = round(产出 × 1.15) − 维护")
+
+	# 12.3 静心道场「修炼 +10%」→ cultivation_speed 增加 baseSpeed × 0.1。
+	var novice: Disciple = _disciple(sect, 1)
+	novice.heartDevil = 0
+	novice.injured = false
+	var speed_before: float = DiscipleRules.cultivation_speed(state, _config, novice)
+	_check(bool(_result(dispatcher, Commands.ENACT_POLICY, {"sectId": sect.id, "cardId": "jing_xin_dao_chang"})["success"]),
+		"夹具：颁行静心道场")
+	_check(is_equal_approx(PolicyRules.cultivation_bonus(state, _config, sect), 0.1), "静心道场 → 修炼加成 0.1")
+	var base_speed: float = float(_config["disciple"]["cultivation"]["baseSpeed"])
+	_check(is_equal_approx(DiscipleRules.cultivation_speed(state, _config, novice) - speed_before, base_speed * 0.1),
+		"静心道场落地：修炼速度 +baseSpeed × 0.1")
+
+	# 12.4 铁律军规「战力 +10%」→ compute_power × 1.1（1.0 同口径为乘法）。
+	var soldier: Disciple = _disciple(sect, 2)
+	soldier.heartDevil = 0
+	soldier.injured = false
+	var combat: Dictionary = _config["combat"]
+	var base_power: float = float(soldier.realmLevel) * float(combat["realmPowerWeight"]) \
+		+ float(soldier.rootGrade) * float(combat["rootGradePowerWeight"])
+	_check(bool(_result(dispatcher, Commands.ENACT_POLICY, {"sectId": sect.id, "cardId": "tie_lv_jun_gui"})["success"]),
+		"夹具：颁行铁律军规")
+	_check(is_equal_approx(PolicyRules.combat_bonus(state, _config, sect), 0.1), "铁律军规 → 战力加成 0.1")
+	_check(CombatResolver.compute_power(state, _config, soldier) == int(round(base_power * 1.1)),
+		"铁律军规落地：战力 = round(基础战力 × 1.1)")
+
+	# 12.5 政令整体关闭：三个乘区全部退回恒等元（`policy.enabled=false`）。
+	var off: Dictionary = _config.duplicate(true)
+	off["policy"]["enabled"] = false
+	_check(is_equal_approx(PolicyRules.output_multiplier(state, off, sect), 1.0), "政令关闭 → 灵力乘区 1.0")
+	_check(is_equal_approx(PolicyRules.cultivation_bonus(state, off, sect), 0.0), "政令关闭 → 修炼加成 0")
+	_check(is_equal_approx(PolicyRules.combat_bonus(state, off, sect), 0.0), "政令关闭 → 战力加成 0")
+
+
+# ---------------------------------------------------------------------------
+# 13. 任务节点标记 `missionNodeId`（1.0 `clearMissionIfLeft` / `withdrawGarrison` 口径）
+# ---------------------------------------------------------------------------
+
+## 为什么单独一组：R6 曾把 `missionNodeId` **设完立刻清空**（两处 `= ""`），使
+## `queryDiscipleDetail.missionNodeId/Name` 恒为空——字段存在但永远没有值，等于没做。
+## 这组钉住「探索后置位 → 离开节点清空 / 主动撤回清空」的完整生命周期。
+func _test_mission_marker() -> void:
+	var dispatcher: CommandDispatcher = _new_game("6091")
+	var state: GameState = dispatcher.state
+	var sect: Sect = _player(dispatcher)
+	var disciple: Disciple = _disciple(sect, 0)
+	disciple.rootGrade = 40
+	var node: GameNode = _inject_node(state, _capital(sect).tileId, Enums.NodeType.JI_YUAN)
+	_check(disciple.missionNodeId.is_empty(), "探索前 missionNodeId 为空")
+	var result: Dictionary = _result(dispatcher, Commands.SEND_TO_JI_YUAN, {"discipleId": disciple.id, "nodeId": node.id})
+	_check(bool(result["success"]), "夹具：机缘必定成功")
+	_check(disciple.missionNodeId == node.id, "探索后 missionNodeId = 节点 id（不再设完即清）")
+	var detail: Dictionary = _result(dispatcher, Commands.QUERY_DISCIPLE_DETAIL, {"discipleId": disciple.id})
+	_check(str(detail.get("missionNodeId", "")) == node.id, "queryDiscipleDetail.missionNodeId 有值")
+	_check(str(detail.get("missionNodeName", "")) == node.name, "queryDiscipleDetail.missionNodeName = 节点名")
+
+	# 走开 → 自动清空（1.0 `MoveAction.clearMissionIfLeft`）。逐个试邻居，山岳不可达则换一个。
+	var moved_ok: bool = false
+	for direction: Variant in Hex.DIRECTIONS:
+		var coords: Vector2i = Hex.coords(node.tileId)
+		var neighbor: String = Hex.id(coords.x + int(direction.x), coords.y + int(direction.y))
+		if not state.tiles.has(neighbor):
+			continue
+		disciple.movePoints = disciple.maxMovePoints
+		var moved: Dictionary = _result(dispatcher, Commands.MOVE_DISCIPLE, {"discipleId": disciple.id, "targetTileId": neighbor})
+		if bool(moved.get("success", false)):
+			moved_ok = true
+			break
+	_check(moved_ok, "夹具：存在可抵达的相邻地块")
+	_check(disciple.missionNodeId.is_empty(), "离开节点地块后 missionNodeId 自动清空")
+
+	# 主动撤回：另开一局，探索成功后原地 `withdrawGarrison` 也要能撤任务。
+	var second: CommandDispatcher = _new_game("6092")
+	var sect2: Sect = _player(second)
+	var disciple2: Disciple = _disciple(sect2, 0)
+	disciple2.rootGrade = 40
+	var node2: GameNode = _inject_node(second.state, _capital(sect2).tileId, Enums.NodeType.JI_YUAN)
+	_check(bool(_result(second, Commands.SEND_TO_JI_YUAN, {"discipleId": disciple2.id, "nodeId": node2.id})["success"]),
+		"夹具：第二局机缘成功")
+	var withdrawn: Dictionary = _result(second, Commands.WITHDRAW_GARRISON, {"discipleId": disciple2.id})
+	_check(bool(withdrawn.get("success", false)), "站在任务节点上的弟子可被 withdrawGarrison 撤回")
+	_check(str(withdrawn.get("message", "")).contains("撤回"), "撤回任务回中文提示")
+	_check(disciple2.missionNodeId.is_empty(), "撤回后 missionNodeId 清空")
 
 
 # ---------------------------------------------------------------------------

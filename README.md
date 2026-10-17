@@ -55,7 +55,7 @@ xiuxiangame2.0/
 ## 快速开始
 
 > **进度**：R0 工程骨架 ✅ 已完成（`d4c5bf7`）；R1 地图与开局 ✅ 已完成并通过验收（服务端 `R1_PASS checks=79458`）；R2 回合/移动/视野 ✅ 已完成（`6c5a232`）；R3 经济与城市 ✅ 已完成（`b036bb4` + 收尾 `e18db84`）；R4 道统与修炼 ✅ 已完成（服务端 `R4_PASS checks=174`、客户端 `R4_CLIENT_RESULT=OK checks=69`）；R3/R4 收尾已补实现**三流派特性**（`FactionRules`：宗门建造提速/副峰降价、家族血脉修炼加成/祖祠叠加、家族峰建造加价）；**R5 兵种与战斗 ✅ 已完成**（服务端 `R5_PASS checks=453`、客户端 `R5_CLIENT_RESULT=OK checks=95`、`tools/check.ps1` 19 阶段全绿）：十兵种 + 相克/地形防御/高台/河流 + 战斗预览与结算（`CombatResolver` 单一入口，预览=实战）+ ZOC/占格阻挡 + 传送 + 驻守 + 转职晋升 + 批量移动。**R5 未含探索那一半**（机缘/秘境属 R6）。
-> **R6 探索/政令/自动化 ✅ 已完成**（服务端 `R6_PASS checks=288`、客户端 `R6_CLIENT_RESULT=OK checks=59`、`tools/check.ps1` 21 阶段 **130/130** 全绿）：机缘（成功率 = 基础 + 灵根品级×系数 + 宗门加成，失败三分支 死亡/受伤/心魔）+ 秘境（扣灵石、人数上限、全员须站在节点格、富矿/灾祸/空手三态）+ 政令（3 政体 × 8 卡、时代与道法门控、槽位裁剪、切换冷却）+ 自动化（自动修缮/改良/修路 + 逐峰自动项目 + 立即探索 + 集结/回防）+ 回合回填（`TurnProcessor` 接自动化与政令结算）。**R5 遗留已全部回填**：`miJingExploredTotal` 可达 → 成就 `boost_first_mijing` 解锁；道点节奏复查完成。
+> **R6 探索/政令/自动化 ✅ 已完成**（服务端 `R6_PASS checks=317`、客户端 `R6_CLIENT_RESULT=OK checks=59`、`tools/check.ps1` 21 阶段 **130/130** 全绿）：机缘（成功率 = 基础 + 灵根品级×系数 + 宗门加成，失败三分支 死亡/受伤/心魔）+ 秘境（扣灵石、人数上限、全员须站在节点格、富矿/灾祸/空手三态）+ 政令（3 政体 × 8 卡、时代与道法门控、槽位裁剪、切换冷却）+ 自动化（自动修缮/改良/修路 + 逐峰自动项目 + 立即探索 + 集结/回防）+ 回合回填（`TurnProcessor` 接自动化与政令结算）。**R5 遗留已全部回填**：`miJingExploredTotal` 可达 → 成就 `boost_first_mijing` 解锁；道点节奏复查完成。
 > 里程碑进度、提示词与已知坑见 [`docs/prompts/README.md`](docs/prompts/README.md) §3。
 
 1. 安装 Godot 4.4.x（标准 GDScript 版即可，无需 .NET 版）；路径 `C:\Users\Administrator\godot\`。

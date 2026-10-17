@@ -167,6 +167,8 @@ static func send_to_ji_yuan(state: GameState, config: Dictionary, disciple_id: S
 	var cooldown: int = int(explore["jiYuanCooldownTurns"])
 	node.cooldown = cooldown
 	result["cooldown"] = cooldown
+	# 站在机缘上的弟子标记为「任务节点」：`queryDiscipleDetail.missionNodeId/Name` 由此有值，
+	# 离开该地块由 `MoveAction.clear_mission_if_left` 清除，也可用 `withdrawGarrison` 主动撤回。
 	disciple.missionNodeId = node.id
 	var success: bool = state.rng.next_float() < chance
 	if success:
@@ -212,7 +214,6 @@ static func send_to_ji_yuan(state: GameState, config: Dictionary, disciple_id: S
 			add_heart_devil(config, disciple, devil)
 			result["message"] = "%s 机缘探索失败, 一无所获, 心魔+%d" % [disciple.name, devil]
 			state.eventLog.append("[探索] %s" % str(result["message"]))
-	disciple.missionNodeId = ""
 	return result
 
 
@@ -319,8 +320,6 @@ static func explore_mi_jing(state: GameState, config: Dictionary, disciple_ids: 
 	else:
 		result["message"] = "秘境探索一无所获"
 		state.eventLog.append("[探索] %s" % str(result["message"]))
-	for entry: Variant in participants:
-		(entry as Disciple).missionNodeId = ""
 	return result
 
 
