@@ -348,14 +348,20 @@ try {
     $expectedFiles += $r7Files
     $r8Files = @(
         'client\scripts\world\Decorations.gd', 'client\scripts\world\Scenery.gd',
+        'client\scripts\world\Buildings.gd',
         'client\scripts\ui\ActionBar.gd', 'client\scripts\ui\Toast.gd',
         'client\scripts\ui\Minimap.gd', 'client\scripts\ui\SettingsPanel.gd',
         'client\scripts\ui\GuideOverlay.gd', 'client\scripts\ui\UiTheme.gd',
+        'client\scripts\ui\RatioBar.gd', 'client\scripts\ui\ScrollFrame.gd',
+        'client\scripts\ui\TurnSummary.gd', 'client\scripts\ui\DaoTreeCanvas.gd',
+        'client\scripts\ui\DaoTreePanel.gd', 'client\scripts\ui\SavesScreen.gd',
+        'client\scripts\ui\CombatScreen.gd', 'client\scripts\ui\VictoryScreen.gd',
         'client\tests\R8ClientTest.gd', 'client\tests\R8ClientTest.tscn',
         'client\tools\AssetGen.gd', 'client\tools\AssetGen.tscn',
         'client\tools\AssetVerify.gd', 'client\tools\AssetVerify.tscn',
         'client\tools\AssetPreview.gd', 'client\tools\AssetPreview.tscn',
         'client\tools\WorldShot.gd', 'client\tools\WorldShot.tscn',
+        'client\tools\BuildingShot.gd', 'client\tools\BuildingShot.tscn',
         'assets\manifest.json', 'assets\README.md'
     )
     $expectedFiles += $r8Files

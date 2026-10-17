@@ -71,6 +71,10 @@ var dao_info_label: Label = null
 var dao_list: VBoxContainer = null
 var dao_status_label: Label = null
 var dao_open: bool = false
+## 旧左侧列表的外层容器（**隐藏的断言镜像**，见 `_build_dao_panel()` 注释）。
+var dao_list_panel: PanelContainer = null
+## 全屏卷轴式道统树（对齐参考图「青云宗道法修行树」）。
+var dao_tree: DaoTreePanel = null
 ## 最近一次 view 里的 `daoOptions`（21 条，客户端零规则）。
 var dao_options: Array = []
 ## 最近一次 view 里的 `unlockedDaoIds`。
@@ -166,6 +170,12 @@ func _ready() -> void:
 	_build_r7_panels()
 	# R8：装饰层 / 底部操作栏 / 小地图 / 设置 / 引导 / 轻提示 / 69 命令入口登记。
 	_build_r8()
+	# 卷轴式全屏界面（对齐参考图）：回合结算 / 道统树 / 存档 / 战斗 / 胜利。
+	_build_turn_summary()
+	_build_dao_tree_screen()
+	_build_saves_screen()
+	_build_combat_screen()
+	_build_victory_screen()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -247,12 +257,18 @@ func _render(view: Dictionary) -> void:
 	_refresh_topbar()
 	_render_city_panel()
 	_render_dao_panel()
+	_refresh_dao_tree()
 	_render_queue_panel()
 	_render_combat_panel()
 	_render_unit_panel()
 	_render_explore_panel()
 	_render_policy_panel()
 	_render_automation_panel()
+	# 回合结算：先按本帧 view 维护资源快照，回合号变化时自动弹结算卷轴。
+	_track_turn_resources(view)
+	# 战斗 / 胜利结算界面若正开着，跟着 view 一起刷新（只读缓存，不发请求）。
+	_refresh_combat_screen()
+	_refresh_victory_screen()
 	_refresh_r8(view)
 
 
@@ -1311,6 +1327,11 @@ func _build_dao_panel() -> void:
 	style.content_margin_bottom = 10.0
 	panel.add_theme_stylebox_override("panel", style)
 	dao_panel.add_child(panel)
+	# 视觉由 `DaoTreePanel`（全屏卷轴）承载；此处保留的列表是**隐藏的断言镜像**：
+	# R4 自动验收依赖 `dao_list` 的 26 个节点、`Dao_<id>` 按钮名与 `dao_title_label` 文案，
+	# 故结构一字不动，仅把外层容器置为不可见（节点仍存在、仍可读取 disabled/text）。
+	dao_list_panel = panel
+	panel.visible = false
 
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
@@ -1360,12 +1381,15 @@ func open_dao_panel() -> void:
 	dao_open = true
 	dao_panel.visible = true
 	_render_dao_panel()
+	_show_dao_tree()
 
 
 func close_dao_panel() -> void:
 	dao_open = false
 	if dao_panel != null:
 		dao_panel.visible = false
+	if dao_tree != null:
+		dao_tree.hide_panel()
 	if city_panel != null:
 		city_panel.visible = true
 
@@ -1382,6 +1406,8 @@ func _close_r4_panels() -> void:
 	queue_open = false
 	if dao_panel != null:
 		dao_panel.visible = false
+	if dao_tree != null:
+		dao_tree.hide_panel()
 	if queue_panel != null:
 		queue_panel.visible = false
 
@@ -2515,6 +2541,7 @@ func _build_sidebar() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
 	layer.name = "Hud"
 	add_child(layer)
+	hud_layer = layer
 
 	# 右侧「地块卡」：参考图的灵脉山面板——宣纸卡片 + 细金边，上缘留出顶栏高度。
 	var panel: PanelContainer = PanelContainer.new()
@@ -3249,6 +3276,12 @@ func _build_r7_panels() -> void:
 	saves_info_label = saves_parts[2] as Label
 	saves_list = saves_parts[3] as VBoxContainer
 	saves_status_label = saves_parts[4] as Label
+	# 视觉由 `SavesScreen`（全屏卷轴）承载；此处保留**隐藏的断言镜像**：
+	# R7 自动验收读 `saves_info_label`（含「槽 0」）与 `Save_%d`/`Load_%d` 按钮，
+	# 故结构一字不动，仅把外层容器置为不可见（节点仍存在、仍可读取 text/disabled）。
+	var legacy_saves_panel: PanelContainer = saves_panel.get_child(0) as PanelContainer
+	if legacy_saves_panel != null:
+		legacy_saves_panel.visible = false
 
 	var gameover_parts: Array = _make_r6_panel("GameOverPanel", "结局")
 	gameover_panel = gameover_parts[0] as CanvasLayer
@@ -3366,6 +3399,7 @@ func _on_victory_progress_received(result: Dictionary) -> void:
 	_render_victory_panel()
 	# 左上目标卡片与胜负面板同源（`routes[].goals[]`），一并刷新。
 	_render_objectives()
+	_refresh_victory_screen()
 
 
 ## `queryVictoryChoice` 回包：待决时把路线并进结局屏展示。
@@ -3469,6 +3503,7 @@ func open_saves_panel() -> void:
 	saves_open = true
 	saves_status_label.text = ""
 	_render_saves_panel()
+	_show_saves_screen()
 	Session.request_list_saves()
 
 
@@ -3476,11 +3511,14 @@ func close_saves_panel() -> void:
 	saves_open = false
 	_sync_r7_visibility()
 	_render_saves_panel()
+	if saves_screen != null:
+		saves_screen.hide_screen()
 
 
 func _on_saves_received(result: Dictionary) -> void:
 	saves_data = result
 	_render_saves_panel()
+	_show_saves_screen()
 
 
 func _saves_by_slot() -> Dictionary:
@@ -4079,6 +4117,8 @@ func _register_r8_commands() -> void:
 		func() -> void: toggle_minimap(), "View")
 	action_bar.add_plain("引导", "重新查看新手引导（快捷键 F1）",
 		func() -> void: guide_overlay.open_panel(), "View")
+	action_bar.add_plain("结算", "打开回合结算卷轴（资源收支 / 重要事件 / 事件时间线）",
+		func() -> void: open_turn_summary(), "View")
 
 	# ③ 面板入口（打开对应面板，真正的命令按钮在面板内）
 	action_bar.add_group("Panel")
@@ -4096,6 +4136,10 @@ func _register_r8_commands() -> void:
 		func() -> void: open_saves_panel(), "Panel")
 	action_bar.add_plain("结局", "打开结局屏（queryGameOver / checkVictory / checkDefeat）",
 		func() -> void: open_gameover_panel(), "Panel")
+	action_bar.add_plain("战斗", "战斗界面（胜负条件 / 胜率预估 / 地形加成 / 五枚动作钮）",
+		func() -> void: open_combat_screen(), "Panel")
+	action_bar.add_plain("凯旋", "胜利结算界面（三路线 + 最终结算 12 项）",
+		func() -> void: open_victory_screen(), "Panel")
 
 	# ④ 面板内按钮型命令
 	var panel_entries: Dictionary = {
@@ -4548,3 +4592,762 @@ func guide_title_text() -> String:
 
 func sun_energy() -> float:
 	return 0.0 if decorations == null else decorations.sun_energy()
+
+
+# ---------------------------------------------------------------------------
+# 回合结算界面（对齐参考图「仙门回合结算：青云宗崛起」）
+# ---------------------------------------------------------------------------
+
+## 结算卷轴（`TurnSummary`）。
+var turn_summary: TurnSummary = null
+## 本回合开始时（该 turn 的第一帧 view）的玩家资源快照。
+var _turn_open_resources: Dictionary = {}
+## 快照对应的回合号；-1 表示尚未取到基线。
+var _turn_open_turn: int = -1
+## 最近一次回合切换算出的资源增减行。
+var _last_turn_delta: Array = []
+## 上述增减行对应的回合号。
+var _last_delta_turn: int = 0
+## 已自动弹过结算的回合号（保证每个回合只自动弹一次）。
+var _summary_auto_turn: int = -1
+
+
+func _build_turn_summary() -> void:
+	turn_summary = TurnSummary.new()
+	turn_summary.setup(Session.assets)
+	add_child(turn_summary)
+
+
+## 取玩家本宗 13 项资源的扁平快照（**只读 view，不做任何推导**）。
+func _player_resources(view: Dictionary) -> Dictionary:
+	for sect_entry: Variant in view.get("sects", []):
+		var sect: Dictionary = sect_entry
+		if not bool(sect.get("player", false)):
+			continue
+		var resources: Dictionary = sect.get("resources", {})
+		var out: Dictionary = {}
+		for key: String in R8_RESOURCE_KEYS:
+			if key.contains("."):
+				var parts: PackedStringArray = key.split(".")
+				var bucket: Dictionary = resources.get(parts[0], {})
+				out[key] = int(bucket.get(parts[1], 0))
+			else:
+				out[key] = int(resources.get(key, 0))
+		return out
+	return {}
+
+
+## 每次 view 刷新都调用：维护「本回合开局快照」，并在回合号变化时结算出增减。
+##
+## 为什么在客户端算：服务端 2.0 不下发回合结算报告（`finishTurn` 只回 view），
+## 而 R8 起定下的口径是「服务端零改动」。这里只是把两帧 view 里同一字段相减，
+## 属于**算术**而非规则推导——产出一律来自服务端下发过的数值。
+func _track_turn_resources(view: Dictionary) -> void:
+	var meta: Dictionary = view.get("metadata", {})
+	var turn: int = int(meta.get("turn", view.get("turn", 0)))
+	var current: Dictionary = _player_resources(view)
+	if current.is_empty():
+		return
+	if _turn_open_turn < 0:
+		_turn_open_turn = turn
+		_turn_open_resources = current.duplicate()
+		return
+	if turn == _turn_open_turn:
+		return
+	_last_turn_delta = _diff_resources(_turn_open_resources, current)
+	_last_delta_turn = _turn_open_turn
+	_turn_open_turn = turn
+	_turn_open_resources = current.duplicate()
+	if _summary_auto_turn != turn:
+		_summary_auto_turn = turn
+		open_turn_summary()
+
+
+## 两帧资源快照相减，返回 `[{key,label,delta}]`（只保留有变化的项）。
+func _diff_resources(before: Dictionary, after: Dictionary) -> Array:
+	var rows: Array = []
+	for key: String in R8_RESOURCE_KEYS:
+		var delta: int = int(after.get(key, 0)) - int(before.get(key, 0))
+		if delta == 0:
+			continue
+		rows.append({"key": key, "label": str(R8_RESOURCE_LABELS.get(key, key)), "delta": delta})
+	return rows
+
+
+## 事件文案 → 卡片类目（只做关键词归类，不改写原文）。
+static func _event_category(text: String) -> Dictionary:
+	if text.contains("突破") or text.contains("修炼") or text.contains("境界"):
+		return {"title": "弟子突破", "glyph": "仙"}
+	if text.contains("战") or text.contains("攻") or text.contains("击退"):
+		return {"title": "战报", "glyph": "剑"}
+	if text.contains("发现") or text.contains("探索") or text.contains("秘境"):
+		return {"title": "新发现", "glyph": "山"}
+	if text.contains("建") or text.contains("落成") or text.contains("完工"):
+		return {"title": "建筑完成", "glyph": "殿"}
+	if text.contains("移") or text.contains("行") or text.contains("抵达"):
+		return {"title": "行军", "glyph": "行"}
+	if text.contains("覆灭") or text.contains("败") or text.contains("陨"):
+		return {"title": "凶讯", "glyph": "殁"}
+	return {"title": "宗门要闻", "glyph": "书"}
+
+
+## 组装并显示结算卷轴。`delta_rows` 为空时按「首回合无基线」处理。
+func open_turn_summary() -> void:
+	if turn_summary == null:
+		return
+	var view: Dictionary = Session.current_view
+	var meta: Dictionary = view.get("metadata", {})
+	var turn: int = int(meta.get("turn", view.get("turn", 0)))
+	var phase: String = str(meta.get("phase", view.get("phase", "")))
+	var season: String = "春"
+	if not SEASON_NAMES.is_empty():
+		season = SEASON_NAMES[maxi(turn - 1, 0) % SEASON_NAMES.size()]
+	var heading: String = "第 %d 回合 · %s · %s" % [
+		turn, season, str(PHASE_LABELS.get(phase, phase))]
+
+	var rows: Array = _last_turn_delta.duplicate()
+	var net: int = 0
+	for entry: Variant in rows:
+		net += int((entry as Dictionary).get("delta", 0))
+
+	# 事件：取最近 4 条（`event_lines` 由 `Session.events_received` 累积，纯文案）。
+	var events: Array = []
+	var timeline: Array = []
+	var start: int = maxi(event_lines.size() - 4, 0)
+	for index: int in range(start, event_lines.size()):
+		var text: String = event_lines[index]
+		var category: Dictionary = _event_category(text)
+		events.append({
+			"id": str(index),
+			"title": str(category["title"]),
+			"glyph": str(category["glyph"]),
+			"detail": text,
+			"fresh": index == event_lines.size() - 1,
+		})
+		timeline.append({
+			"stamp": "第 %d 回合" % turn,
+			"text": text,
+			"glyph": str(category["glyph"]),
+		})
+	if events.is_empty():
+		timeline.append({"stamp": "第 %d 回合" % turn, "text": "本回合结算完成", "glyph": "◆"})
+
+	turn_summary.show_summary({
+		"heading": heading,
+		"resources": rows,
+		"net": net,
+		"hasBaseline": not rows.is_empty(),
+		"events": events,
+		"timeline": timeline,
+	})
+
+
+func close_turn_summary() -> void:
+	if turn_summary != null:
+		turn_summary.hide_summary()
+
+
+# --- 供自动验收断言 ---
+
+func turn_summary_visible() -> bool:
+	return turn_summary != null and turn_summary.visible
+
+
+func turn_summary_delta_count() -> int:
+	return _last_turn_delta.size()
+
+
+func turn_summary_net() -> int:
+	var net: int = 0
+	for entry: Variant in _last_turn_delta:
+		net += int((entry as Dictionary).get("delta", 0))
+	return net
+
+
+func turn_summary_heading() -> String:
+	if turn_summary == null or turn_summary.title_label == null:
+		return ""
+	return turn_summary.title_label.text
+
+
+# ---------------------------------------------------------------------------
+# 道统树界面（对齐参考图「青云宗道法修行树」）
+# ---------------------------------------------------------------------------
+
+## 灵根代码 → 单字（键取自 `gameConfig.setup.rootTypes`，此处仅做文案映射）。
+const ROOT_NAMES: Dictionary = {
+	"JIN": "金", "MU": "木", "SHUI": "水", "HUO": "火",
+	"TU": "土", "FENG": "风", "LEI": "雷", "ZA": "杂",
+}
+
+## `data/gameConfig.json` 只读缓存（仅用于取 `progressCapPerRealm` 这一处显示上限）。
+static var _config_cache: Dictionary = {}
+
+
+func _build_dao_tree_screen() -> void:
+	dao_tree = DaoTreePanel.new()
+	dao_tree.setup()
+	dao_tree.research_requested.connect(_on_dao_tree_research)
+	add_child(dao_tree)
+
+
+## 卷轴里的「研究此道法」→ 与旧列表走同一条写命令（R4 断言仍读 `dao_status_label` 回显）。
+func _on_dao_tree_research(dao_id: String) -> void:
+	var sect_id: String = player_sect_id()
+	if sect_id.is_empty() or dao_id.is_empty():
+		return
+	Session.request_research_dao(sect_id, dao_id)
+
+
+func _show_dao_tree() -> void:
+	if dao_tree == null:
+		return
+	dao_tree.show_tree(_dao_tree_data())
+
+
+## view 刷新后同步（仅当卷轴正在显示；隐藏时不做无用功）。
+func _refresh_dao_tree() -> void:
+	if dao_tree == null or not dao_tree.visible:
+		return
+	dao_tree.show_tree(_dao_tree_data())
+
+
+## 组装道统树全部数据：道法条目 / 已解锁 / 弟子 / 灵根 / 突破 / 研究队列。
+## 每一项都直接取自 view 或既有缓存，客户端不做任何规则推导。
+func _dao_tree_data() -> Dictionary:
+	var sect: Dictionary = _player_sect_view()
+	var disciples: Array = sect.get("disciples", [])
+	return {
+		"entries": dao_options,
+		"unlocked": unlocked_dao_ids,
+		"disciple": _featured_disciple(disciples),
+		"roots": _root_tally(disciples),
+		"breaks": _break_log(),
+		"queue": _research_queue_rows(),
+	}
+
+
+## 己方宗门字典（只读 view）。
+func _player_sect_view() -> Dictionary:
+	for entry: Variant in Session.current_view.get("sects", []):
+		var sect: Dictionary = entry
+		if bool(sect.get("player", false)):
+			return sect
+	return {}
+
+
+## 取「修为进度最接近突破」的弟子作为右栏主角（同值取先出现者，保证确定性）。
+func _featured_disciple(disciples: Array) -> Dictionary:
+	var best: Dictionary = {}
+	var best_ratio: float = -1.0
+	for entry: Variant in disciples:
+		var disciple: Dictionary = entry
+		var ratio: float = _cultivation_ratio(disciple)
+		if ratio > best_ratio:
+			best_ratio = ratio
+			best = disciple
+	if best.is_empty():
+		return {}
+	var realm: String = str(best.get("realm", ""))
+	var cap: float = _cultivation_cap(realm)
+	var progress: float = float(best.get("cultivationProgress", 0.0))
+	var progress_text: String = "修为 %d" % int(roundf(progress))
+	if cap > 0.0:
+		progress_text = "修为 %d / %d" % [int(roundf(progress)), int(roundf(cap))]
+	var roots: PackedStringArray = PackedStringArray()
+	for root: Variant in best.get("spiritRoots", []):
+		roots.append(str(ROOT_NAMES.get(str(root), str(root))))
+	var rows: Array = [
+		["灵根", "·".join(roots) if roots.size() > 0 else "—"],
+		["品阶", "%d 品" % int(best.get("rootGrade", 0))],
+		["心魔", "%d" % int(best.get("heartDevil", 0))],
+		["伤势", "受伤" if bool(best.get("injured", false)) else "无恙"],
+		["入门", "%d 回合" % int(best.get("turnsInSect", 0))],
+		["战阶", "%d" % int(best.get("battleLevel", 0))],
+	]
+	return {
+		"name": str(best.get("name", "")),
+		"realmLabel": str(Enums.Realm.NAMES.get(realm, realm)),
+		"progressRatio": best_ratio,
+		"progressText": progress_text,
+		"rows": rows,
+	}
+
+
+## 修为进度比例 = cultivationProgress / progressCapPerRealm[realm]（上限缺失则 0）。
+func _cultivation_ratio(disciple: Dictionary) -> float:
+	var cap: float = _cultivation_cap(str(disciple.get("realm", "")))
+	if cap <= 0.0:
+		return 0.0
+	return clampf(float(disciple.get("cultivationProgress", 0.0)) / cap, 0.0, 1.0)
+
+
+## 读配置里的单境界修为上限（**只读一个数字，不重算任何规则**）。
+func _cultivation_cap(realm: String) -> float:
+	if _config_cache.is_empty():
+		var path: String = Launcher.default_data_path()
+		if FileAccess.file_exists(path):
+			var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+			if file != null:
+				var parsed: Variant = JSON.parse_string(file.get_as_text())
+				file.close()
+				if parsed is Dictionary:
+					_config_cache = parsed
+	if _config_cache.is_empty():
+		return 0.0
+	var disciple_config: Dictionary = _config_cache.get("disciple", {})
+	var cultivation: Dictionary = disciple_config.get("cultivation", {})
+	var caps: Dictionary = cultivation.get("progressCapPerRealm", {})
+	return float(caps.get(realm, 0.0))
+
+
+## 灵根排行：按弟子 `spiritRoots[]` 逐条计数（同一条多灵根各计一次）。
+func _root_tally(disciples: Array) -> Array:
+	var counts: Dictionary = {}
+	for entry: Variant in disciples:
+		for root: Variant in (entry as Dictionary).get("spiritRoots", []):
+			var key: String = str(root)
+			counts[key] = int(counts.get(key, 0)) + 1
+	var keys: Array[String] = []
+	for key: Variant in counts.keys():
+		keys.append(str(key))
+	keys.sort()
+	var rows: Array = []
+	for key: String in keys:
+		rows.append({"key": key, "label": str(ROOT_NAMES.get(key, key)), "count": int(counts[key])})
+	return rows
+
+
+## 突破记录：从真实事件文案里筛「突破」，取最近 3 条（不造历史）。
+func _break_log() -> Array:
+	var rows: Array = []
+	for index: int in range(event_lines.size() - 1, -1, -1):
+		var text: String = event_lines[index]
+		if not text.contains("突破"):
+			continue
+		rows.append({"text": text})
+		if rows.size() >= 3:
+			break
+	return rows
+
+
+## 研究队列行（`researchQueue[]` 属宗门，取自 `queryProjectQueue` 回包缓存）。
+func _research_queue_rows() -> Array:
+	var rows: Array = []
+	for entry: Variant in project_queue.get("researchQueue", []):
+		var item: Dictionary = entry
+		var dao_id: String = str(item.get("id", ""))
+		rows.append({
+			"id": dao_id,
+			"name": _dao_name(dao_id),
+			"turnsRemaining": int(item.get("turnsRemaining", 0)),
+			"turnsRequired": int(item.get("turnsRequired", 0)),
+		})
+	return rows
+
+
+# --- 供自动验收断言 ---
+
+func dao_tree_visible() -> bool:
+	return dao_tree != null and dao_tree.visible
+
+
+func dao_tree_node_count() -> int:
+	return 0 if dao_tree == null else dao_tree.tree_node_count()
+
+
+func dao_tree_depth_count() -> int:
+	return 0 if dao_tree == null else dao_tree.depth_count()
+
+
+# ---------------------------------------------------------------------------
+# 存档 / 战斗 / 胜利结算三个全屏界面（对齐参考图）
+# ---------------------------------------------------------------------------
+
+## 全屏存档卷轴（`SavesScreen`）。
+var saves_screen: SavesScreen = null
+## 战斗界面（`CombatScreen`，叠加在战场之上）。
+var combat_screen: CombatScreen = null
+## 胜利结算界面（`VictoryScreen`）。
+var victory_screen: VictoryScreen = null
+## 战斗界面是否由玩家显式打开（关闭后不再随 view 刷新自动弹）。
+var combat_screen_open: bool = false
+## 右侧 HUD 层（地块卡 / 事件 / 目标）。战斗界面打开时整体让位，关闭后恢复。
+var hud_layer: CanvasLayer = null
+## 战斗界面打开前，各 HUD 面板的可见性快照（关闭时原样还原）。
+var _combat_hud_snapshot: Dictionary = {}
+## 势力流派代码 → 显示名（`Enums.FactionType` 未提供 NAMES，此处仅做文案映射）。
+const FACTION_LABELS: Dictionary = {"ZONG_MEN": "宗门", "JIA_ZU": "家族", "GUO_JIA": "国家"}
+
+
+func _build_saves_screen() -> void:
+	saves_screen = SavesScreen.new()
+	saves_screen.setup()
+	saves_screen.load_requested.connect(_on_saves_screen_load)
+	saves_screen.save_requested.connect(_on_saves_screen_save)
+	saves_screen.refresh_requested.connect(func() -> void: Session.request_list_saves())
+	add_child(saves_screen)
+
+
+func _build_combat_screen() -> void:
+	combat_screen = CombatScreen.new()
+	combat_screen.setup()
+	combat_screen.action_pressed.connect(_on_combat_action)
+	combat_screen.close_requested.connect(func() -> void: close_combat_screen())
+	add_child(combat_screen)
+
+
+func _build_victory_screen() -> void:
+	victory_screen = VictoryScreen.new()
+	victory_screen.setup()
+	victory_screen.restart_requested.connect(func() -> void:
+		close_victory_screen()
+		get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	victory_screen.map_requested.connect(func() -> void: close_victory_screen())
+	victory_screen.saves_requested.connect(func() -> void:
+		close_victory_screen()
+		open_saves_panel())
+	add_child(victory_screen)
+
+
+# --- 存档 ---
+
+func _show_saves_screen() -> void:
+	if saves_screen == null or not saves_open:
+		return
+	saves_screen.show_saves(saves_data.get("saves", []))
+
+
+func _on_saves_screen_load(slot: int) -> void:
+	saves_screen.set_status("读取槽 %d …" % slot)
+	Session.request_load_game(slot)
+
+
+func _on_saves_screen_save(slot: int) -> void:
+	saves_screen.set_status("写入槽 %d …" % slot)
+	Session.request_save_game(slot)
+
+
+# --- 战斗 ---
+
+func open_combat_screen() -> void:
+	if combat_screen == null:
+		return
+	combat_screen_open = true
+	# 战斗界面自带「胜负条件 / 部队 / 胜率 / 地形 / 单位卡」，与常驻 HUD 同区域，
+	# 故打开时把常驻 HUD 与左侧城市面板整体让位，关闭时原样还原（不改任何面板内部状态）。
+	_combat_hud_snapshot.clear()
+	for node: Node in [hud_layer, city_panel, unit_panel]:
+		if node == null:
+			continue
+		var control: CanvasLayer = node as CanvasLayer
+		_combat_hud_snapshot[control.name] = control.visible
+		control.visible = false
+	combat_screen.show_combat(_combat_data())
+
+
+func close_combat_screen() -> void:
+	combat_screen_open = false
+	if combat_screen != null:
+		combat_screen.hide_screen()
+	for key: Variant in _combat_hud_snapshot.keys():
+		var control: CanvasLayer = get_node_or_null(NodePath(str(key))) as CanvasLayer
+		if control != null:
+			control.visible = bool(_combat_hud_snapshot[key])
+	_combat_hud_snapshot.clear()
+	# 单位面板的可见性由 `_render_unit_panel` 决定，还原后重算一次避免残留。
+	_render_unit_panel()
+
+
+func _refresh_combat_screen() -> void:
+	if combat_screen == null or not combat_screen.visible:
+		return
+	combat_screen.show_combat(_combat_data())
+
+
+## 五枚圆钮 → 既有真实入口（不做任何新规则）。
+func _on_combat_action(key: String) -> void:
+	match key:
+		"move":
+			if not selected_disciple_id.is_empty():
+				Session.request_query_move_range(selected_disciple_id)
+		"attack":
+			if not selected_disciple_id.is_empty():
+				Session.request_query_attackable(selected_disciple_id)
+		"dao":
+			close_combat_screen()
+			open_dao_panel()
+		"retreat":
+			close_combat_screen()
+			_begin_retreat()
+		"wait":
+			pass
+
+
+## 组装战斗界面数据：胜负条件读配置、部队/胜率/射程读预览回包、地形读 warfare 系数。
+func _combat_data() -> Dictionary:
+	var view: Dictionary = Session.current_view
+	var meta: Dictionary = view.get("metadata", {})
+	var turn: int = int(meta.get("turn", view.get("turn", 0)))
+	var sect: Dictionary = _player_sect_view()
+	var faction: String = str(sect.get("factionType", ""))
+	var disciple: Dictionary = _find_disciple(selected_disciple_id)
+	var preview: Dictionary = attack_preview
+	var has_preview: bool = not preview.is_empty() and str(preview.get("blockedReason", "")).is_empty()
+	var attacker_power: int = int(preview.get("attackerPower", 0))
+	var defender_power: int = int(preview.get("defenderPower", 0))
+	var total_power: int = maxi(attacker_power + defender_power, 1)
+
+	var troop: Dictionary = {}
+	var unit: Dictionary = {}
+	if not disciple.is_empty():
+		var sect_name: String = str(sect.get("name", ""))
+		var class_name_text: String = _unit_class_label(str(disciple.get("unitClass", "")))
+		var realm_label: String = str(Enums.Realm.NAMES.get(str(disciple.get("realm", "")),
+			str(disciple.get("realm", ""))))
+		var power_text: String = "—"
+		var power_ratio: float = 0.0
+		if has_preview:
+			power_text = "%d / %d" % [attacker_power, attacker_power + defender_power]
+			power_ratio = float(attacker_power) / float(total_power)
+		troop = {
+			"sectName": sect_name,
+			"title": "%s部队" % class_name_text,
+			"powerRatio": power_ratio,
+			"powerText": power_text,
+			"stats": [
+				["兵", "战力", "%d" % attacker_power if has_preview else "—"],
+				["行", "移动", "%d / %d" % [
+					int(disciple.get("movePoints", 0)), int(disciple.get("maxMovePoints", 0))]],
+				["弓", "射程", "%d" % attack_range if attack_range > 0 else "—"],
+				["刃", "攻击次数", "%d" % int(disciple.get("attacksRemaining", 0))],
+			],
+		}
+		unit = {
+			"name": str(disciple.get("name", "")),
+			"sectName": sect_name,
+			"className": class_name_text,
+			"realmLabel": realm_label,
+			"powerRatio": power_ratio,
+			"powerText": power_text,
+			"stats": [
+				["兵", "%d" % attacker_power if has_preview else "—"],
+				["行", "%d" % int(disciple.get("movePoints", 0))],
+				["弓", "%d" % attack_range if attack_range > 0 else "—"],
+				["刃", "%d" % int(disciple.get("attacksRemaining", 0))],
+				["星", "%d" % int(disciple.get("battleLevel", 0))],
+			],
+		}
+
+	var odds: Dictionary = {"known": false, "chance": 0.0,
+		"note": "选中弟子并指向可攻击格后显示"}
+	if has_preview:
+		var chance: float = float(preview.get("winChance", 0.0))
+		odds = {
+			"known": true,
+			"chance": chance,
+			"note": "%s · 相克 ×%.2f · 反击 %d" % [
+				"我方优势" if chance >= 0.5 else "敌方占优",
+				float(preview.get("counterMultiplier", 1.0)),
+				int(preview.get("retaliationPower", 0)),
+			],
+		}
+
+	return {
+		"heading": "第 %d 回合 · 我方行动" % turn,
+		"victory": _victory_conditions(faction),
+		"defeat": _defeat_conditions(faction),
+		"troop": troop,
+		"unit": unit,
+		"odds": odds,
+		"terrain": _terrain_bonus_rows(),
+	}
+
+
+## 胜利条件：直接读 `gameConfig.victory.<faction>` 的阈值（与 VictoryRules 同源）。
+func _victory_conditions(faction: String) -> Array:
+	var victory: Dictionary = _game_config().get("victory", {})
+	match faction:
+		"JIA_ZU":
+			var jia: Dictionary = victory.get("jiaZu", {})
+			return [
+				"化神飞升 %d 人" % int(jia.get("ascensionCount", 0)),
+				"血脉族人 ≥ %d 人" % int(jia.get("minClanMembers", 0)),
+				"元婴以上 ≥ %d 人" % int(jia.get("minHighRealmMembers", 0)),
+			]
+		"GUO_JIA":
+			var guo: Dictionary = victory.get("guoJia", {})
+			return [
+				"王土份额 ≥ %.0f%%" % (float(guo.get("claimedTileRatio", 0.0)) * 100.0),
+				"控制地块 ≥ %d 格" % int(guo.get("minControlledTiles", 0)),
+				"灵峰 ≥ %d 座" % int(guo.get("minPeaks", 0)),
+			]
+	var zong: Dictionary = victory.get("zongMen", {})
+	return [
+		"主干道统完成度 100%",
+		"核心道法齐备 %d 种" % (zong.get("coreDaoIds", []) as Array).size(),
+		"势力等级 ≥ %d 级" % int(zong.get("powerLevel", 0)),
+		"道场灵峰 ≥ %d 座" % int(zong.get("minPeaks", 0)),
+	]
+
+
+## 失败条件：与 `VictoryRules.check_defeat` 的判定项逐条对应。
+func _defeat_conditions(faction: String) -> Array:
+	var rows: Array = ["门下尽墨（弟子全灭）", "灵峰尽失（无立足之地）"]
+	if faction == "ZONG_MEN":
+		rows.append("宗主陨落且无金丹以上继承人")
+	rows.append("回合上限 %d" % int(_game_config().get("victory", {}).get("maxTurns", 0)))
+	return rows
+
+
+## 地形加成：`gameConfig.warfare` 的四个系数，纯展示。
+func _terrain_bonus_rows() -> Array:
+	var warfare: Dictionary = _game_config().get("warfare", {})
+	var terrain_defense: Dictionary = warfare.get("terrainDefenseBonus", {})
+	return [
+		{"label": "高地", "ratio": float(warfare.get("highGroundBonus", 0.0)), "note": "伤害"},
+		{"label": "河流", "ratio": -float(warfare.get("riverCrossPenalty", 0.0)), "note": "移动"},
+		{"label": "险地", "ratio": float(terrain_defense.get("险地", 0.0)), "note": "防御"},
+		{"label": "驻防", "ratio": float(warfare.get("garrisonDefenseBonus", 0.0)), "note": "防御"},
+	]
+
+
+## 只读 `data/gameConfig.json`（显示用常量；与 `_cultivation_cap` 共用同一份缓存）。
+func _game_config() -> Dictionary:
+	if _config_cache.is_empty():
+		var path: String = Launcher.default_data_path()
+		if FileAccess.file_exists(path):
+			var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+			if file != null:
+				var parsed: Variant = JSON.parse_string(file.get_as_text())
+				file.close()
+				if parsed is Dictionary:
+					_config_cache = parsed
+	return _config_cache
+
+
+# --- 胜利结算 ---
+
+func open_victory_screen() -> void:
+	if victory_screen == null:
+		return
+	# 先拉一次三路线进度（只读命令），回包到达后 `_on_victory_progress_received` 会再刷新。
+	Session.request_query_victory_progress(player_sect_id())
+	victory_screen.show_victory(_victory_data())
+
+
+func close_victory_screen() -> void:
+	if victory_screen != null:
+		victory_screen.hide_screen()
+
+
+func _refresh_victory_screen() -> void:
+	if victory_screen == null or not victory_screen.visible:
+		return
+	victory_screen.show_victory(_victory_data())
+
+
+## 组装胜利结算数据：三路线读 `victory_progress`，12 项读玩家宗门 view。
+func _victory_data() -> Dictionary:
+	var view: Dictionary = Session.current_view
+	var meta: Dictionary = view.get("metadata", {})
+	var turn: int = int(meta.get("turn", view.get("turn", 0)))
+	var sect: Dictionary = _player_sect_view()
+	var faction: String = str(sect.get("factionType", ""))
+	var max_turns: int = int(_game_config().get("victory", {}).get("maxTurns", 0))
+
+	var routes: Dictionary = {}
+	var score_value: int = 0
+	var has_score: bool = false
+	for entry: Variant in victory_progress.get("routes", []):
+		var route: Dictionary = entry
+		routes[str(route.get("route", ""))] = route
+		if str(route.get("route", "")) == "SCORE" and route.get("score") != null:
+			score_value = int(route.get("score", 0))
+			has_score = true
+
+	var disciples: Array = sect.get("disciples", [])
+	var cultivation_total: float = 0.0
+	for entry: Variant in disciples:
+		cultivation_total += float((entry as Dictionary).get("cultivationProgress", 0.0))
+	var resources: Dictionary = sect.get("resources", {})
+	var unlocked: Array = sect.get("unlockedDaoIds", [])
+	var all_daos: Array = sect.get("daoOptions", [])
+
+	var rows: Array = [
+		["总计分数", "%d" % score_value if has_score else "—", "分"],
+		["势力等级", "%d 级" % int(sect.get("powerLevel", 0)), "级"],
+		["领地数量", "%d 格" % _owned_tile_count(sect), "疆"],
+		["弟子总数", "%d 人" % disciples.size(), "众"],
+		["道法解锁", "%d / %d" % [unlocked.size(), all_daos.size()], "诀"],
+		["修为总量", "%d" % int(roundf(cultivation_total)), "修"],
+		["灵峰数量", "%d 座" % (sect.get("spiritPeaks", []) as Array).size(), "峰"],
+		["灵石", "%d" % int(resources.get("spiritStones", 0)), "石"],
+		["灵力", "%d" % int(resources.get("spiritPower", 0)), "灵"],
+		["道点", "%d" % int(resources.get("daoPoints", 0)), "点"],
+		["游戏回合", "%d / %d" % [turn, max_turns], "轮"],
+		["势力流派", str(FACTION_LABELS.get(faction, faction)), "派"],
+	]
+
+	var win_type: String = str(gameover_state.get("winType", ""))
+	var chapter: String = "第 %d 章 · 终焉之战" % maxi(turn, 1)
+	return {
+		"chapter": chapter,
+		"chapterNote": "终局 · 仙途长明",
+		"routes": routes,
+		"activeRoute": faction,
+		"rows": rows,
+		"footer": "仙路漫漫，终得大道" if win_type.is_empty() else "终局：%s" % win_type,
+	}
+
+
+## 玩家名下地块数（`view.tiles` 是 `{tileId: tile}` 字典，直接数 `ownerSectId`，不做规则推导）。
+func _owned_tile_count(sect: Dictionary) -> int:
+	var sect_id: String = str(sect.get("id", ""))
+	if sect_id.is_empty():
+		return 0
+	var count: int = 0
+	var tiles: Dictionary = Session.current_view.get("tiles", {})
+	for tile_id: Variant in tiles.keys():
+		var tile: Dictionary = tiles[tile_id]
+		if str(tile.get("ownerSectId", "")) == sect_id:
+			count += 1
+	return count
+
+
+# --- 供自动验收断言 ---
+
+func saves_screen_visible() -> bool:
+	return saves_screen != null and saves_screen.visible
+
+
+func saves_screen_slot_count() -> int:
+	return 0 if saves_screen == null else saves_screen.slot_card_count()
+
+
+func combat_screen_visible() -> bool:
+	return combat_screen != null and combat_screen.visible
+
+
+func combat_action_count() -> int:
+	return 0 if combat_screen == null else combat_screen.action_button_count()
+
+
+func combat_terrain_count() -> int:
+	return 0 if combat_screen == null else combat_screen.terrain_row_count()
+
+
+func combat_odds_text() -> String:
+	return "" if combat_screen == null else combat_screen.odds_text()
+
+
+func victory_screen_visible() -> bool:
+	return victory_screen != null and victory_screen.visible
+
+
+func victory_screen_row_count() -> int:
+	return 0 if victory_screen == null else victory_screen.row_count()
+
+
+func victory_screen_route_count() -> int:
+	return 0 if victory_screen == null else victory_screen.route_emblem_count()
