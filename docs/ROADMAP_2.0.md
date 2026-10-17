@@ -61,7 +61,8 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 | 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command`；**R5 新增**：12 条 `request_*` 包装 + 5 个信号（`attackPreview`/`attackable`/`teleportOptions`/`discipleDetail`/`r5Result`）+ `_is_r5_command`；**R6 新增**：16 条 `request_*` 包装 + 5 个信号（`ji_yuan_info_received`/`mi_jing_info_received`/`policy_options_received`/`automation_state_received`/`r6_result_received`）+ `_is_r6_command`；**点选弟子改为三段串行链**（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），因 `_request` 是单请求语义、并发会被静默丢弃；**R7 新增**：14 条 `request_*` 包装 + 6 个信号（`victory_progress_received`/`victory_choice_received`/`saves_received`/`await_input`/`events_received`/`r7_result_received`）+ `_is_r7_command`；`NetClient.server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）；`loadGame` 与 `newGame` 同样触发 `game_started`；**R8 新增**：`request_next_turn()`（`nextTurn` 此前服务端已实现、客户端无入口，R8「70 条全入口」才暴露） |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
 | 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R7 起 69 条 + `ping` 全部标「已实现」**（`implemented_commands()` 共 70 项；**无「待实现」**）；`TODO(需核对)` 降至 **7 处**（R7 回填 §11.2 #1 `AppointmentResult` 与 #3 `goals` 9 键，§3 `tribulate`/`appoint*` 的 result 展开；**R9 W0 后为 3 处，见 §4.11**）；校验脚本 **38/38** 全绿（新增「已实现 = 70」全量断言与 `awaitInput` 转正断言）、69 分组点数不变 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **25 阶段**（`[0/25]`–`[24/25]`），含 R0–R9 全量断言 + 导出冒烟 + 协议契约校验（**200/200** 全绿） |
+| 工具 | `tools/{setup_shared,run_dev,check,export}.ps1`、`tools/check_protocol.ps1`、`server/tools/BalanceSim.gd` | ✅ `check.ps1` 已扩为 **26 阶段**（`[0/26]`–`[25/26]`），含 R0–R9 全量断言 + 导出冒烟 + 协议契约校验 + **平衡抽样器自检**（**222/222** 全绿）；`BalanceSim` 是 R9 W4 的平衡抽样器（72 局批量模拟，见 §4.15） |
+| 平衡抽样 | `docs/BALANCE_REPORT.md` + `server/tools/BalanceSim.gd` | ✅ **R9 W4 新增**：72 局无头批量模拟（`ffa` 36 + `player` 36），产出可复现的胜率/覆灭/卡点数据；抽样器零服务端改动，`--verify` 双跑指纹一致（见 §4.15） |
 
 ### 1.3 遗留缺口（进入 R5 前需知悉，不阻塞 R5）
 
@@ -788,7 +789,113 @@ func _on_skin_changed(pack: String) -> void:
   与默认皮肤 `ui_preview_map.png` 并排即可肉眼比对换皮效果。
 
 **验收**
-- `check.ps1` **210/210 `CHECK_RESULT=OK`**（25 阶段；`[22/25]` 新增 10 条换皮断言）
+- `check.ps1` **222/222 `CHECK_RESULT=OK`**（26 阶段；`[22/26]` 的 10 条换皮断言不变）
+- `check_protocol.ps1` 仍 **38/38**
+
+---
+
+### 4.15 R9 W4：平衡抽样报告（72 局无头批量模拟）
+
+目标：把「感觉不平衡」变成「可复现的数字」——**只测量，不改数值**（R8 裁决五）。
+
+**一、工具：`server/tools/BalanceSim.gd`**
+
+只调现成公开入口（`CommandDispatcher` 开局 → `TurnProcessor.begin_player_turn/finish_turn`
+→ `AIController.run_turn`），**服务端零改动**。
+
+| 模式 | 做法 | 回答什么 |
+|---|---|---|
+| `ffa` | 四席全部 `player=false`，并清空 `state.playerSectId` | 纯流派强度 |
+| `player` | `sect_0` 保留 `player=true`，行动阶段**临时**翻成 false 让 AI 代打，调完立刻还原 | 玩家真实处境：自己覆灭即终局 |
+
+`ffa` 清空 `playerSectId` 是必须的：`VictoryRules.process_victory_check` 里
+`if sect.id == state.playerSectId: state.gameOver = true`，不清空的话某家覆灭就把整局掐断，
+根本跑不到 240 回合的分数结算。
+
+`AIController.run_turn` 对 `sect.player` 直接 `return`，故「玩家席位代打」只能靠翻标志——
+那三行是本工具唯一碰 `GameState` 的地方，且只翻运行时布尔，不写任何数值。
+
+**覆灭原因靠读 `state.eventLog`**：`check_defeat` 判定时会写一行 `[胜负] …`，
+而 `eventLog` 要到**下一回合** `begin_player_turn` 才清空，故在 `finish_turn` 之后立刻读，
+拿到的就是本次覆灭的原始原因行。覆灭时 `collapse_sect` 会清空弟子与灵峰，
+**事后无法再推断原因**，只能这样当场抓。
+
+**可复现**：种子由 `mode+流派+序号` 文本散列（与 `R7Test._seed_of` 同算法），随机只经
+`GameState.rng`。`--verify` 连跑同一局两遍比对终局指纹 → `BALANCE_VERIFY=OK`。
+
+参数：`--games=N` / `--modes=ffa,player` / `--turns=N` / `--difficulty=easy|normal|hard`。
+
+**二、抽样结果（72 局 = 12 局 × 3 流派 × 2 模式，normal 难度，20×14 地图）**
+
+`ffa` 的 36 局、144 个席位：
+
+| 流派 | 出场 | 夺冠 | 胜率 | 覆灭 | 覆灭率 | 平均覆灭回合 |
+|---|---|---|---|---|---|---|
+| ZONG_MEN | 48 | 0 | 0% | 48 | **100%** | 74.2 |
+| JIA_ZU | 48 | 12 | 25% | 0 | 0% | — |
+| GUO_JIA | 48 | 24 | **50%** | 0 | 0% | — |
+
+`player` 模式的玩家席位（该席覆灭即终局）：
+
+| 玩家流派 | 通关 | 通关率 | 覆灭 | 覆灭率 | 平均覆灭回合 |
+|---|---|---|---|---|---|
+| ZONG_MEN | 0/12 | 0% | 12/12 | 100% | 75.8 |
+| JIA_ZU | 5/12 | 42% | 0 | 0% | — |
+| GUO_JIA | 8/12 | 67% | 0 | 0% | — |
+
+**四条结论**（都是抽样里的事实，不是推断）：
+
+1. **招牌路线 0/72 达成。** 72 局**全部**在 240 回合靠分数兜底（`修仙共主`）收尾，
+   三家招牌路线（万法归宗 / 举族登仙 / 一统天下）一次都没走通。而配置给它们的预期是
+   115–210 回合达成——**预期与实际差一个量级**。`player` 模式里 JIA_ZU / GUO_JIA 的
+   「通关」也都是分数路线赢，不是招牌路线，故报告 §3.1 的校准样本数为 **0**。
+2. **ZONG_MEN 100% 覆灭，原因单一。** 48/48 席全部死于「宗主陨落且无金丹继承人」，
+   平均第 74.2 回合。三家流派里**只有宗门流有这条失败条件**
+   （`VictoryRules.check_defeat` 第三个分支），而 `AIController._try_attack` 把宗主当普通
+   战力派去进攻（它只看 `can_fight` 与战力优势，不看职位），于是「主将阵亡即亡国」
+   在 AI 手里必然触发。玩家视角同样 12/12 覆灭——**选宗门流等于开局就带一个必炸的雷**。
+3. **扩张事实上停滞。** 存续席位终局灵峰**恒为 1 座**（192/192 个非 ZONG_MEN 席位），
+   控制地块 4–7 格。`AIController._try_expand` 要求「金丹以上 + 闲置」的弟子，
+   而开局名册只有宗主一人是金丹（`map.setup.leaderRealm=JIN_DAN`，外门两人是炼气），
+   扩张通道被宗主一人卡住，他还同时承担攻击/驻守。这条**不是配置能调的**，属规则层
+   的 AI 缺口——也正是 GUO_JIA「实际控制地块 24 格」永远只有 28% 的直接原因。
+4. **GUO_JIA 明显强于 JIA_ZU。** 同样 48 席，夺冠 24 vs 12；玩家视角 67% vs 42%。
+   两者都不覆灭、都靠分数赢，差异来自王土份额权重（`victory.score.claimedTileShareWeight=40`）
+   与国家流的势力等级加成（`faction.guoJia.territoryPowerWeight=1.5`，
+   `powerLevel.tilesPerLevel=5`）——占地越多，分越高。
+
+**卡点定位**（报告 §4.2 的机器版；覆灭席位取**最后一次存活快照**，否则覆灭清算会把诊断信息清成 0）：
+
+| 流派 | 招牌路线 | 卡在哪个目标 |
+|---|---|---|
+| ZONG_MEN | 万法归宗 | **核心道法 0%**（`fei_sheng`/`hun_yuan` 一个没解锁）；主干道统 6%、势力等级 3%、道场灵峰 10% |
+| JIA_ZU | 举族登仙 | **化神飞升 0/4**、元婴以上 0/3（血脉族人 96% 已达标） |
+| GUO_JIA | 一统天下 | **实际控制地块 28%**（目标 24 格 vs 实测 4–7 格）；王土份额 100% 已达标 |
+
+三家卡点指向同一件事：**AI 在 240 回合里几乎不成长**——不开峰、不飞升、不推道统。
+
+**三、为什么不改数值**
+
+按 R8 裁决五，本工作包**只测量**。上面第 3 条属规则层（`_try_expand` 的门槛），
+第 1/2/4 条是配置层。真要调，建议顺序是：`ai.*` 倾向与 `actionPoints`（最灵敏）→
+`victory.*.expectedMin/MaxTurns`（先对齐文档口径，不改变际）→ `victory.*` 阈值
+（改难度本身，最后动）。该建议已写进报告 §5.3，**待产品裁决后再单独提交**。
+
+**四、断言**
+
+| 层 | 断言 |
+|---|---|
+| 抽样器自检 | `--verify` 双跑同一局，终局指纹逐字一致 → `BALANCE_VERIFY=OK` |
+| 报告骨架 | `docs/BALANCE_REPORT.md` 六章齐全 + 含「不改数值」声明 + 含三流派实际结果 |
+| 交付物清单 | `server/tools/BalanceSim.{gd,tscn}` 与 `docs/BALANCE_REPORT.md` 入 `$r9Files` |
+| 导出隔离 | `server/export_presets.cfg` 的 `exclude_filter` 加 `tools/*`——抽样器不进发布包 |
+
+`check.ps1` 的 `[25/26]` 只跑 `--verify`（2 局，约 12 秒）。**72 局全量抽样是手工动作**
+（`--games=12`，约 6.5 分钟）：产物 `docs/BALANCE_REPORT.md` 入库，
+`outputs/balance_sample.json` 不入库（`.gitignore` 的 `/outputs/`），需要时按报告头部的命令重跑。
+
+**验收**
+- `check.ps1` **222/222 `CHECK_RESULT=OK`**（26 阶段；`[25/26]` 新增 12 条平衡断言）
 - `check_protocol.ps1` 仍 **38/38**
 
 ---

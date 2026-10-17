@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="Runner"]
+script/source = "extends Node
+func _ready() -> void:
+	var tool_script: GDScript = load(\"res://tools/BalanceSim.gd\")
+	if tool_script == null or not tool_script.can_instantiate():
+		printerr(\"BALANCE_FAIL 抽样器或依赖脚本未能编译\")
+		get_tree().quit(1)
+		return
+	var tool_node: Node = Node.new()
+	tool_node.set_script(tool_script)
+	add_child(tool_node)
+"
+
+[node name="BalanceSim" type="Node"]
+script = SubResource("Runner")
