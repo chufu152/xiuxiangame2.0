@@ -13,6 +13,9 @@
 # ===== 本地存档（服务端运行时生成，不提交）=====
 /saves/*
 !/saves/.gitkeep
+# SaveManager 的 res:// 是 server/ 工程根，故实际落盘在 server/saves/（R7 起自动存档会生成 save_*.json）
+/server/saves/*
+!/server/saves/.gitkeep
 *.save
 *.sav
 

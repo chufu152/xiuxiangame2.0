@@ -671,21 +671,29 @@ func _test_settlement() -> void:
 	var state2: GameState = dispatcher2.state
 	var sect2: Sect = state2.sects[0]
 	var peak2: SpiritPeak = _capital(sect2)
-	for index: int in range(20):
-		var building_id: String = "test_building_%d" % index
-		peak2.buildings[building_id] = {"id": building_id, "type": "SHAN_MEN", "name": "山门", "level": 1, "districtId": ""}
 	peak2.food = 7.0
 	sect2.resources["spiritPower"] = 0
+	# 先量一次「不挂建筑」时的毛产出，再逐座加建筑把维护顶到产出之上。
+	# 不写死建筑数：R7 加了峰主灵力加成后毛产出变高，写死的 20 座会构造不出赤字。
 	var totals2: Dictionary = EconomyRules.zero_yield()
 	for each: SpiritPeak in sect2.spiritPeaks:
 		EconomyRules.add_yield(totals2, EconomyRules.peak_output(state2, _config, each))
 	var upkeep2: Dictionary = EconomyRules.sect_upkeep(state2, _config, sect2)
+	var guard: int = 0
+	while int(sect2.resources["spiritPower"]) + int(totals2["spiritPower"]) >= int(upkeep2["spiritPower"]) and guard < 200:
+		var building_id: String = "test_building_%d" % guard
+		peak2.buildings[building_id] = {"id": building_id, "type": "SHAN_MEN", "name": "山门", "level": 1, "districtId": ""}
+		upkeep2 = EconomyRules.sect_upkeep(state2, _config, sect2)
+		guard += 1
 	_check(int(sect2.resources["spiritPower"]) + int(totals2["spiritPower"]) < int(upkeep2["spiritPower"]), "夹具：已构造灵力赤字")
 	var no_deficit: float = EconomyRules.stability_of(state2, _config, peak2, false)
+	# 结算后的 `stability_of` 会受后续阶段影响（R7 起 AI 会真的行动、可能改地块归属与奢侈资源），
+	# 故先把「赤字口径」的期望值在结算前算好，再与结算结果比。
+	var expected_deficit: float = EconomyRules.stability_of(state2, _config, peak2, true)
 	_request(dispatcher2, "finishTurn")
 	_check(int(sect2.resources["spiritPower"]) == 0, "赤字时灵力清零")
 	_check(is_equal_approx(peak2.stability, no_deficit - float(_config["economy"]["stabilityDropOnDeficit"])), "赤字时安定按 stabilityDropOnDeficit 结算")
-	_check(is_equal_approx(peak2.stability, EconomyRules.stability_of(state2, _config, peak2, true)), "赤字安定 == stability_of(deficit=true)")
+	_check(is_equal_approx(peak2.stability, expected_deficit), "赤字安定 == 结算前复算的 stability_of(deficit=true)")
 	_check(peak2.stability <= no_deficit, "赤字时安定不上升")
 
 

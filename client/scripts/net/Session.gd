@@ -54,6 +54,24 @@ signal automation_state_received(result: Dictionary)
 ## 任一 R6 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
 signal r6_result_received(command: String, result: Dictionary)
 
+# --- R7 任命/渡劫/胜负/存档（只读命令把 result 交给世界层；写命令复用 view_changed）---
+## `queryVictoryProgress` 结果（`{sectId, routes:[{route,achieved,ratio,summary,stage,score,goals}]}`，
+## 见 PROTOCOL §2 / §11.2 #3：`goals[]` 为 1.0 `VictoryGoal` 5 字段 + 4 派生 = 9 键）。
+signal victory_progress_received(result: Dictionary)
+## `queryVictoryChoice` 结果（`{pending, gameOver, winnerSectId, winType, options[]}`）。
+signal victory_choice_received(result: Dictionary)
+## `listSaves` 结果（`{saves:[{slotId,turn,playerSectName,factionType,savedAt,filePath,fileSize}]}`）。
+signal saves_received(result: Dictionary)
+## 服务端**主动推送**的 `awaitInput`（2.0 仅 `kind="victoryChoice"`，PROTOCOL §0.7）。
+##
+## 为什么单独一条信号：`awaitInput` 不是任何请求的回包（没有 `id`/`ok`/`view` 信封字段），
+## 由服务端在响应发出后另行推送，故只能从 `NetClient.server_message` 分流出来。
+signal await_input(message: Dictionary)
+## 回包信封里的 `events[]`（AI 行动、胜负、宗主外出等文案）。R7 只做占位展示，真回放留 R8。
+signal events_received(events: Array)
+## 任一 R7 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
+signal r7_result_received(command: String, result: Dictionary)
+
 ## 拉起服务端后的就绪总超时。实测冷启动 2.18s / 6.49s / 19s 波动极大，故取 40s 留足余量。
 const SERVER_READY_TIMEOUT_SEC: float = 40.0
 ## 就绪轮询间隔：每 0.5s 尝试连接一次。
@@ -97,6 +115,7 @@ func _ready() -> void:
 	add_child(net)
 	net.handshake_received.connect(_on_hello)
 	net.response_received.connect(_on_response)
+	net.server_message.connect(_on_server_message)
 	net.connect_failed.connect(_on_connect_failed)
 	net.disconnected.connect(_on_disconnected)
 	net.connected.connect(func() -> void: _set_status("已连接，等待 hello"))
@@ -361,6 +380,82 @@ func request_query_automation_state(sect_id: String) -> String:
 func request_set_setting(key: String, value: Variant) -> String:
 	return _request(Commands.SET_SETTING, {"key": key, "value": value})
 
+
+# ---------------------------------------------------------------------------
+# R7：任命 / 渡劫 / 胜负 / 待抉择 / 存档（14 条）
+# ---------------------------------------------------------------------------
+
+## 存档槽位列表（只读）→ `saves_received`。`saves[]` 7 字段与 1.0 `SaveInfo` 逐字一致。
+func request_list_saves() -> String:
+	return _request(Commands.LIST_SAVES, {})
+
+
+## 存档（写）。**回包是 `{slot, saved}` 而非 `{success, message}`**（PROTOCOL §2 / 裁决八）：
+## 失败时带 `message`、`saved=false`，故世界层不能靠 `success` 判断。
+func request_save_game(slot: int) -> String:
+	return _request(Commands.SAVE_GAME, {"slot": slot})
+
+
+## 读档（写）。回 view，世界层据 `view_changed` 整体重建；`events[]` 里可能带
+## 「读档回到待决点」提示，随后服务端会**重新推送** `awaitInput`（PROTOCOL §2）。
+func request_load_game(slot: int) -> String:
+	return _request(Commands.LOAD_GAME, {"slot": slot})
+
+
+## 胜利进度（只读）→ `victory_progress_received`。三路线 `routes[]` 全由服务端算。
+func request_query_victory_progress(sect_id: String) -> String:
+	return _request(Commands.QUERY_VICTORY_PROGRESS, {"sectId": sect_id})
+
+
+## 胜负判定（只读）。`{sectId, route}`；未达成时 `route` 为 `null`。
+func request_check_victory(sect_id: String) -> String:
+	return _request(Commands.CHECK_VICTORY, {"sectId": sect_id})
+
+
+## 失败判定（只读）。`{sectId, defeated}`；只判定不清算。
+func request_check_defeat(sect_id: String) -> String:
+	return _request(Commands.CHECK_DEFEAT, {"sectId": sect_id})
+
+
+## 择定胜利路线（写）。只认 `pendingVictoryChoices` 内的 `routeId`。
+func request_choose_victory(route_id: String) -> String:
+	return _request(Commands.CHOOSE_VICTORY, {"routeId": route_id})
+
+
+## 终局状态（只读）`{turn, gameOver, winType, winnerSectId, pendingVictoryChoices[]}`。
+func request_query_game_over() -> String:
+	return _request(Commands.QUERY_GAME_OVER, {})
+
+
+## 渡劫飞升（写）。成功率/心魔/陨落全由服务端判定。
+func request_tribulate(disciple_id: String) -> String:
+	return _request(Commands.TRIBULATE, {"discipleId": disciple_id})
+
+
+## 任命峰主（写）。`peakId` 必须是本宗灵峰；回包 `{success, message}`（裁决二）。
+func request_appoint_feng_zhu(disciple_id: String, peak_id: String) -> String:
+	return _request(Commands.APPOINT_FENG_ZHU, {"discipleId": disciple_id, "peakId": peak_id})
+
+
+## 任命长老（写）。名额 = `zhangLaoBaseLimit` + `powerLevel`×`zhangLaoPerPowerLevel`。
+func request_appoint_zhang_lao(disciple_id: String) -> String:
+	return _request(Commands.APPOINT_ZHANG_LAO, {"discipleId": disciple_id})
+
+
+## 任命宗主（写）。家族流须血脉、须身处首都；原宗主退为长老。
+func request_appoint_zong_zhu(disciple_id: String) -> String:
+	return _request(Commands.APPOINT_ZONG_ZHU, {"discipleId": disciple_id})
+
+
+## 待抉择状态（只读）→ `victory_choice_received`。
+func request_query_victory_choice() -> String:
+	return _request(Commands.QUERY_VICTORY_CHOICE, {})
+
+
+## 回应待抉择（写）。`req_id` 取 `awaitInput.reqId`；越界回 `BAD_PARAMS` 且待决保留。
+func request_resolve_choice(req_id: String, option_index: int) -> String:
+	return _request(Commands.RESOLVE_CHOICE, {"reqId": req_id, "optionIndex": option_index})
+
 ## 「结束回合」顺序封装：**先 finishTurn，收到响应后再 beginPlayerTurn**
 ## （与 1.0 GUI 手动结束回合一致）。期间 busy；最终以 beginPlayerTurn 的 view 渲染。
 func request_end_turn_sequence() -> String:
@@ -422,6 +517,9 @@ func _handle_response(response: Dictionary) -> void:
 	var command: String = str(pending.get(request_id, ""))
 	pending.erase(request_id)
 	busy = not pending.is_empty()
+	var events: Array = response.get(Msg.KEY_EVENTS, [])
+	if not events.is_empty():
+		events_received.emit(events)
 	if not bool(response.get("ok", false)):
 		_set_status("%s：%s" % [str(response.get("errorCode", "请求失败")), str(response.get("message", ""))])
 		if _is_r3_command(command):
@@ -432,6 +530,8 @@ func _handle_response(response: Dictionary) -> void:
 			r5_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if _is_r6_command(command):
 			r6_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
+		if _is_r7_command(command):
+			r7_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -448,12 +548,16 @@ func _handle_response(response: Dictionary) -> void:
 			r5_result_received.emit(command, result)
 		if _is_r6_command(command):
 			r6_result_received.emit(command, result)
+		if _is_r7_command(command):
+			r7_result_received.emit(command, result)
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
 	if response.get("view") is Dictionary:
 		accept_view(response["view"])
-		if command == Commands.NEW_GAME:
+		# `newGame` 与 `loadGame` 都从「无对局」进入「有对局」，故都触发 `game_started`：
+		# 主菜单据此切场景（读档即开局，PROTOCOL §2 `loadGame` 回 view）。
+		if command == Commands.NEW_GAME or command == Commands.LOAD_GAME:
 			game_started.emit()
 	if command == Commands.QUERY_MOVE_RANGE:
 		move_range_received.emit(result)
@@ -487,6 +591,12 @@ func _handle_response(response: Dictionary) -> void:
 		policy_options_received.emit(result)
 	elif command == Commands.QUERY_AUTOMATION_STATE:
 		automation_state_received.emit(result)
+	elif command == Commands.QUERY_VICTORY_PROGRESS:
+		victory_progress_received.emit(result)
+	elif command == Commands.QUERY_VICTORY_CHOICE:
+		victory_choice_received.emit(result)
+	elif command == Commands.LIST_SAVES:
+		saves_received.emit(result)
 	if _is_r3_command(command):
 		r3_result_received.emit(command, result)
 	if _is_r4_command(command):
@@ -495,6 +605,8 @@ func _handle_response(response: Dictionary) -> void:
 		r5_result_received.emit(command, result)
 	if _is_r6_command(command):
 		r6_result_received.emit(command, result)
+	if _is_r7_command(command):
+		r7_result_received.emit(command, result)
 	_set_status("已同步服务端 view")
 	_advance_end_turn_sequence(command)
 
@@ -540,6 +652,25 @@ func _is_r6_command(command: String) -> bool:
 		Commands.SET_PEAK_AUTO_PROJECT, Commands.SET_ALL_AUTO_PROJECT,
 		Commands.EXPLORE_NOW, Commands.QUERY_AUTOMATION_STATE, Commands.SET_SETTING,
 	]
+
+
+## 是否为 R7 任命/渡劫/胜负/存档命令（14 条）。
+func _is_r7_command(command: String) -> bool:
+	return command in [
+		Commands.LIST_SAVES, Commands.SAVE_GAME, Commands.LOAD_GAME,
+		Commands.QUERY_VICTORY_PROGRESS, Commands.CHECK_VICTORY, Commands.CHECK_DEFEAT,
+		Commands.CHOOSE_VICTORY, Commands.QUERY_GAME_OVER, Commands.TRIBULATE,
+		Commands.APPOINT_FENG_ZHU, Commands.APPOINT_ZHANG_LAO, Commands.APPOINT_ZONG_ZHU,
+		Commands.QUERY_VICTORY_CHOICE, Commands.RESOLVE_CHOICE,
+	]
+
+
+## 服务端主动消息分流：2.0 只有 `hello`（由 NetClient 单独处理）与 `awaitInput`。
+## `awaitInput` 不带 `id`/`ok`/`view`，故走不到 `_handle_response`，只能在这里接。
+func _on_server_message(payload: Dictionary) -> void:
+	if str(payload.get(Msg.KEY_TYPE, "")) == Msg.TYPE_AWAIT_INPUT:
+		_set_status("服务端请求抉择：%s" % str(payload.get("kind", "")))
+		await_input.emit(payload)
 
 
 ## 结束回合序列推进：finishTurn 响应到达后再发 beginPlayerTurn。

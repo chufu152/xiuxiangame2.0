@@ -59,6 +59,19 @@ var lastPolicySwitchTurn: int = 0
 var automationToggles: Dictionary = {}
 ## R6 新增：逐峰自动项目开关（peakId -> bool）。缺键 = 跟随 `automation.defaultAutoProject`。
 var autoProjectByPeak: Dictionary = {}
+## R7 新增：势力等级派生缓存（裁决六，**不是声望折算**）。由
+## `VictoryRules.refresh_power_level` 按 `powerLevel.*` 四权重重算；`appointment` 长老名额与
+## 宗门流胜利条件都读它，故每次判定前必须刷新（1.0 `refreshPowerLevel` 同语义）。
+var powerLevel: int = 0
+## R7 新增：已覆灭（`VictoryRules.check_defeat` 命中）。覆灭宗门的弟子/灵峰已清空，
+## `_run_ai_action` 跳过、胜负判定跳过（1.0 `Sect.eliminated` 同语义）。
+var defeated: bool = false
+## R7 新增（**内部记账，不下发 view**）：最近一次自动存档的回合，避免同一回合重复落盘。
+var lastAutoSaveTurn: int = 0
+## R7 新增（**内部记账，不下发 view**）：上一回合宗主是否处于「外出」状态
+## （有宗主但不在首都，或首都未建宗主大殿）。`TurnProcessor._run_turn_start` 只在
+## **状态翻转时**记一条事件，避免每回合刷屏。
+var zongZhuOutside: bool = false
 
 func public_info() -> Dictionary:
 	return {"id": id, "name": name, "factionType": factionType, "player": player}

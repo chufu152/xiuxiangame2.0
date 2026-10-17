@@ -17,6 +17,9 @@ var _config: Dictionary = {}
 var _handlers: Dictionary = {}
 var state: GameState = null
 var _turns: TurnProcessor = null
+## R7：已推送过的 `awaitInput.reqId`（空 = 尚未推送）。只在 reqId 变化时推一次，
+## `loadGame` 后清空以「回到待决点重新推送」（裁决七 / PROTOCOL §2 `loadGame.events`）。
+var _await_input_sent: String = ""
 const SAFE_JSON_INTEGER: int = 9007199254740991
 
 
@@ -83,6 +86,21 @@ func _init(config: Dictionary = {}) -> void:
 	_handlers[Commands.EXPLORE_NOW] = Callable(self, "_handle_explore_now")
 	_handlers[Commands.QUERY_AUTOMATION_STATE] = Callable(self, "_handle_query_automation_state")
 	_handlers[Commands.SET_SETTING] = Callable(self, "_handle_set_setting")
+	# R7：存档（3）+ 胜负（5）+ 待抉择（2）+ 任命/渡劫（4）
+	_handlers[Commands.LIST_SAVES] = Callable(self, "_handle_list_saves")
+	_handlers[Commands.SAVE_GAME] = Callable(self, "_handle_save_game")
+	_handlers[Commands.LOAD_GAME] = Callable(self, "_handle_load_game")
+	_handlers[Commands.QUERY_VICTORY_PROGRESS] = Callable(self, "_handle_query_victory_progress")
+	_handlers[Commands.CHECK_VICTORY] = Callable(self, "_handle_check_victory")
+	_handlers[Commands.CHECK_DEFEAT] = Callable(self, "_handle_check_defeat")
+	_handlers[Commands.CHOOSE_VICTORY] = Callable(self, "_handle_choose_victory")
+	_handlers[Commands.QUERY_GAME_OVER] = Callable(self, "_handle_query_game_over")
+	_handlers[Commands.TRIBULATE] = Callable(self, "_handle_tribulate")
+	_handlers[Commands.APPOINT_FENG_ZHU] = Callable(self, "_handle_appoint_feng_zhu")
+	_handlers[Commands.APPOINT_ZHANG_LAO] = Callable(self, "_handle_appoint_zhang_lao")
+	_handlers[Commands.APPOINT_ZONG_ZHU] = Callable(self, "_handle_appoint_zong_zhu")
+	_handlers[Commands.QUERY_VICTORY_CHOICE] = Callable(self, "_handle_query_victory_choice")
+	_handlers[Commands.RESOLVE_CHOICE] = Callable(self, "_handle_resolve_choice")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -896,3 +914,184 @@ func _player_capital_tile_id() -> String:
 	if peak_id.is_empty(): return ""
 	var peak: SpiritPeak = CityAction.find_peak(state, peak_id)
 	return "" if peak == null else peak.tileId
+
+
+# ---------------------------------------------------------------------------
+# 处理器（R7：存档 / 胜负 / 待抉择 / 任命 / 渡劫）
+# ---------------------------------------------------------------------------
+
+## 取待推送的 `awaitInput` 消息体；无待决或已推过同一 reqId 时返回 `null`。
+## 由 `NetServer` 在响应发出后调用（主动消息，不进响应信封）。
+func poll_await_input() -> Variant:
+	if state == null:
+		return null
+	var payload: Variant = VictoryAction.await_input_payload(state)
+	if payload == null:
+		_await_input_sent = ""
+		return null
+	var req_id: String = str((payload as Dictionary)["reqId"])
+	if req_id == _await_input_sent:
+		return null
+	_await_input_sent = req_id
+	return payload
+
+
+## `slot` 参数：接受 int 或可转 int 的非空字符串；范围 0..99（1.0 槽位是文件名里的整数）。
+func _require_slot(request_id: String, params: Dictionary) -> Dictionary:
+	var value: Variant = params.get("slot")
+	var slot: int = -1
+	if typeof(value) == TYPE_INT:
+		slot = int(value)
+	elif typeof(value) == TYPE_STRING and String(value).strip_edges().is_valid_int():
+		slot = int(String(value).strip_edges())
+	elif typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), roundf(float(value))):
+		slot = int(roundf(float(value)))
+	if slot < 0 or slot > 99:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "slot 必须是 0..99 的整数")}
+	return {"ok": true, "value": slot}
+
+
+## `listSaves`：只读，不回 view（PROTOCOL §2）。
+func _handle_list_saves(request_id: String, _params: Dictionary) -> Dictionary:
+	return Dto.ok_response(request_id, [], null, SaveAction.list_saves())
+
+
+## `saveGame`：`{slot, saved}`（失败带 `message`，**无 `success` 布尔**）。
+## 未开局属业务失败（`saved=false`）而非协议失败，故仍回 `ok:true`。
+func _handle_save_game(request_id: String, params: Dictionary) -> Dictionary:
+	var slot_check: Dictionary = _require_slot(request_id, params)
+	if not bool(slot_check["ok"]): return slot_check["response"]
+	if state == null:
+		return Dto.ok_response(request_id, [], null,
+			{"slot": int(slot_check["value"]), "saved": false, "message": "尚未开局"})
+	var result: Dictionary = SaveAction.save_game(state, _config, int(slot_check["value"]))
+	return Dto.ok_response(request_id, [], null, result)
+
+
+## `loadGame`：`{slot, turn}` + 回 view；槽位不存在 → `BAD_PARAMS`。
+## 读档后若有待决，清空推送标记让 `poll_await_input` 重新推一次。
+func _handle_load_game(request_id: String, params: Dictionary) -> Dictionary:
+	var slot_check: Dictionary = _require_slot(request_id, params)
+	if not bool(slot_check["ok"]): return slot_check["response"]
+	var loaded: Dictionary = SaveAction.load_game(_config, int(slot_check["value"]))
+	if loaded["state"] == null:
+		return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(loaded.get("message", "存档槽位不存在")))
+	state = loaded["state"]
+	_await_input_sent = ""
+	var events: Array[String] = []
+	if not state.pendingVictoryChoices.is_empty():
+		events.append("读档回到待决点: 请择定结局")
+	return Dto.ok_response(request_id, events, StateView.build(state, _config),
+		{"slot": int(loaded["slot"]), "turn": int(loaded["turn"])})
+
+
+## `queryVictoryProgress`：只读，不回 view；会刷新 `sect.powerLevel` 派生缓存。
+func _handle_query_victory_progress(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_any_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null,
+		VictoryAction.query_victory_progress(state, _config, str(sect_check["value"])))
+
+
+func _handle_check_victory(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_any_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null,
+		VictoryAction.check_victory(state, _config, str(sect_check["value"])))
+
+
+func _handle_check_defeat(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_any_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null,
+		VictoryAction.check_defeat(state, _config, str(sect_check["value"])))
+
+
+## `chooseVictory`：`{success, routeId, winType, message}`，回 view。
+func _handle_choose_victory(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var route_check: Dictionary = _require_nonempty(params, "routeId")
+	if not bool(route_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(route_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = VictoryAction.choose_victory(state, str(route_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## `queryGameOver`：只读，不回 view。
+func _handle_query_game_over(request_id: String, _params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	return Dto.ok_response(request_id, [], null, VictoryAction.query_game_over(state))
+
+
+## `tribulate`：渡劫飞升，回 view。
+func _handle_tribulate(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AppointmentAction.tribulate(state, _config, str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## `appointFengZhu`：`{success, message}`（裁决二：1.0 只有这两个字段），回 view。
+func _handle_appoint_feng_zhu(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var peak_check: Dictionary = _require_nonempty(params, "peakId")
+	if not bool(peak_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(peak_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AppointmentAction.appoint_feng_zhu(state, _config,
+		str(disciple_check["value"]), str(peak_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_appoint_zhang_lao(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AppointmentAction.appoint_zhang_lao(state, _config, str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_appoint_zong_zhu(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AppointmentAction.appoint_zong_zhu(state, _config, str(disciple_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## `queryVictoryChoice`：只读，不回 view。
+func _handle_query_victory_choice(request_id: String, _params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	return Dto.ok_response(request_id, [], null, VictoryAction.query_victory_choice(state))
+
+
+## `resolveChoice`：越界 / `reqId` 认不出 → `BAD_PARAMS` **且待决状态原样保留**（裁决七）。
+func _handle_resolve_choice(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var req_check: Dictionary = _require_nonempty(params, "reqId")
+	if not bool(req_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(req_check["message"]))
+	var index_check: Dictionary = _require_int(params, "optionIndex")
+	if not bool(index_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(index_check["message"]))
+	var blocker: String = VictoryAction.resolve_choice_blocker(state, str(req_check["value"]), int(index_check["value"]))
+	if not blocker.is_empty():
+		return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, blocker)
+	var before: int = state.eventLog.size()
+	var result: Dictionary = VictoryAction.resolve_choice(state, str(req_check["value"]), int(index_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## 校验 `sectId` 存在（**不限于己方**：胜负进度与失败判定对 AI 宗门也开放，1.0 同语义）。
+func _require_any_sect(request_id: String, params: Dictionary) -> Dictionary:
+	var check: Dictionary = _require_nonempty(params, "sectId")
+	if not bool(check["ok"]): return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(check["message"]))}
+	if CityAction.find_sect(state, str(check["value"])) == null:
+		return {"ok": false, "response": Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "宗门不存在：" + str(check["value"]))}
+	return {"ok": true, "value": str(check["value"])}

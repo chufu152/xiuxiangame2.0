@@ -39,7 +39,7 @@ const NEEDS_GAME_R6: Array[String] = [
 
 var _failures: Array[String] = []
 var _checks: int = 0
-## 已实现命令总数（`_test_registration` 记录，供 `R6_IMPLEMENTED=` 行自报，check.ps1 据此卡 56 条）。
+## 已实现命令总数（`_test_registration` 记录，供 `R6_IMPLEMENTED=` 行自报，check.ps1 据此卡 ≥56 条）。
 var _implemented_count: int = 0
 var _config: Dictionary = {}
 var _finished: bool = false
@@ -92,7 +92,9 @@ func _test_registration() -> void:
 	_implemented_count = implemented.size()
 	for command: String in R6_COMMANDS:
 		_check(implemented.has(command), "已登记 R6 命令：" + command)
-	_check(implemented.size() == 56, "已登记命令 56 条（40 + 16，实际 %d）" % implemented.size())
+	# R6 的验收语义是「这 16 条都已登记」，不是「全仓恰好 56 条」——后者会被后续里程碑打破
+	# （R7 加了 14 条 → 70 条）。故断言下限 + 逐条覆盖，保持 R6 断言的有效性。
+	_check(implemented.size() >= 56, "已登记命令不少于 56 条（R6 交付时 40 + 16，实际 %d）" % implemented.size())
 	for command: String in NEEDS_GAME_R6:
 		_check(_request(dispatcher, command, {}).get("errorCode") == "NO_GAME", "%s 开局前 NO_GAME" % command)
 	# `setSetting` 无状态也可用（服务端只确认，不碰 GameState）。

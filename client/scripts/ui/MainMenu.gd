@@ -10,7 +10,12 @@ var width_input: SpinBox = null
 var height_input: SpinBox = null
 var seed_input: LineEdit = null
 var start_button: Button = null
+var load_button: Button = null
+var load_list: VBoxContainer = null
+var load_status_label: Label = null
 var status_label: Label = null
+## `listSaves` 最近一次回包（`{saves:[…]}`）。
+var saves_data: Dictionary = {}
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -18,6 +23,7 @@ func _ready() -> void:
 	_build_ui()
 	Session.status_changed.connect(_update_status)
 	Session.game_started.connect(_enter_world)
+	Session.saves_received.connect(_on_saves_received)
 	_update_status()
 
 func build_params() -> Dictionary:
@@ -32,7 +38,49 @@ func _update_status() -> void:
 	var valid: bool = not sect_name.text.strip_edges().is_empty() and (seed_input.text.strip_edges().is_empty() or seed_input.text.strip_edges().is_valid_int())
 	start_button.disabled = Session.busy or not Session.supports(Commands.NEW_GAME) or not valid
 	start_button.tooltip_text = "需要服务端 hello 支持 newGame、非空名称与整数种子" if start_button.disabled else "向本地服务端请求开局"
+	if load_button != null:
+		load_button.disabled = Session.busy or not Session.supports(Commands.LOAD_GAME)
 	status_label.text = Session.status
+
+
+## R7 读档：先 `listSaves` 拉列表，再按槽位 `loadGame`。
+## 读档成功后服务端回 view，`Session.game_started` 触发 `_enter_world`（与 newGame 同路径）。
+func _toggle_load_list() -> void:
+	if load_list.get_child_count() > 0:
+		_clear_load_list()
+		load_status_label.text = ""
+		return
+	load_status_label.text = "正在读取存档列表…"
+	Session.request_list_saves()
+
+
+func _on_saves_received(result: Dictionary) -> void:
+	saves_data = result
+	_clear_load_list()
+	var saves: Array = result.get("saves", [])
+	if saves.is_empty():
+		load_status_label.text = "（暂无存档；对局中每 10 回合会自动存入槽 0）"
+		return
+	load_status_label.text = "共 %d 个存档，点选读取：" % saves.size()
+	for entry: Variant in saves:
+		var info: Dictionary = entry
+		var slot: int = int(info.get("slotId", -1))
+		var button: Button = Button.new()
+		button.name = "LoadSlot_%d" % slot
+		button.text = "槽 %d · 第 %d 回合 · %s（%s）" % [
+			slot, int(info.get("turn", 0)), str(info.get("playerSectName", "")), str(info.get("savedAt", "")),
+		]
+		button.tooltip_text = "%s · %d 字节 · %s" % [
+			str(info.get("factionType", "")), int(info.get("fileSize", 0)), str(info.get("filePath", "")),
+		]
+		button.pressed.connect(func() -> void: Session.request_load_game(slot))
+		load_list.add_child(button)
+
+
+func _clear_load_list() -> void:
+	for child: Node in load_list.get_children():
+		load_list.remove_child(child)
+		child.queue_free()
 
 func _enter_world() -> void:
 	get_tree().change_scene_to_file("res://scenes/World.tscn")
@@ -102,6 +150,18 @@ func _build_ui() -> void:
 	start_button.custom_minimum_size.y = 50
 	start_button.pressed.connect(func() -> void: Session.request_new_game(build_params()))
 	column.add_child(start_button)
+	# R7：读档开局（listSaves → loadGame，成功后与 newGame 走同一条 `game_started` 路径）。
+	load_button = Button.new()
+	load_button.name = "LoadGameButton"
+	load_button.text = "读取存档"
+	load_button.tooltip_text = "列出本地存档槽（槽 0 = 每 10 回合自动存档）并读取"
+	load_button.pressed.connect(func() -> void: _toggle_load_list())
+	column.add_child(load_button)
+	load_list = VBoxContainer.new()
+	load_list.add_theme_constant_override("separation", 4)
+	column.add_child(load_list)
+	load_status_label = _label(column, "", 14)
+	load_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label = _label(column, "", 15)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(column, "正交 45° · 滚轮缩放 · 中 / 右键平移 · F5 资源热重读", 14)

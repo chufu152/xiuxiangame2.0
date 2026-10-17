@@ -5,45 +5,53 @@
     + R3 经济结算/灵峰城市/建筑区域劳力改良道路 + R4 道统/修炼/项目队列/收徒
     + R5 十兵种/战斗预览与结算/转职晋升/传送驻守/批量移动
     + R6 探索（机缘/秘境）/政令（政体/卡牌）/自动化（开关/立即探索/集结回防）
+    + R7 任命/血脉/渡劫飞升/反应式 AI/胜负与评分/存档读档/胜利择一
     （对应 docs/prompts/*.md「自动验收」）。
 
 .DESCRIPTION
     依次执行：
-      [0/21] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6）
-      [1/21] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
-      [2/21] 两个工程 --import 无解析错误并生成 class_name 缓存
-      [3/21] 配置缺失时服务端非零退出（负向用例）
-      [4/21] console 版 --headless 启动服务端并监听 127.0.0.1:9527
-      [5/21] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
-      [6/21] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
-      [7/21] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
+      [0/23] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7）
+      [1/23] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
+      [2/23] 两个工程 --import 无解析错误并生成 class_name 缓存
+      [3/23] 配置缺失时服务端非零退出（负向用例）
+      [4/23] console 版 --headless 启动服务端并监听 127.0.0.1:9527
+      [5/23] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
+      [6/23] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
+      [7/23] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
             且同种子双跑导出的权威地图 outputs/r1_authority_a|b.json 逐字一致（SHA256 相同）
-      [8/21] 服务端 R2 验收：res://tests/R2Test.tscn 打印 R2_PASS、退出码 0
+      [8/23] 服务端 R2 验收：res://tests/R2Test.tscn 打印 R2_PASS、退出码 0
             （回合状态机 + 地形叠加移动成本 + BFS 可达 + 移动后视野刷新 + 确定性）
-      [9/21] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
+      [9/23] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
             再加 --integration 端到端（真实拉起 headless 服务端 + newGame 300 格 view + getState 往返）
-      [10/21] 客户端 R2 验收：res://tests/R2ClientTest.tscn 无头全绿；
+      [10/23] 客户端 R2 验收：res://tests/R2ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点选弟子 → 移动高亮 → moveDisciple → 结束回合 → 相机不重置）
-      [11/21] 服务端 R3 验收：res://tests/R3Test.tscn 打印 R3_PASS、退出码 0
+      [11/23] 服务端 R3 验收：res://tests/R3Test.tscn 打印 R3_PASS、退出码 0
             （开峰 + 建筑 10 种 + 区域/邻接 + 劳力 + 改良地形限制 + 经济结算/赤字 + 道路减耗 + 气运扩张 + 确定性）
-      [12/21] 客户端 R3 验收：res://tests/R3ClientTest.tscn 无头全绿；
+      [12/23] 客户端 R3 验收：res://tests/R3ClientTest.tscn 无头全绿；
             再加 --integration 端到端（选中灵峰 → 城市面板 → 建造山门 → 指派劳力 → 相机不重置）
-      [13/21] 服务端 R4 验收：res://tests/R4Test.tscn 打印 R4_PASS、退出码 0
+      [13/23] 服务端 R4 验收：res://tests/R4Test.tscn 打印 R4_PASS、退出码 0
             （21 道法树前置/时代/流派/血脉门控 + 研究队列 + 修炼/突破/渡劫 + 收徒 + 项目队列取消/加速 + 成就 boost + 确定性）
-      [14/21] 客户端 R4 验收：res://tests/R4ClientTest.tscn 无头全绿；
+      [14/23] 客户端 R4 验收：res://tests/R4ClientTest.tscn 无头全绿；
             再加 --integration 端到端（道统树三态 → 研究道法 → 队列两列不混 → 加速 → 收徒 → 取消 → 相机不重置）
-      [15/21] 服务端 R5 验收：res://tests/R5Test.tscn 打印 R5_PASS、退出码 0
+      [15/23] 服务端 R5 验收：res://tests/R5Test.tscn 打印 R5_PASS、退出码 0
             （十兵种/相克/地形防御/高台/河流/城防 + 攻击预览与结算一致 + ZOC/占格阻挡 + 传送 + 驻守 + 转职晋升 + 批量移动 + 确定性）
-      [16/21] 客户端 R5 验收：res://tests/R5ClientTest.tscn 无头全绿；
+      [16/23] 客户端 R5 验收：res://tests/R5ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点选三段串行链 → 十兵种转职三态 → 攻击预览 blockedReason →
             attack/reclass/promote/retreat 业务失败提示 → 传送未开启 → Shift 多选 batchMove → 两层高亮独立 → 相机不重置）
-      [17/21] 服务端 R6 验收：res://tests/R6Test.tscn 打印 R6_PASS、退出码 0
+      [17/23] 服务端 R6 验收：res://tests/R6Test.tscn 打印 R6_PASS、退出码 0
             （机缘成功率/失败三分支 + 秘境成本/人数/富矿与灾祸 + 政体切换冷却 + 卡牌槽位/时代/道法门控 + 政令安定叠加
              + 自动化预算与建造者扣次 + 集结超限拒绝 + setSetting 不下发 view + 回合回填 + 确定性）
-      [18/21] 客户端 R6 验收：res://tests/R6ClientTest.tscn 无头全绿；
+      [18/23] 客户端 R6 验收：res://tests/R6ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点节点格开探索面板 → 派弟子 → 政令面板颁卡 → 自动化开关/立即探索/集结 → 本地设置 → 相机不重置）
-      [19/21] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
-      [20/21] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
+      [19/23] 服务端 R7 验收：res://tests/R7Test.tscn 打印 R7_PASS、退出码 0
+            （任命名额/境界门控/峰主长老宗主加成 + 联姻繁衍冷却与品级抖动 + 渡劫成功率/心魔/陨落
+             + AI 反应式行动与视野刷新 + 三流派胜负/失败清算 + 评分公式/240 回合强制结算
+             + 待抉择 awaitInput/resolveChoice + 存档 {slot,saved} 与读档 view 逐字一致 + 确定性双跑 SHA256）
+      [20/23] 客户端 R7 验收：res://tests/R7ClientTest.tscn 无头全绿；
+            再加 --integration 端到端（胜利进度面板 → 存读档往返 → awaitInput 弹窗 → resolveChoice →
+            结局屏 → 事件栏 → 相机不重置）
+      [21/23] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
+      [22/23] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
 
     退出码：0 = 全绿；1 = 存在失败项。
 
@@ -248,12 +256,12 @@ $serverOutTask = $null
 $serverErrTask = $null
 
 try {
-    Write-Host "=== 修仙4X·宗门争霸 2.0 —— 里程碑自检（R0 + R1 + R2 + R3 + R4 + R5）===" -ForegroundColor Cyan
+    Write-Host "=== 修仙4X·宗门争霸 2.0 —— 里程碑自检（R0 + R1 + R2 + R3 + R4 + R5 + R6 + R7）===" -ForegroundColor Cyan
     Write-Host "仓库根：$root"
     Write-Host "临时目录：$workDir"
 
     # ---------------------------------------------------------------- 0. 环境
-    Write-Host "`n[0/21] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6）" -ForegroundColor Cyan
+    Write-Host "`n[0/23] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7）" -ForegroundColor Cyan
     $godotExe = $null
     try { $godotExe = Resolve-GodotConsole }
     catch { Assert-Check $false '定位 Godot 控制台版可执行文件' $_.Exception.Message }
@@ -323,18 +331,29 @@ try {
         'client\tests\R6ClientTest.gd', 'client\tests\R6ClientTest.tscn'
     )
     $expectedFiles += $r6Files
+    $r7Files = @(
+        'server\scripts\model\SaveInfo.gd',
+        'server\scripts\rules\AppointmentRules.gd', 'server\scripts\rules\VictoryRules.gd',
+        'server\scripts\rules\BloodlineRules.gd', 'server\scripts\rules\AIController.gd',
+        'server\scripts\save\SaveManager.gd',
+        'server\scripts\rules\AppointmentAction.gd', 'server\scripts\rules\VictoryAction.gd',
+        'server\scripts\rules\SaveAction.gd',
+        'server\tests\R7Test.gd', 'server\tests\R7Test.tscn',
+        'client\tests\R7ClientTest.gd', 'client\tests\R7ClientTest.tscn'
+    )
+    $expectedFiles += $r7Files
     $missing = @()
     foreach ($rel in $expectedFiles) {
         if (-not (Test-Path (Join-Path $root $rel))) { $missing += $rel }
     }
     Assert-Check ($missing.Count -eq 0) `
-        "R0+R1+R3+R4+R5+R6 交付物清单齐全（R0 $($r0Files.Count) + R1 $($r1Files.Count) + R3 $($r3Files.Count) + R4 $($r4Files.Count) + R5 $($r5Files.Count) + R6 $($r6Files.Count) 个文件）" `
+        "R0+R1+R3+R4+R5+R6+R7 交付物清单齐全（R0 $($r0Files.Count) + R1 $($r1Files.Count) + R3 $($r3Files.Count) + R4 $($r4Files.Count) + R5 $($r5Files.Count) + R6 $($r6Files.Count) + R7 $($r7Files.Count) 个文件）" `
         ("缺失：`n" + ($missing -join "`n"))
 
     if (-not $godotExe) { throw '未定位到 Godot 可执行文件，后续步骤无法进行。' }
 
     # ------------------------------------------- 1. shared 目录联接（幂等 + 贯通）
-    Write-Host "`n[1/21] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
+    Write-Host "`n[1/23] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
     $setupScript = Join-Path $PSScriptRoot 'setup_shared.ps1'
 
     $firstOk = $true; $firstErr = ''
@@ -383,7 +402,7 @@ try {
     Assert-Check (-not (Test-Path $probeTop)) '临时探测文件已清理'
 
     # --------------------------------------------------------- 2. 工程导入
-    Write-Host "`n[2/21] 工程导入与 GDScript 解析" -ForegroundColor Cyan
+    Write-Host "`n[2/23] 工程导入与 GDScript 解析" -ForegroundColor Cyan
     if ($SkipImport) {
         Write-Host '  （-SkipImport：跳过导入步骤）' -ForegroundColor DarkGray
     }
@@ -404,7 +423,7 @@ try {
     }
 
     # --------------------------------------------- 3. 配置失败路径（负向用例）
-    Write-Host "`n[3/21] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
+    Write-Host "`n[3/23] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
     $missingConfig = Join-Path $workDir 'not-exists.json'
     $badResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$missingConfig") `
@@ -414,7 +433,7 @@ try {
     Assert-Check ($badCombined -match 'config_load_failed|配置加载失败') '配置缺失时输出可诊断的失败原因' $badCombined.Trim()
 
     # ------------------------------------------------- 4. 启动 headless 服务端
-    Write-Host "`n[4/21] headless 服务端启动并监听" -ForegroundColor Cyan
+    Write-Host "`n[4/23] headless 服务端启动并监听" -ForegroundColor Cyan
     $serverInfo = New-GodotStartInfo -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$dataPath") -CaptureOutput
     $serverProcess = [System.Diagnostics.Process]::Start($serverInfo)
@@ -432,7 +451,7 @@ try {
     Assert-Check (-not $serverProcess.HasExited) '服务端进程持续运行（未提前退出）'
 
     # ------------------------------------------------ 5. 无头自测（SmokeTest）
-    Write-Host "`n[5/21] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
+    Write-Host "`n[5/23] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
     if ($ready) {
         $smokeResult = Invoke-GodotCapture -Executable $godotExe `
             -Arguments @('--headless', '--path', $serverPath, 'res://tests/SmokeTest.tscn', '--', "--port=$Port") `
@@ -457,7 +476,7 @@ catch {
 }
 finally {
     # ------------------------------------------------------- 6. 清理与残留
-    Write-Host "`n[6/21] 进程清理（R0 服务端）" -ForegroundColor Cyan
+    Write-Host "`n[6/23] 进程清理（R0 服务端）" -ForegroundColor Cyan
 
     if ($serverProcess) {
         try { $serverProcess.Refresh() } catch { }
@@ -488,7 +507,7 @@ finally {
 }
 
 # ------------------------------------------- 7. 服务端 R1 验收（R1Test）
-Write-Host "`n[7/21] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[7/23] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r1Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R1Test.tscn') `
@@ -519,7 +538,7 @@ else {
 }
 
 # ------------------------------------------- 8. 服务端 R2 验收（回合 + 移动 + 视野）
-Write-Host "`n[8/21] 服务端 R2 验收（res://tests/R2Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[8/23] 服务端 R2 验收（res://tests/R2Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r2Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R2Test.tscn') `
@@ -535,7 +554,7 @@ else {
 }
 
 # ------------------------------------------- 9. 客户端 R1 验收（无头 + 端到端）
-Write-Host "`n[9/21] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[9/23] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $clientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn') `
@@ -574,7 +593,7 @@ else {
 }
 
 # ------------------------------ 10. 客户端 R2 验收（点选 → 高亮 → 移动 → 结束回合）
-Write-Host "`n[10/21] 客户端 R2 验收（res://tests/R2ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[10/23] 客户端 R2 验收（res://tests/R2ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r2ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R2ClientTest.tscn') `
@@ -612,7 +631,7 @@ else {
 }
 
 # ------------------------------ 11. 服务端 R3 验收（经济 + 城市 + 建筑/区域/劳力/改良/道路）
-Write-Host "`n[11/21] 服务端 R3 验收（res://tests/R3Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[11/23] 服务端 R3 验收（res://tests/R3Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r3Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R3Test.tscn') `
@@ -628,7 +647,7 @@ else {
 }
 
 # ------------------------------ 12. 客户端 R3 验收（选中灵峰 → 城市面板 → 建造 → 指派劳力）
-Write-Host "`n[12/21] 客户端 R3 验收（res://tests/R3ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[12/23] 客户端 R3 验收（res://tests/R3ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r3ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R3ClientTest.tscn') `
@@ -665,7 +684,7 @@ else {
 }
 
 # ------------------------------ 13. 服务端 R4 验收（道统树 + 修炼/突破/渡劫 + 项目队列 + 收徒）
-Write-Host "`n[13/21] 服务端 R4 验收（res://tests/R4Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[13/23] 服务端 R4 验收（res://tests/R4Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r4Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R4Test.tscn') `
@@ -681,7 +700,7 @@ else {
 }
 
 # ------------------------------ 14. 客户端 R4 验收（道统树 → 研究 → 队列 → 加速 → 收徒 → 取消）
-Write-Host "`n[14/21] 客户端 R4 验收（res://tests/R4ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[14/23] 客户端 R4 验收（res://tests/R4ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r4ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R4ClientTest.tscn') `
@@ -720,7 +739,7 @@ else {
 }
 
 # ------------------------------ 15. 服务端 R5 验收（十兵种 + 战斗结算 + ZOC + 传送 + 转职晋升）
-Write-Host "`n[15/21] 服务端 R5 验收（res://tests/R5Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[15/23] 服务端 R5 验收（res://tests/R5Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r5Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R5Test.tscn') `
@@ -736,7 +755,7 @@ else {
 }
 
 # ------------------------------ 16. 客户端 R5 验收（攻击预览 → 转职晋升 → 批量移动）
-Write-Host "`n[16/21] 客户端 R5 验收（res://tests/R5ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[16/23] 客户端 R5 验收（res://tests/R5ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r5ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R5ClientTest.tscn') `
@@ -777,7 +796,7 @@ else {
 }
 
 # ------------------------------ 17. 服务端 R6 验收（探索 / 政令 / 自动化）
-Write-Host "`n[17/21] 服务端 R6 验收（res://tests/R6Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[17/23] 服务端 R6 验收（res://tests/R6Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r6Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R6Test.tscn') `
@@ -788,8 +807,10 @@ if ($godotExe) {
     Assert-Check ($r6Result.ExitCode -eq 0) '服务端 R6 验收退出码为 0' "退出码：$($r6Result.ExitCode)"
     Assert-Check ($r6Combined -notmatch 'R6_FAIL') '服务端 R6 验收未出现 R6_FAIL' `
         ((Select-GodotProblems -Text $r6Combined) -join "`n")
-    # 56 条已实现是 R6 的硬口径：命令总数由 CommandDispatcher 自报，避免文档与实现脱节。
-    Assert-Check ($r6Combined -match 'R6_IMPLEMENTED=56') '服务端已实现命令累计 56 条（40 + R6 16 条）' `
+    # R6 的硬口径是「R6 那 16 条都已登记、总数不少于 56」；后续里程碑继续加命令不应打破它，
+    # 故这里卡下限而非等值（R7 后总数 70）。
+    Assert-Check ($r6Combined -match 'R6_IMPLEMENTED=(\d+)' -and [int]$Matches[1] -ge 56) `
+        '服务端已实现命令不少于 56 条（R6 交付 40 + 16）' `
         ((Select-GodotProblems -Text $r6Combined) -join "`n")
 }
 else {
@@ -797,7 +818,7 @@ else {
 }
 
 # ------------------------------ 18. 客户端 R6 验收（探索面板 → 政令面板 → 自动化面板）
-Write-Host "`n[18/21] 客户端 R6 验收（res://tests/R6ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[18/23] 客户端 R6 验收（res://tests/R6ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r6ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R6ClientTest.tscn') `
@@ -839,8 +860,76 @@ else {
     Assert-Check $false '运行客户端 R6 验收（未定位到 Godot，已跳过）'
 }
 
-# ------------------------------------------------------ 19. 仓库扫描与最终残留
-Write-Host "`n[19/21] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
+# ------------------------------ 19. 服务端 R7 验收（任命 / 渡劫 / AI / 胜负 / 存档）
+Write-Host "`n[19/23] 服务端 R7 验收（res://tests/R7Test.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $r7Result = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $serverPath, 'res://tests/R7Test.tscn') `
+        -TimeoutMs 600000
+    $r7Combined = ($r7Result.StdOut + "`n" + $r7Result.StdErr)
+    Assert-Check ($r7Combined -match 'R7_PASS checks=\d+') '服务端 R7 验收打印 R7_PASS checks=N' `
+        ((Select-GodotProblems -Text $r7Combined) -join "`n")
+    Assert-Check ($r7Result.ExitCode -eq 0) '服务端 R7 验收退出码为 0' "退出码：$($r7Result.ExitCode)"
+    Assert-Check ($r7Combined -notmatch 'R7_FAIL') '服务端 R7 验收未出现 R7_FAIL' `
+        ((Select-GodotProblems -Text $r7Combined) -join "`n")
+    # R7 的硬口径是「hello 下发 70 条 = 69 + ping 全覆盖」（任务 4 第 2 条）。
+    Assert-Check ($r7Combined -match 'R7_IMPLEMENTED=(\d+)' -and [int]$Matches[1] -eq 70) `
+        '服务端已实现命令 70 条（69 + ping 全覆盖）' `
+        ((Select-GodotProblems -Text $r7Combined) -join "`n")
+}
+else {
+    Assert-Check $false '运行服务端 R7 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------ 20. 客户端 R7 验收（胜负面板 / 存读档 / awaitInput / 结局屏）
+Write-Host "`n[20/23] 客户端 R7 验收（res://tests/R7ClientTest.tscn）" -ForegroundColor Cyan
+if ($godotExe) {
+    $r7ClientResult = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R7ClientTest.tscn') `
+        -TimeoutMs 120000
+    $r7ClientCombined = ($r7ClientResult.StdOut + "`n" + $r7ClientResult.StdErr)
+    Assert-Check ($r7ClientCombined -match 'R7_CLIENT_RESULT=OK') '客户端 R7 无头验收全绿（R7_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $r7ClientCombined) -join "`n")
+    Assert-Check ($r7ClientResult.ExitCode -eq 0) '客户端 R7 无头验收退出码为 0' "退出码：$($r7ClientResult.ExitCode)"
+    Assert-Check ($r7ClientCombined -notmatch 'R7_CLIENT_FAIL') '客户端 R7 无头验收未出现 R7_CLIENT_FAIL'
+
+    $r7Integration = Invoke-GodotCapture -Executable $godotExe `
+        -Arguments @('--headless', '--path', $clientPath, 'res://tests/R7ClientTest.tscn', '--', '--integration') `
+        -TimeoutMs 600000
+    $r7IntegrationCombined = ($r7Integration.StdOut + "`n" + $r7Integration.StdErr)
+    # 与 R1–R6 同理：必须匹配 R7_CLIENT_PASS: 前缀，否则 FAIL 也会被判 PASS。
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：打开胜利进度面板') `
+        '端到端 R7：打开胜利进度面板并渲染三路线 goals' `
+        ((Select-GodotProblems -Text $r7IntegrationCombined) -join "`n")
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：未达成路线的择定按钮置灰') `
+        '端到端 R7：未达成路线的择定按钮置灰'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：saveGame 回') `
+        '端到端 R7：saveGame 回 {slot,saved} 被判为成功（无 success 布尔）'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：读档后回合与存档时一致') `
+        '端到端 R7：存读档往返后回合与 view 一致'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：awaitInput 触发待抉择弹窗') `
+        '端到端 R7：awaitInput 主动消息触发待抉择弹窗'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：待决未清空时弹窗保留') `
+        '端到端 R7：resolveChoice 越界时待决保留且弹窗不消失'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：结局屏显示 winType') `
+        '端到端 R7：结局屏展示 winType / winnerSectId'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：事件栏展示回包 events') `
+        '端到端 R7：事件栏展示回包 events（AI 行动占位）'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_PASS: 端到端：全程相机 transform 不变') `
+        '端到端 R7：全程相机 transform/size 不重置'
+    Assert-Check ($r7IntegrationCombined -match 'R7_CLIENT_RESULT=OK') '端到端 R7 集成验收全绿（R7_CLIENT_RESULT=OK）' `
+        ((Select-GodotProblems -Text $r7IntegrationCombined) -join "`n")
+
+    Start-Sleep -Milliseconds 800
+    [void](Stop-ProjectGodotProcesses -ProjectPaths @($serverPath, $clientPath))
+    Start-Sleep -Milliseconds 500
+}
+else {
+    Assert-Check $false '运行客户端 R7 验收（未定位到 Godot，已跳过）'
+}
+
+# ------------------------------------------------------ 21. 仓库扫描与最终残留
+Write-Host "`n[21/23] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
 $javaFiles = @()
 try {
     $javaFiles = Get-ChildItem -Path $root -Recurse -File -Filter '*.java' -ErrorAction SilentlyContinue |
@@ -857,8 +946,8 @@ Assert-Check ($finalServer.Count -eq 0) 'R1 验收结束后无残留 godot 服�
 Assert-Check ($finalClient.Count -eq 0) 'R1 验收结束后无残留 godot 客户端进程' `
     (($finalClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 
-# ---------------------------------------------- 20. 协议契约（PROTOCOL_2.0）
-Write-Host "`n[20/21] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
+# ---------------------------------------------- 22. 协议契约（PROTOCOL_2.0）
+Write-Host "`n[22/23] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
 $protocolScript = Join-Path $PSScriptRoot 'check_protocol.ps1'
 if (Test-Path -PathType Leaf $protocolScript) {
     # 必须放到子进程执行：脚本内的 exit 会终止当前会话，直接 & 调用会把自检一起带走。

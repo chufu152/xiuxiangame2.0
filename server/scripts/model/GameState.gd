@@ -23,3 +23,10 @@ var improvementSeq: int = 0
 ## R4 新增（内部记账，不入 view）：弟子 id 单调序号（收徒产出用；不复用 `disciples.size()`
 ## 以免叛逃/陨落后 id 重复）。
 var discipleSeq: int = 0
+## R7 新增：终局字段。`view` 早在 R1 就声明了这三项并恒为空，R7 起由 `VictoryRules` 写入。
+## `winType` 是 1.0 `GameState.winType` 的结局名（`VictoryRoute.getDisplayName()`，如「道统大成」），
+## 空串 = 未终局；`winnerSectId` 只在有胜者时非空；`pendingVictoryChoices` 是同时达成的路线 id 列表
+## （招牌路线在前、分数路线在后，1.0 `achievedRoutes` 同序），非空即代表等玩家 `chooseVictory`。
+var winType: String = ""
+var winnerSectId: String = ""
+var pendingVictoryChoices: Array[String] = []

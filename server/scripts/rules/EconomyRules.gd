@@ -100,8 +100,12 @@ static func peak_output(state: GameState, config: Dictionary, peak: SpiritPeak) 
 	# 区域
 	for district: District in peak.districts:
 		add_yield(result, CityRules.district_yield(state, config, peak, district.type, district.tileId))
-	# 主峰基础灵力（按等级）
-	result["spiritPower"] = int(result["spiritPower"]) + int(config["spiritPeak"]["baseSpiritPowerOutput"]) * peak.level
+	# 主峰基础灵力（按等级）；**峰主驻留该峰时** ×(1 + `fengZhuSpiritPowerBonus`)，外出失效（R7）。
+	var base_power: int = int(config["spiritPeak"]["baseSpiritPowerOutput"]) * peak.level
+	if AppointmentRules.feng_zhu_present(state, sect, peak):
+		base_power = int(round(float(base_power) \
+			* (1.0 + float(config["appointment"]["fengZhuSpiritPowerBonus"]))))
+	result["spiritPower"] = int(result["spiritPower"]) + base_power
 	# 藏经阁：每座道点 +cangJingGePointsPerTurn
 	var cang_jing: int = CityRules.building_count(peak, Enums.Building.CANG_JING_GE)
 	if cang_jing > 0:
@@ -112,6 +116,12 @@ static func peak_output(state: GameState, config: Dictionary, peak: SpiritPeak) 
 	qi_yun += _adjacent_resource_nodes(state, peak) * int(config["qiYun"]["adjacentNodeBonus"])
 	if peak.capital:
 		qi_yun += _luxury_qi_yun(config, sect)
+	# R7 任命气运：峰主驻留该峰 +`fengZhuQiYunBonus`；宗主坐镇首都大殿 +`zongZhuDaDianQiYunBonus`。
+	# 两者都是「在场才生效」，与灵力加成的失效口径一致（1.0 `calculateQiYun` 同序）。
+	if AppointmentRules.feng_zhu_present(state, sect, peak):
+		qi_yun += int(config["appointment"]["fengZhuQiYunBonus"])
+	if peak.capital and sect != null:
+		qi_yun += AppointmentRules.zong_zhu_qi_yun_bonus(state, config, sect)
 	result["qiYun"] = int(result["qiYun"]) + qi_yun
 	if peak.capital and sect != null:
 		# 弟子灵力反哺（宗级计一次；R3 无重伤/渡劫状态，全员计入）
@@ -265,6 +275,11 @@ static func apply_settlement(state: GameState, config: Dictionary) -> Array[Stri
 		var policy_multiplier: float = PolicyRules.output_multiplier(state, config, sect)
 		if not is_equal_approx(policy_multiplier, 1.0):
 			totals["spiritPower"] = int(round(float(totals["spiritPower"]) * policy_multiplier))
+		# 宗主大殿灵力乘区（R7）：宗主坐镇首都且大殿建成时宗级 ×1.2，外出即 ×1.0。
+		# 与 1.0 `calculateSpiritPowerIncome` 的 `total *= 1 + zongZhuDaDianSpiritPowerBonus` 同位置。
+		var zong_zhu_multiplier: float = AppointmentRules.zong_zhu_spirit_multiplier(state, config, sect)
+		if not is_equal_approx(zong_zhu_multiplier, 1.0):
+			totals["spiritPower"] = int(round(float(totals["spiritPower"]) * zong_zhu_multiplier))
 		var deficit: bool = int(sect.resources.get("spiritPower", 0)) + int(totals["spiritPower"]) < int(upkeep["spiritPower"])
 		settle_city(state, config, sect, deficit)
 		_apply_economy(state, config, sect, totals, per_peak, upkeep, deficit)

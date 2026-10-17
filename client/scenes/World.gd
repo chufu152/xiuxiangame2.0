@@ -161,6 +161,7 @@ func _ready() -> void:
 	_build_explore_panel()
 	_build_policy_panel()
 	_build_automation_panel()
+	_build_r7_panels()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -183,6 +184,12 @@ func _ready() -> void:
 	Session.policy_options_received.connect(_on_policy_options_received)
 	Session.automation_state_received.connect(_on_automation_state_received)
 	Session.r6_result_received.connect(_on_r6_result_received)
+	Session.victory_progress_received.connect(_on_victory_progress_received)
+	Session.victory_choice_received.connect(_on_victory_choice_received)
+	Session.saves_received.connect(_on_saves_received)
+	Session.await_input.connect(_on_await_input)
+	Session.events_received.connect(_on_events_received)
+	Session.r7_result_received.connect(_on_r7_result_received)
 	if not Session.current_view.is_empty():
 		_render(Session.current_view)
 	else:
@@ -197,6 +204,7 @@ func _ready() -> void:
 		_render_explore_panel()
 		_render_policy_panel()
 		_render_automation_panel()
+		_render_r7_panels()
 
 
 func _process(_delta: float) -> void:
@@ -645,6 +653,26 @@ func _build_topbar() -> void:
 	automation_button.tooltip_text = "打开自动化面板（开关/自动项目/立即探索/集结/回防）；相机角度与缩放保持不变"
 	automation_button.pressed.connect(func() -> void: open_automation_panel())
 	row.add_child(automation_button)
+
+	# R7：胜负进度 / 存档 / 结局 入口（互斥显示，均不触碰相机）。
+	var victory_button: Button = Button.new()
+	victory_button.name = "VictoryButton"
+	victory_button.text = "胜负"
+	victory_button.tooltip_text = "打开胜利进度面板（三路线 goals 全由服务端算）；相机角度与缩放保持不变"
+	victory_button.pressed.connect(func() -> void: open_victory_panel())
+	row.add_child(victory_button)
+	var saves_button: Button = Button.new()
+	saves_button.name = "SavesButton"
+	saves_button.text = "存档"
+	saves_button.tooltip_text = "打开存档面板（listSaves / saveGame / loadGame）；相机角度与缩放保持不变"
+	saves_button.pressed.connect(func() -> void: open_saves_panel())
+	row.add_child(saves_button)
+	var gameover_button: Button = Button.new()
+	gameover_button.name = "GameOverButton"
+	gameover_button.text = "结局"
+	gameover_button.tooltip_text = "打开结局屏（queryGameOver / checkVictory / checkDefeat）；相机角度与缩放保持不变"
+	gameover_button.pressed.connect(func() -> void: open_gameover_panel())
+	row.add_child(gameover_button)
 
 	end_turn_button = Button.new()
 	end_turn_button.text = "结束回合"
@@ -1815,6 +1843,46 @@ func _populate_unit_actions() -> void:
 		promotion_button.disabled = int(disciple_detail.get("promotionPoints", 0)) <= 0
 		promotion_button.pressed.connect(func() -> void: Session.request_promote(selected_disciple_id, promotion_id))
 		unit_list.add_child(promotion_button)
+	# R7：任命 / 渡劫（门槛、名额、成功率全由服务端判定；这里只发命令并展示 message）。
+	unit_list.add_child(_city_section_label("任命 / 渡劫"))
+	var peak_id: String = active_peak_id()
+	var peak_name: String = _peak_name_of(peak_id)
+	var feng_zhu: Button = Button.new()
+	feng_zhu.name = "AppointFengZhu"
+	feng_zhu.text = "任命为峰主（%s）" % (peak_name if not peak_name.is_empty() else "无灵峰")
+	feng_zhu.tooltip_text = "appointFengZhu：需达岗位最低境界，原峰主自动降为亲传"
+	feng_zhu.disabled = peak_id.is_empty()
+	feng_zhu.pressed.connect(func() -> void: Session.request_appoint_feng_zhu(selected_disciple_id, peak_id))
+	unit_list.add_child(feng_zhu)
+	var zhang_lao: Button = Button.new()
+	zhang_lao.name = "AppointZhangLao"
+	zhang_lao.text = "任命为长老"
+	zhang_lao.tooltip_text = "appointZhangLao：名额 = 基础 2 + 势力等级×1；宗主不可兼任"
+	zhang_lao.pressed.connect(func() -> void: Session.request_appoint_zhang_lao(selected_disciple_id))
+	unit_list.add_child(zhang_lao)
+	var zong_zhu: Button = Button.new()
+	zong_zhu.name = "AppointZongZhu"
+	zong_zhu.text = "任命为宗主"
+	zong_zhu.tooltip_text = "appointZongZhu：家族流须血脉、须身处首都；原宗主退为长老"
+	zong_zhu.pressed.connect(func() -> void: Session.request_appoint_zong_zhu(selected_disciple_id))
+	unit_list.add_child(zong_zhu)
+	var tribulate: Button = Button.new()
+	tribulate.name = "Tribulate"
+	tribulate.text = "渡劫飞升"
+	tribulate.tooltip_text = "tribulate：成功率/心魔/陨落由服务端掷骰（仅经 GameState.rng，确定性）"
+	tribulate.pressed.connect(func() -> void: Session.request_tribulate(selected_disciple_id))
+	unit_list.add_child(tribulate)
+
+
+## 灵峰 id → 名称（`view.sects[player].spiritPeaks[]`；找不到回空串）。
+func _peak_name_of(peak_id: String) -> String:
+	if peak_id.is_empty():
+		return ""
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		for peak: Dictionary in sect.get("spiritPeaks", []):
+			if str(peak.get("id", "")) == peak_id:
+				return str(peak.get("name", peak_id))
+	return ""
 
 
 ## 撤退模式：候选格 = 服务端可达集中**相邻**者（相邻性属纯几何，用 Hex.distance 判，
@@ -2223,6 +2291,23 @@ func _build_sidebar() -> void:
 
 	column.add_child(HSeparator.new())
 
+	# R7：事件栏（AI 行动 / 胜负 / 宗主外出等）。占位展示，真回放留 R8。
+	var event_title: Label = Label.new()
+	event_title.text = "事件"
+	event_title.add_theme_font_size_override("font_size", 14)
+	event_title.add_theme_color_override("font_color", Color("294e48"))
+	column.add_child(event_title)
+	event_label = RichTextLabel.new()
+	event_label.fit_content = false
+	event_label.scroll_active = true
+	event_label.selection_enabled = false
+	event_label.custom_minimum_size = Vector2(0, 96)
+	event_label.add_theme_font_size_override("normal_font_size", 13)
+	event_label.text = "（暂无事件）"
+	column.add_child(event_label)
+
+	column.add_child(HSeparator.new())
+
 	var buttons: HBoxContainer = HBoxContainer.new()
 	column.add_child(buttons)
 	var refresh: Button = Button.new()
@@ -2385,6 +2470,7 @@ func _build_automation_panel() -> void:
 
 
 ## 关闭三面板（`keep` 指定的那个保留），供互斥显示用。
+## R7 起一并收起胜负/存档/结局三面板（同一屏幕区域，避免叠在一起）。
 func _close_r6_panels(keep: CanvasLayer = null) -> void:
 	if explore_panel != keep:
 		explore_open = false
@@ -2392,6 +2478,7 @@ func _close_r6_panels(keep: CanvasLayer = null) -> void:
 		policy_open = false
 	if automation_panel != keep:
 		automation_open = false
+	_close_r7_panels()
 	_sync_r6_visibility()
 
 
@@ -2794,6 +2881,659 @@ func automation_button_count() -> int:
 ## 按按钮名找到按钮状态（`Toggle_<key>` / `Peak_<peakId>` / `Card_<cardId>` / `Gov_<govId>`）。
 func r6_button_state(button_name: String) -> Dictionary:
 	for list: VBoxContainer in [explore_list, policy_list, automation_list]:
+		if list == null:
+			continue
+		var button: Button = list.get_node_or_null(NodePath(button_name)) as Button
+		if button != null:
+			return {"disabled": button.disabled, "text": button.text, "tooltip": button.tooltip_text}
+	return {}
+
+
+# ---------------------------------------------------------------------------
+# R7 胜负 / 存档 / 结局 / 待抉择（只表现，不推规则）
+# ---------------------------------------------------------------------------
+# 四块 UI 的共同约束：
+#   1. 所有数值（进度比例、目标、评分、结局名、存档槽内容）一律来自服务端回包；
+#      客户端只做字符串拼接与按钮禁用态，**不算任何规则**。
+#   2. 任何面板开关、任何 view 刷新都**不触碰相机**（不调 frame_once / 不改 transform / 不改 size）。
+#   3. `saveGame` 的回包是 `{slot, saved}`（**没有 `success` 布尔**），故此处判 `saved`
+#      而不是 `success`——这是 PROTOCOL §2 / 裁决八的硬约束，不能照抄 R3–R6 的写法。
+
+## 事件栏保留条数（占位展示，滚动可回看；真回放在 R8）。
+const EVENT_MAX_LINES: int = 12
+## 存档面板展示的槽位（0 = 自动存档槽，裁决九：`turn % 10 == 0` 写槽 0）。
+## 槽 4 是客户端端到端验收的专用槽（`R7ClientTest` 写完后自行删除），故一并列出。
+const SAVE_SLOTS: Array[int] = [0, 1, 2, 3, 4]
+## 路线 id → 显示名（= 1.0 `winType` 四值）。**纯文案映射，不是规则**：
+## 服务端 `routes[]` 只下发路线 id（PROTOCOL §2），故客户端需一张对照表来显示中文名。
+const ROUTE_LABELS: Dictionary = {
+	"ZONG_MEN_DAOTONG": "万法归宗",
+	"JIA_ZU_ASCENSION": "举族登仙",
+	"GUO_JIA_UNIFICATION": "一统天下",
+	"SCORE_SUPREMACY": "修仙共主",
+}
+
+var victory_panel: CanvasLayer = null
+var victory_title_label: Label = null
+var victory_info_label: Label = null
+var victory_list: VBoxContainer = null
+var victory_status_label: Label = null
+var victory_open: bool = false
+var victory_progress: Dictionary = {}
+## `queryVictoryChoice` 最近一次回包（只读展示用）。
+var victory_choice_state: Dictionary = {}
+
+var saves_panel: CanvasLayer = null
+var saves_title_label: Label = null
+var saves_info_label: Label = null
+var saves_list: VBoxContainer = null
+var saves_status_label: Label = null
+var saves_open: bool = false
+var saves_data: Dictionary = {}
+
+var gameover_panel: CanvasLayer = null
+var gameover_title_label: Label = null
+var gameover_info_label: Label = null
+var gameover_list: VBoxContainer = null
+var gameover_status_label: Label = null
+var gameover_open: bool = false
+var gameover_state: Dictionary = {}
+var gameover_route: String = ""
+var gameover_defeated: bool = false
+
+var choice_panel: CanvasLayer = null
+var choice_info_label: Label = null
+var choice_list: VBoxContainer = null
+var choice_status_label: Label = null
+var choice_open: bool = false
+var await_choice: Dictionary = {}
+
+## 侧栏事件栏（R7 占位）。
+var event_label: RichTextLabel = null
+var event_lines: Array[String] = []
+
+
+func _build_r7_panels() -> void:
+	var victory_parts: Array = _make_r6_panel("VictoryPanel", "胜利进度")
+	victory_panel = victory_parts[0] as CanvasLayer
+	victory_title_label = victory_parts[1] as Label
+	victory_info_label = victory_parts[2] as Label
+	victory_list = victory_parts[3] as VBoxContainer
+	victory_status_label = victory_parts[4] as Label
+
+	var saves_parts: Array = _make_r6_panel("SavesPanel", "存档")
+	saves_panel = saves_parts[0] as CanvasLayer
+	saves_title_label = saves_parts[1] as Label
+	saves_info_label = saves_parts[2] as Label
+	saves_list = saves_parts[3] as VBoxContainer
+	saves_status_label = saves_parts[4] as Label
+
+	var gameover_parts: Array = _make_r6_panel("GameOverPanel", "结局")
+	gameover_panel = gameover_parts[0] as CanvasLayer
+	gameover_title_label = gameover_parts[1] as Label
+	gameover_info_label = gameover_parts[2] as Label
+	gameover_list = gameover_parts[3] as VBoxContainer
+	gameover_status_label = gameover_parts[4] as Label
+
+	_build_choice_panel()
+
+
+## 待抉择弹窗：居中、层级最高（`layer = 5`），只由服务端主动推送的 `awaitInput` 打开。
+func _build_choice_panel() -> void:
+	choice_panel = CanvasLayer.new()
+	choice_panel.name = "ChoicePanel"
+	choice_panel.layer = 5
+	add_child(choice_panel)
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -260.0
+	panel.offset_right = 260.0
+	panel.offset_top = -170.0
+	panel.offset_bottom = 170.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.97)
+	style.border_color = Color("8c6a3f")
+	style.set_border_width_all(2)
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 14.0
+	style.content_margin_bottom = 14.0
+	panel.add_theme_stylebox_override("panel", style)
+	choice_panel.add_child(panel)
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	panel.add_child(column)
+	var title: Label = Label.new()
+	title.text = "择定结局"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color("294e48"))
+	column.add_child(title)
+	choice_info_label = Label.new()
+	choice_info_label.add_theme_font_size_override("font_size", 13)
+	choice_info_label.add_theme_color_override("font_color", Color("3c4b45"))
+	choice_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(choice_info_label)
+	column.add_child(HSeparator.new())
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 140)
+	column.add_child(scroll)
+	choice_list = VBoxContainer.new()
+	choice_list.add_theme_constant_override("separation", 4)
+	choice_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(choice_list)
+	choice_status_label = Label.new()
+	choice_status_label.add_theme_font_size_override("font_size", 12)
+	choice_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	choice_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(choice_status_label)
+	choice_panel.visible = false
+
+
+## 关闭胜负/存档/结局三面板（`keep` 指定的那个保留）。
+func _close_r7_panels(keep: CanvasLayer = null) -> void:
+	if victory_panel != keep:
+		victory_open = false
+	if saves_panel != keep:
+		saves_open = false
+	if gameover_panel != keep:
+		gameover_open = false
+
+
+func _sync_r7_visibility() -> void:
+	if victory_panel != null:
+		victory_panel.visible = victory_open
+	if saves_panel != null:
+		saves_panel.visible = saves_open
+	if gameover_panel != null:
+		gameover_panel.visible = gameover_open
+	if choice_panel != null:
+		choice_panel.visible = choice_open
+
+
+func _render_r7_panels() -> void:
+	_sync_r7_visibility()
+	_render_victory_panel()
+	_render_saves_panel()
+	_render_gameover_panel()
+	_render_choice_panel()
+
+
+# --- 胜利进度 ---
+
+func open_victory_panel() -> void:
+	_close_r6_panels()
+	_close_r7_panels(victory_panel)
+	victory_open = true
+	victory_status_label.text = ""
+	_render_victory_panel()
+	Session.request_query_victory_progress(player_sect_id())
+
+
+func close_victory_panel() -> void:
+	victory_open = false
+	_sync_r7_visibility()
+	_render_victory_panel()
+
+
+func _on_victory_progress_received(result: Dictionary) -> void:
+	victory_progress = result
+	_render_victory_panel()
+
+
+## `queryVictoryChoice` 回包：待决时把路线并进结局屏展示。
+##
+## **不在此处合成 `reqId`**：`resolveChoice` 只认 `awaitInput.reqId`（前缀 `req_victory_`，
+## 裁决七），而 `queryVictoryChoice` 不下发该字段，故实际择定一律走 `awaitInput` 弹窗；
+## 本函数只负责「有待决」这一事实的只读展示。
+func _on_victory_choice_received(result: Dictionary) -> void:
+	victory_choice_state = result
+	if not bool(result.get("pending", false)):
+		return
+	var pending: Array = []
+	for entry: Variant in result.get("options", []):
+		var option: Dictionary = entry
+		pending.append(str(option.get("routeId", "")))
+	if pending.is_empty():
+		return
+	gameover_state["pendingVictoryChoices"] = pending
+	_render_gameover_panel()
+
+
+## 三路线：`route`（id）/`achieved`/`ratio`/`summary`/`stage`/`score`/`goals[]`（9 键）。
+func _render_victory_panel() -> void:
+	_sync_r7_visibility()
+	if victory_info_label == null:
+		return
+	if not victory_open:
+		victory_info_label.text = ""
+		_clear_r6_list(victory_list)
+		return
+	var routes: Array = victory_progress.get("routes", [])
+	var lines: PackedStringArray = PackedStringArray()
+	if routes.is_empty():
+		lines.append("（等待服务端胜利进度…）")
+	for entry: Variant in routes:
+		var route: Dictionary = entry
+		lines.append("%s · %s · 进度 %d%%%s" % [
+			_route_label(str(route.get("route", ""))),
+			str(route.get("stage", "")),
+			int(roundf(float(route.get("ratio", 0.0)) * 100.0)),
+			"（已达成）" if bool(route.get("achieved", false)) else "",
+		])
+		lines.append("    %s" % str(route.get("summary", "")))
+		if route.get("score") != null:
+			lines.append("    当前评分 %d" % int(route.get("score", 0)))
+	victory_info_label.text = "\n".join(lines)
+	_clear_r6_list(victory_list)
+	for entry: Variant in routes:
+		var route: Dictionary = entry
+		var route_id: String = str(route.get("route", ""))
+		for goal_entry: Variant in route.get("goals", []):
+			var goal: Dictionary = goal_entry
+			var row: Label = Label.new()
+			row.name = "Goal_%s_%s" % [route_id, str(goal.get("name", ""))]
+			row.text = "%s %s · %s" % [
+				"✓" if bool(goal.get("met", false)) else "·",
+				str(goal.get("name", "")),
+				str(goal.get("valueText", "")),
+			]
+			row.tooltip_text = str(goal.get("description", ""))
+			row.add_theme_font_size_override("font_size", 12)
+			row.add_theme_color_override("font_color", Color("3c4b45") if bool(goal.get("met", false)) else Color("8a6a3a"))
+			victory_list.add_child(row)
+		var choose: Button = Button.new()
+		choose.name = "Choose_" + route_id
+		choose.text = "择定「%s」" % _route_label(route_id)
+		choose.tooltip_text = "chooseVictory：仅待择路线可择；多条同时达成时由 awaitInput 择一"
+		choose.disabled = not bool(route.get("achieved", false))
+		choose.pressed.connect(func() -> void: Session.request_choose_victory(route_id))
+		victory_list.add_child(choose)
+		victory_list.add_child(HSeparator.new())
+	var refresh: Button = Button.new()
+	refresh.name = "RefreshVictory"
+	refresh.text = "刷新进度"
+	refresh.pressed.connect(func() -> void: Session.request_query_victory_progress(player_sect_id()))
+	victory_list.add_child(refresh)
+	var close: Button = Button.new()
+	close.name = "CloseVictory"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_victory_panel())
+	victory_list.add_child(close)
+
+
+func _route_label(route_id: String) -> String:
+	return str(ROUTE_LABELS.get(route_id, route_id))
+
+
+# --- 存档 ---
+
+func open_saves_panel() -> void:
+	_close_r6_panels()
+	_close_r7_panels(saves_panel)
+	saves_open = true
+	saves_status_label.text = ""
+	_render_saves_panel()
+	Session.request_list_saves()
+
+
+func close_saves_panel() -> void:
+	saves_open = false
+	_sync_r7_visibility()
+	_render_saves_panel()
+
+
+func _on_saves_received(result: Dictionary) -> void:
+	saves_data = result
+	_render_saves_panel()
+
+
+func _saves_by_slot() -> Dictionary:
+	var by_slot: Dictionary = {}
+	for entry: Variant in saves_data.get("saves", []):
+		var info: Dictionary = entry
+		by_slot[int(info.get("slotId", -1))] = info
+	return by_slot
+
+
+func _render_saves_panel() -> void:
+	_sync_r7_visibility()
+	if saves_info_label == null:
+		return
+	if not saves_open:
+		saves_info_label.text = ""
+		_clear_r6_list(saves_list)
+		return
+	var by_slot: Dictionary = _saves_by_slot()
+	saves_info_label.text = "共 %d 个存档（槽 0 = 每 10 回合自动存档）\n%s" % [
+		by_slot.size(),
+		"读档后按 view 整体重建，相机角度与缩放保持不变",
+	]
+	_clear_r6_list(saves_list)
+	for slot: int in SAVE_SLOTS:
+		# 闭包按值捕获，故每次迭代取一份新的局部副本（GDScript 循环变量在 lambda 里易踩坑）。
+		var slot_index: int = slot
+		var info: Dictionary = by_slot.get(slot_index, {})
+		var save_button: Button = Button.new()
+		save_button.name = "Save_%d" % slot_index
+		save_button.text = "存入槽 %d" % slot_index
+		save_button.tooltip_text = "saveGame：回包 {slot, saved}（失败带 message，无 success 布尔）"
+		save_button.pressed.connect(func() -> void: Session.request_save_game(slot_index))
+		saves_list.add_child(save_button)
+		var load_button: Button = Button.new()
+		load_button.name = "Load_%d" % slot_index
+		if info.is_empty():
+			load_button.text = "读取槽 %d（空）" % slot_index
+			load_button.disabled = true
+		else:
+			load_button.text = "读取槽 %d · 第 %d 回合 · %s" % [
+				slot_index, int(info.get("turn", 0)), str(info.get("playerSectName", "")),
+			]
+			load_button.tooltip_text = "%s · %s · %d 字节" % [
+				str(info.get("factionType", "")), str(info.get("savedAt", "")), int(info.get("fileSize", 0)),
+			]
+			load_button.pressed.connect(func() -> void: Session.request_load_game(slot_index))
+		saves_list.add_child(load_button)
+		saves_list.add_child(HSeparator.new())
+	var refresh: Button = Button.new()
+	refresh.name = "RefreshSaves"
+	refresh.text = "刷新列表"
+	refresh.pressed.connect(func() -> void: Session.request_list_saves())
+	saves_list.add_child(refresh)
+	var close: Button = Button.new()
+	close.name = "CloseSaves"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_saves_panel())
+	saves_list.add_child(close)
+
+
+# --- 结局屏 ---
+
+func open_gameover_panel() -> void:
+	_close_r6_panels()
+	_close_r7_panels(gameover_panel)
+	gameover_open = true
+	gameover_status_label.text = ""
+	_render_gameover_panel()
+	Session.request_query_game_over()
+	Session.request_check_victory(player_sect_id())
+	Session.request_check_defeat(player_sect_id())
+
+
+func close_gameover_panel() -> void:
+	gameover_open = false
+	_sync_r7_visibility()
+	_render_gameover_panel()
+
+
+func _render_gameover_panel() -> void:
+	_sync_r7_visibility()
+	if gameover_info_label == null:
+		return
+	if not gameover_open:
+		gameover_info_label.text = ""
+		_clear_r6_list(gameover_list)
+		return
+	var win_type: String = str(gameover_state.get("winType", ""))
+	var winner: String = str(gameover_state.get("winnerSectId", ""))
+	var pending: Array = gameover_state.get("pendingVictoryChoices", [])
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("回合 %d · %s" % [
+		int(gameover_state.get("turn", 0)),
+		"终局已定" if bool(gameover_state.get("gameOver", false)) else "对局进行中",
+	])
+	lines.append("结局：%s" % (win_type if not win_type.is_empty() else "未定"))
+	lines.append("胜者：%s" % (_sect_name(winner) if not winner.is_empty() else "未定"))
+	if not gameover_route.is_empty():
+		lines.append("本宗达成路线：%s" % _route_label(gameover_route))
+	if gameover_defeated:
+		lines.append("本宗已覆灭（弟子全灭 / 灵峰全失 / 宗主陨落无继承人）")
+	if not pending.is_empty():
+		var names: PackedStringArray = PackedStringArray()
+		for entry: Variant in pending:
+			names.append(_route_label(str(entry)))
+		lines.append("待择路线：%s（见「择定结局」弹窗）" % "、".join(names))
+	gameover_info_label.text = "\n".join(lines)
+	_clear_r6_list(gameover_list)
+	for entry: Variant in pending:
+		var route_id: String = str(entry)
+		var choose: Button = Button.new()
+		choose.name = "GameOverChoose_" + route_id
+		choose.text = "择定「%s」" % _route_label(route_id)
+		choose.pressed.connect(func() -> void: Session.request_choose_victory(route_id))
+		gameover_list.add_child(choose)
+	var refresh: Button = Button.new()
+	refresh.name = "RefreshGameOver"
+	refresh.text = "刷新结局"
+	refresh.pressed.connect(func() -> void: open_gameover_panel())
+	gameover_list.add_child(refresh)
+	var close: Button = Button.new()
+	close.name = "CloseGameOver"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_gameover_panel())
+	gameover_list.add_child(close)
+
+
+func _sect_name(sect_id: String) -> String:
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		if str(sect.get("id", "")) == sect_id:
+			return str(sect.get("name", sect_id))
+	return sect_id
+
+
+# --- 待抉择（awaitInput）---
+
+## 服务端主动推送 `awaitInput`（2.0 仅 `kind="victoryChoice"`）。
+## 形状：`{type,reqId,kind,prompt,options[{index,label,routeId,description}]}`（PROTOCOL §0.7）。
+func _on_await_input(message: Dictionary) -> void:
+	await_choice = message
+	choice_open = true
+	choice_status_label.text = ""
+	_render_choice_panel()
+
+
+func close_choice_panel() -> void:
+	choice_open = false
+	_sync_r7_visibility()
+	_render_choice_panel()
+
+
+func _render_choice_panel() -> void:
+	_sync_r7_visibility()
+	if choice_info_label == null:
+		return
+	if not choice_open:
+		choice_info_label.text = ""
+		_clear_r6_list(choice_list)
+		return
+	choice_info_label.text = "%s\n%s" % [
+		str(await_choice.get("prompt", "同时达成多条胜利路线，请择一而终")),
+		"reqId=%s · kind=%s" % [str(await_choice.get("reqId", "")), str(await_choice.get("kind", ""))],
+	]
+	_clear_r6_list(choice_list)
+	var req_id: String = str(await_choice.get("reqId", ""))
+	for entry: Variant in await_choice.get("options", []):
+		var option: Dictionary = entry
+		var index: int = int(option.get("index", 0))
+		var button: Button = Button.new()
+		button.name = "Choice_%d" % index
+		button.text = "%s · %s" % [str(option.get("label", option.get("routeId", "?"))), str(option.get("description", ""))]
+		button.pressed.connect(func() -> void: Session.request_resolve_choice(req_id, index))
+		choice_list.add_child(button)
+	var later: Button = Button.new()
+	later.name = "ChoiceLater"
+	later.text = "稍后再说"
+	later.tooltip_text = "不回应则待决状态保留，下次回包时服务端会重新推送"
+	later.pressed.connect(func() -> void: close_choice_panel())
+	choice_list.add_child(later)
+
+
+# --- 事件栏（AI 行动占位展示）---
+
+func _on_events_received(events: Array) -> void:
+	for entry: Variant in events:
+		var text: String = str(entry).strip_edges()
+		if text.is_empty():
+			continue
+		event_lines.append(text)
+	while event_lines.size() > EVENT_MAX_LINES:
+		event_lines.pop_front()
+	_refresh_event_label()
+
+
+func _refresh_event_label() -> void:
+	if event_label == null:
+		return
+	if event_lines.is_empty():
+		event_label.text = "（暂无事件）"
+		return
+	var lines: PackedStringArray = PackedStringArray()
+	for index: int in range(event_lines.size()):
+		lines.append("%d. %s" % [index + 1, event_lines[index]])
+	event_label.text = "\n".join(lines)
+
+
+# --- R7 回包汇总 ---
+
+## R7 写命令回包：把 message 落到对应面板，并重拉该面板的只读数据。
+##
+## **`saveGame` 单独处理**：它回 `{slot, saved}` 而非 `{success, message}`，
+## 若照抄 `success` 判断会把「存档成功」误判为失败（裁决八）。
+func _on_r7_result_received(command: String, result: Dictionary) -> void:
+	var message: String = str(result.get("message", ""))
+	if command == Commands.SAVE_GAME:
+		var saved: bool = bool(result.get("saved", false))
+		if saves_status_label != null:
+			saves_status_label.text = ("✓ 已存入槽 %d" % int(result.get("slot", 0))) if saved \
+				else ("✗ 存档失败：%s" % message)
+		if saved:
+			Session.request_list_saves()
+		return
+	if not bool(result.get("success", true)):
+		message = "✗ " + message
+	match command:
+		Commands.TRIBULATE:
+			combat_feedback = message
+			_render_unit_panel()
+			_render_combat_panel()
+		Commands.APPOINT_FENG_ZHU, Commands.APPOINT_ZHANG_LAO, Commands.APPOINT_ZONG_ZHU:
+			combat_feedback = message
+			_render_unit_panel()
+			_render_combat_panel()
+		Commands.CHOOSE_VICTORY, Commands.RESOLVE_CHOICE:
+			if victory_status_label != null:
+				victory_status_label.text = message
+			if choice_status_label != null:
+				choice_status_label.text = message
+			if bool(result.get("success", false)):
+				choice_open = false
+				_render_choice_panel()
+			Session.request_query_game_over()
+			if gameover_open:
+				Session.request_check_victory(player_sect_id())
+		Commands.QUERY_GAME_OVER:
+			gameover_state = result
+			_render_gameover_panel()
+		Commands.CHECK_VICTORY:
+			gameover_route = "" if result.get("route") == null else str(result.get("route"))
+			_render_gameover_panel()
+		Commands.CHECK_DEFEAT:
+			gameover_defeated = bool(result.get("defeated", false))
+			_render_gameover_panel()
+		Commands.LOAD_GAME:
+			if saves_status_label != null:
+				saves_status_label.text = "✓ 已读取槽 %d（第 %d 回合）" % [
+					int(result.get("slot", 0)), int(result.get("turn", 0)),
+				]
+			_render_r7_panels()
+		_:
+			pass
+
+
+# --- 供自动验收断言（R7）---
+
+func victory_panel_visible() -> bool:
+	return victory_open
+
+
+func victory_info_text() -> String:
+	return victory_info_label.text if victory_info_label != null else ""
+
+
+func victory_feedback_text() -> String:
+	return victory_status_label.text if victory_status_label != null else ""
+
+
+func victory_button_count() -> int:
+	return victory_list.get_child_count() if victory_list != null else 0
+
+
+func victory_route_count() -> int:
+	return (victory_progress.get("routes", []) as Array).size()
+
+
+func saves_panel_visible() -> bool:
+	return saves_open
+
+
+func saves_info_text() -> String:
+	return saves_info_label.text if saves_info_label != null else ""
+
+
+func saves_feedback_text() -> String:
+	return saves_status_label.text if saves_status_label != null else ""
+
+
+func saves_button_count() -> int:
+	return saves_list.get_child_count() if saves_list != null else 0
+
+
+func saves_slot_count() -> int:
+	return (saves_data.get("saves", []) as Array).size()
+
+
+func gameover_panel_visible() -> bool:
+	return gameover_open
+
+
+func gameover_info_text() -> String:
+	return gameover_info_label.text if gameover_info_label != null else ""
+
+
+func gameover_button_count() -> int:
+	return gameover_list.get_child_count() if gameover_list != null else 0
+
+
+func choice_panel_visible() -> bool:
+	return choice_open
+
+
+func choice_info_text() -> String:
+	return choice_info_label.text if choice_info_label != null else ""
+
+
+func choice_button_count() -> int:
+	return choice_list.get_child_count() if choice_list != null else 0
+
+
+func choice_feedback_text() -> String:
+	return choice_status_label.text if choice_status_label != null else ""
+
+
+func choice_option_count() -> int:
+	return (await_choice.get("options", []) as Array).size()
+
+
+func event_text() -> String:
+	return event_label.text if event_label != null else ""
+
+
+## 按按钮名在 R7 四个面板里找按钮状态（`Save_<slot>` / `Load_<slot>` / `Choose_<route>` / `Choice_<i>`）。
+func r7_button_state(button_name: String) -> Dictionary:
+	for list: VBoxContainer in [victory_list, saves_list, gameover_list, choice_list]:
 		if list == null:
 			continue
 		var button: Button = list.get_node_or_null(NodePath(button_name)) as Button

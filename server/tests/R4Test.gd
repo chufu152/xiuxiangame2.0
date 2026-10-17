@@ -63,7 +63,9 @@ func _test_registration() -> void:
 	for command: String in R4_COMMANDS:
 		_check(implemented.has(command), "已登记 R4 命令：" + command)
 	_check(implemented.size() >= 28, "已登记命令不少于 R4 的 28 条（ping + 7 + 15 + 5）")
-	_check(not implemented.has("tribulate"), "tribulate 未登记命令（归 R7，裁决六）")
+	# R4 交付时 `tribulate` 只落地规则函数、不注册命令（裁决六）；R7 已注册命令，
+	# 故这里断言「规则函数存在」而不是「命令未登记」——后者会被后续里程碑打破。
+	_check(Commands.TRIBULATE == "tribulate", "tribulate 命令名已登记（R7 起注册命令，R4 只落规则函数）")
 	for command: String in R4_COMMANDS:
 		var response: Dictionary = _request(dispatcher, command, {})
 		_check(response.get("errorCode") == "NO_GAME", "%s 开局前 NO_GAME" % command)

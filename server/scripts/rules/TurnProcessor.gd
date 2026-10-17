@@ -51,10 +51,11 @@ func next_turn(state: GameState) -> Array[String]:
 # 各阶段
 # ---------------------------------------------------------------------------
 
-## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零 + R6 回填自动化）：
+## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零 + R6 回填自动化
+## + R7 回填宗主外出检查）：
 ## 重算视野 → 刷新道路网 → 传送次数清零 → 每名弟子重置出手/转职冷却、按公式恢复移动力
-## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼 → **玩家宗门自动化**。
-## **不做**：宗主外出（R7）。
+## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼 → **玩家宗门自动化**
+## → **宗主外出检查**。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
 	# R3 回填：道路网等级刷新（R2 留的 TODO）。
@@ -79,6 +80,20 @@ func _run_turn_start(state: GameState) -> void:
 			DiscipleRules.advance_cultivation(state, _config, disciple)
 	# R6 回填：玩家宗门自动化（R2 留的 TODO）。必须放在移动力恢复之后——自动工序要移动建造者/弟子。
 	AutomationRules.run_turn(state, _config)
+	# R7 回填：宗主外出检查（R2 留的 TODO）。只在**状态翻转时**记事件，避免每回合刷屏；
+	# 加成本身由 `EconomyRules` 每回合现算（`AppointmentRules.zong_zhu_outside_bonus_active`）。
+	for sect: Sect in state.sects:
+		var has_zong_zhu: bool = false
+		for disciple: Disciple in sect.disciples:
+			if disciple.position == Enums.Position.ZONG_ZHU:
+				has_zong_zhu = true
+				break
+		var outside: bool = has_zong_zhu and not AppointmentRules.zong_zhu_outside_bonus_active(state, _config, sect)
+		if outside and not sect.zongZhuOutside:
+			state.eventLog.append("[任命] %s 宗主外出, 宗主大殿全局加成失效" % sect.name)
+		elif not outside and sect.zongZhuOutside:
+			state.eventLog.append("[任命] %s 宗主归位, 宗主大殿全局加成恢复" % sect.name)
+		sect.zongZhuOutside = outside
 
 
 ## SPIRIT_PEAK（R3 实做 + R4 回填研究队列 + R5 回填围城断供）：
@@ -137,14 +152,23 @@ func _run_heart_devil(state: GameState) -> void:
 			index += 1
 
 
-func _run_ai_action(_state: GameState) -> void:
-	# TODO(R7): 三家 AI 行动。R2 三家 AI 不行动。
-	pass
+## AI_ACTION（R7 回填 R2 留的 TODO）：未覆灭的 AI 宗门逐家行动，行动后重算其视野。
+## 顺序固定（宗门序），每家的 `AIController.run_turn` 内部也按 id 升序遍历，
+## 故「同种子 + 同指令序列」下 AI 行为逐字一致（验收 9）。
+## **AI 不检查宣战**（PRD §5.2 #1）。
+func _run_ai_action(state: GameState) -> void:
+	for sect: Sect in state.sects:
+		if sect.player or sect.defeated:
+			continue
+		AIController.run_turn(state, _config, sect)
+	# AI 行动会改地块归属/灵峰易主，行动后统一重算视野，让「AI 打到哪」即时反映在迷雾上。
+	VisionCalculator.recalculate(state, _config)
 
 
-func _run_victory_check(_state: GameState) -> void:
-	# TODO(R7): 胜负判定 / 240 回合强制分数。R2 不判定、不终局。
-	pass
+## VICTORY_CHECK（R7 回填 R2 留的 TODO）：胜负判定 / 终局冻结 / 240 回合分数结算 /
+## 每 10 回合自动存档，全部收敛在 `VictoryRules.process_victory_check` 一个入口。
+func _run_victory_check(state: GameState) -> void:
+	VictoryRules.process_victory_check(state, _config)
 
 
 func _log(state: GameState, text: String) -> String:

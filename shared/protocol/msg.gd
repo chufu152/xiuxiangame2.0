@@ -23,6 +23,9 @@ const FRAME_BUFFER_BYTES: int = 16 * 1024 * 1024
 
 # --- 主动消息类型（服务端 -> 客户端）---
 const TYPE_HELLO: String = "hello"
+## 2.0 **只保留** `victoryChoice` 一种待决（PRD §5.2 #7 / PROTOCOL §11.1 #7）：
+## `{type,reqId,kind:"victoryChoice",prompt,options[{index,label,routeId,description}]}`。
+const TYPE_AWAIT_INPUT: String = "awaitInput"
 
 # --- 信封字段名 ---
 const KEY_ID: String = "id"

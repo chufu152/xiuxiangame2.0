@@ -70,6 +70,19 @@ class Position:
 	const ALL: Array[String] = [ZA_YI, WAI_MEN, NEI_MEN, QIN_CHUAN, FENG_ZHU, ZHANG_LAO, ZONG_ZHU]
 	## R4 新增：岗位显示名（纯文案）。
 	const NAMES: Dictionary = {"ZA_YI": "杂役", "WAI_MEN": "外门", "NEI_MEN": "内门", "QIN_CHUAN": "亲传", "FENG_ZHU": "峰主", "ZHANG_LAO": "长老", "ZONG_ZHU": "宗主"}
+	## R7 新增：各岗位的最低境界（`AppointmentRules.can_appoint` 的门槛）。
+	## 出处：1.0 `entity/Position.java` 的 `minRealm` 构造参数——**岗位结构定义，不是可调数值**，
+	## 故不入 `gameConfig.json`（同 `NAMES` 惯例）。1.0 原文：
+	## `ZA_YI/WAI_MEN → LIAN_QI`、`NEI_MEN/QIN_CHUAN → ZHU_JI`、`FENG_ZHU/ZHANG_LAO/ZONG_ZHU → JIN_DAN`。
+	const MIN_REALM: Dictionary = {
+		"ZA_YI": "LIAN_QI",
+		"WAI_MEN": "LIAN_QI",
+		"NEI_MEN": "ZHU_JI",
+		"QIN_CHUAN": "ZHU_JI",
+		"FENG_ZHU": "JIN_DAN",
+		"ZHANG_LAO": "JIN_DAN",
+		"ZONG_ZHU": "JIN_DAN",
+	}
 
 class SpiritRootType:
 	const ALL: Array[String] = ["JIN", "MU", "SHUI", "HUO", "TU", "FENG", "LEI", "ZA"]

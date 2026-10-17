@@ -45,6 +45,9 @@ static func cultivation_speed(state: GameState, config: Dictionary, disciple: Di
 		bonus += DaoRules.cultivation_bonus(state, config, sect)
 		# 政令修炼加成（R6）：`jing_xin_dao_chang` +10% / `xian_tu_zhao_ling` +15%，未颁卡时为 0。
 		bonus += PolicyRules.cultivation_bonus(state, config, sect)
+		# 长老修炼加成（R7）：每位长老 +`zhangLaoCultivationBonus`（加性，1.0 `DiscipleManager` 同口径）。
+		# 长老的研究加成 R4 已在 `DaoRules.research_turns` 消费，此处只补修炼那一半。
+		bonus += AppointmentRules.zhang_lao_cultivation_bonus(config, sect)
 	var speed: float = float(cultivation["baseSpeed"]) * (1.0 + bonus)
 	# 三流派特性（PRD §1.1）：家族流血脉弟子 ×1.4，本宗有祖祠再 ×1.25。
 	speed *= FactionRules.cultivation_multiplier(config, sect, disciple)

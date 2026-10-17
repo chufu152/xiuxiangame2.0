@@ -90,7 +90,7 @@
 | 类型 | 2.0 状态 | 形状 | 出处 |
 |---|---|---|---|
 | `hello` | ✅ 已实现 | `{type,protocolVersion,backend,saveVersion,implementedCommands[]}` | `shared/protocol/dto.gd` `hello()` |
-| `awaitInput` | 待实现（R7，仅 `victoryChoice`） | `{type,reqId,kind:"victoryChoice",prompt,options[{index,label,routeId,description}]}` | PRD §6.3、§5.2 #7 |
+| `awaitInput` | 已实现（R7，仅 `victoryChoice`） | `{type,reqId,kind:"victoryChoice",prompt,options[{index,label,routeId,description}]}` | PRD §6.3、§5.2 #7 |
 | `snapshot` / `event` | 不采用 | 2.0 以「每条命令回包带全量 `view` + `events` 增量」替代 | PRD §6.2 |
 
 > 1.0 的 `awaitInput.kind` 有 `randomEvent` / `victoryChoice` 两种；2.0 **只保留 `victoryChoice`**（PRD §5.2 #7），`resolveChoice` 只分派 `req_victory_*`。
@@ -103,7 +103,7 @@
 
 「回 view」= 成功响应是否携带全量快照。「状态」= 已实现 / 待实现（R*）。
 
-> 截至 R6 已实现 **55 条 + `ping`**（`CommandDispatcher.implemented_commands()` 共 56 项）；待实现 14 条，全部属 R7。
+> 截至 R7 已实现 **69 条 + `ping`**（`CommandDispatcher.implemented_commands()` 共 **70** 项）：PRD §6.7 的 69 条**全部落地**，**无待实现**。
 
 ### 会话与存档（13）
 
@@ -114,14 +114,14 @@
 | `finishTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
 | `beginPlayerTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
 | `nextTurn` | 会话 | R2 | 是 | 否 | 已实现（R2） |
-| `listSaves` | 会话 | R7 | 否 | 是 | 待实现（R7） |
-| `saveGame` | 会话 | R7 | 否 | 否 | 待实现（R7） |
-| `loadGame` | 会话 | R7 | 是 | 否 | 待实现（R7） |
-| `queryVictoryProgress` | 会话 | R7 | 否 | 是 | 待实现（R7） |
-| `checkVictory` | 会话 | R7 | 否 | 是 | 待实现（R7） |
-| `checkDefeat` | 会话 | R7 | 否 | 是 | 待实现（R7） |
-| `chooseVictory` | 会话 | R7 | 是 | 否 | 待实现（R7） |
-| `queryGameOver` | 会话 | R7 | 否 | 是 | 待实现（R7） |
+| `listSaves` | 会话 | R7 | 否 | 是 | 已实现（R7） |
+| `saveGame` | 会话 | R7 | 否 | 否 | 已实现（R7） |
+| `loadGame` | 会话 | R7 | 是 | 否 | 已实现（R7） |
+| `queryVictoryProgress` | 会话 | R7 | 否 | 是 | 已实现（R7） |
+| `checkVictory` | 会话 | R7 | 否 | 是 | 已实现（R7） |
+| `checkDefeat` | 会话 | R7 | 否 | 是 | 已实现（R7） |
+| `chooseVictory` | 会话 | R7 | 是 | 否 | 已实现（R7） |
+| `queryGameOver` | 会话 | R7 | 否 | 是 | 已实现（R7） |
 
 ### 单位（22）
 
@@ -145,10 +145,10 @@
 | `appointBuilder` | 单位 | R3 | 是 | 否 | 已实现（R3） |
 | `rally` | 单位 | R6 | 是 | 否 | 已实现（R6） |
 | `returnToDefense` | 单位 | R6 | 是 | 否 | 已实现（R6） |
-| `tribulate` | 单位 | R7 | 是 | 否 | 待实现（R7） |
-| `appointFengZhu` | 单位 | R7 | 是 | 否 | 待实现（R7） |
-| `appointZhangLao` | 单位 | R7 | 是 | 否 | 待实现（R7） |
-| `appointZongZhu` | 单位 | R7 | 是 | 否 | 待实现（R7） |
+| `tribulate` | 单位 | R7 | 是 | 否 | 已实现（R7） |
+| `appointFengZhu` | 单位 | R7 | 是 | 否 | 已实现（R7） |
+| `appointZhangLao` | 单位 | R7 | 是 | 否 | 已实现（R7） |
+| `appointZongZhu` | 单位 | R7 | 是 | 否 | 已实现（R7） |
 
 ### 城市 / 区域 / 改良（18）
 
@@ -206,8 +206,8 @@
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `queryVictoryChoice` | 待抉择 | R7 | 否 | 是 | 待实现（R7） |
-| `resolveChoice` | 待抉择 | R7 | 是 | 否 | 待实现（R7） |
+| `queryVictoryChoice` | 待抉择 | R7 | 否 | 是 | 已实现（R7） |
+| `resolveChoice` | 待抉择 | R7 | 是 | 否 | 已实现（R7） |
 
 > **分组点数校验**：13 / 22 / 18 / 4 / 4 / 6 / 2 = 69，与 PRD §6.7 一致；由 `tools/check_protocol.ps1` 自动断言。
 
@@ -296,7 +296,7 @@
 - **events**：`[]`。
 - **errorCode**：`INTERNAL`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ### `saveGame`
@@ -313,7 +313,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`（槽位非法）、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ### `loadGame`
@@ -330,7 +330,7 @@
 - **events**：读档后若有待决（胜利择一），追加一条 `awaitInput`（PRD §6.3）。
 - **errorCode**：`BAD_PARAMS`、`INTERNAL`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1；PRD §6.3。
 
 ### `queryVictoryProgress`
@@ -343,11 +343,17 @@
 | `sectId` | string | 是 | — | 目标宗门 id | 1.0 `PROTOCOL.md` §11.1 |
 
 - **result**：`{sectId, routes:[{route, achieved, ratio, summary, stage, score, goals}…]}`。
+  - `route` ∈ `ZONG_MEN_DAOTONG`/`JIA_ZU_ASCENSION`/`GUO_JIA_UNIFICATION`/`SCORE_SUPREMACY`（= 1.0 `VictoryRoute.name()`）；
+  - `ratio` = 各 goal 比例（**取最拖后腿一项**为 `min`，其余为均值；分数路线取 `min`）；
+  - `summary` = 1.0 `getSummary()`（已达成给「已达成」，否则报最短板 `missingText`）；
+  - `stage` ∈ `白手起家`/`初具规模`/`渐入佳境`/`大势已成`/`临门一脚`/`功成`（1.0 阈值 0/0.3/0.6/0.85/达成）；
+  - `score` 仅分数路线非 `null`，其余为 `null`；
+  - `goals[]` = **9 键** `{name, current, target, unit, description, ratio, met, missingText, valueText}`（见 §11.2 #3）。
 - **view**：否（只读）。会顺带刷新 `sect.powerLevel` 派生缓存（1.0 既有行为）。
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ### `checkVictory`
@@ -364,7 +370,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ### `checkDefeat`
@@ -381,7 +387,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ### `chooseVictory`
@@ -398,7 +404,7 @@
 - **events**：结局事件。
 - **errorCode**：`BAD_PARAMS`（routeId 非法）、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §1、§8。
 
 ### `queryGameOver`
@@ -410,7 +416,7 @@
 - **events**：`[]`。
 - **errorCode**：`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.1；`COMMAND_MAP.md` §1。
 
 ---
@@ -748,12 +754,17 @@
 |---|---|---|---|---|---|
 | `discipleId` | string | 是 | — | 弟子 id | 1.0 `PROTOCOL.md` §11.5 |
 
-- **result**：`{success:true, message}`（文案型命令）。
+- **result**：`{success, reason, chance, realm, heartDevil, fallen, message}`。
+  六键取自 1.0 `DiscipleManager.tribulate` 的返回体，`message` 为 2.0 追加的中文文案：
+  `chance` 为**服务端实算成功率**（`tribulationBaseSuccessChance` + 已解锁道法数×`tribulationDaoBonusPerUnlocked` + 灵根品级×`tribulationRootGradeBonusPerGrade`，夹在 0..1）；
+  `realm` 为渡劫后境界（成功即 `HUA_SHEN`）；`heartDevil` 为渡劫后心魔值（失败 +`tribulationFailHeartDevil`）；
+  `fallen=true` 表示按 `tribulationFailFallChance` 判定陨落。**业务失败仍是 `ok:true + success:false`**（如境界不足/资源不足），
+  与 1.0 一致。
 - **view**：是。
 - **events**：渡劫结果事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2；2.0 PRD §7（R7 含「tribulate/任命」）。
 
 ### `appointFengZhu`
@@ -766,12 +777,12 @@
 | `discipleId` | string | 是 | — | 弟子 id | 1.0 `PROTOCOL.md` §11.5 |
 | `peakId` | string | 否 | — | 目标灵峰 id | 同上 |
 
-- **result**：`AppointmentResult`（字段形状见 §11 待办 #1）。
+- **result**：`{success, message}`（1.0 `entity/AppointmentResult.java` 只有这两个字段，见 §11.2 #1 / 裁决二；**不加** `discipleId`/`position`/`peakId`）。
 - **view**：是。
 - **events**：任命事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `appointZhangLao`
@@ -784,12 +795,12 @@
 | `discipleId` | string | 是 | — | 弟子 id | 1.0 `PROTOCOL.md` §11.5 |
 | `peakId` | string | 否 | — | 目标灵峰 id | 同上 |
 
-- **result**：`AppointmentResult`（字段形状见 §11 待办 #1）。
+- **result**：`{success, message}`（1.0 `entity/AppointmentResult.java` 只有这两个字段，见 §11.2 #1 / 裁决二；**不加** `discipleId`/`position`/`peakId`）。
 - **view**：是。
 - **events**：任命事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ### `appointZongZhu`
@@ -802,12 +813,12 @@
 | `discipleId` | string | 是 | — | 弟子 id | 1.0 `PROTOCOL.md` §11.5 |
 | `peakId` | string | 否 | — | 目标灵峰 id | 同上 |
 
-- **result**：`AppointmentResult`（字段形状见 §11 待办 #1）。
+- **result**：`{success, message}`（1.0 `entity/AppointmentResult.java` 只有这两个字段，见 §11.2 #1 / 裁决二；**不加** `discipleId`/`position`/`peakId`）。
 - **view**：是。
 - **events**：任命事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2。
 
 ---
@@ -1429,7 +1440,7 @@
 - **events**：`[]`。
 - **errorCode**：`NO_GAME`。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §8。
 
 ### `resolveChoice`
@@ -1447,7 +1458,7 @@
 - **events**：结局事件。
 - **errorCode**：`BAD_PARAMS`（`optionIndex` 越界 / `reqId` 认不出，**且待决状态原样保留**）。
 - **里程碑**：R7。
-- **状态**：待实现（R7）。
+- **状态**：已实现（R7）。
 - **出处**：PRD §6.3、§5.2 #7；1.0 `PROTOCOL.md` §4.4、§11.5。
 
 ---
@@ -1542,9 +1553,9 @@
 
 | # | 项 | 现状 | 需要什么 |
 |---|---|---|---|
-| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | **`TrainingResult` 已回填（R5）**：1.0 `TrainingResult.java` 实际字段恰为 `{success, message, unitClass}`，故 `reclass`/`promote` 的 result 按此三字段落地（`unitClass` 返回**改后**的兵种）。**`ExploreResult` / `PolicyResult` 已回填（R6）**：1.0 `ExploreResult.java` 恰为 `{success, message, rewards:List<Reward>, casualties:List<String>, injured:List<String>, cooldown:int}`，`Reward` 为 `{type, amount, materialId}`（`type` ∈ `SPIRIT_POWER`/`SPIRIT_STONES`/`RARE_MATERIAL`/`DAO_POINT`）；1.0 `PolicyAction.PolicyResult` 恰为 `{success, message}`。仅 `AppointmentResult` 仍 `TODO(需核对)`（属 R7 任命） |
+| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | **`TrainingResult` 已回填（R5）**：1.0 `TrainingResult.java` 实际字段恰为 `{success, message, unitClass}`，故 `reclass`/`promote` 的 result 按此三字段落地（`unitClass` 返回**改后**的兵种）。**`ExploreResult` / `PolicyResult` 已回填（R6）**：1.0 `ExploreResult.java` 恰为 `{success, message, rewards:List<Reward>, casualties:List<String>, injured:List<String>, cooldown:int}`，`Reward` 为 `{type, amount, materialId}`（`type` ∈ `SPIRIT_POWER`/`SPIRIT_STONES`/`RARE_MATERIAL`/`DAO_POINT`）；1.0 `PolicyAction.PolicyResult` 恰为 `{success, message}`。**`AppointmentResult` 已回填（R7）**：1.0 `entity/AppointmentResult.java` 只有 `boolean success` + `String message` 两个字段，`bridge/CommandDispatcher.toResult()` 亦无额外包装，故 `appointFengZhu`/`appointZhangLao`/`appointZongZhu` 的 result 按 **`{success, message}` 两键**落地（裁决二），**不添加** `discipleId`/`position`/`peakId` 等 1.0 不存在的字段。至此本节第 1 项**全部回填完毕，无 TODO** |
 | 2 | `NodeInfo`（`queryJiYuanInfo`/`queryMiJingInfo` 的 `info`） | 1.0 仅给类型名 | **已回填（R6）**：1.0 `entity/NodeInfo.java` 九字段 `{nodeId, name, type, level, requiredRealmLevel, cooldown, cost, maxParticipants, rewardPreview}`，2.0 原样落地；未用到的字段留默认（机缘 `cost`=0 / `maxParticipants`=1，秘境 `requiredRealmLevel`=0）。`name` 取自 `GameNode.name`（`MapGenerator` 按 `NodeType.NAMES` + 序号取名），不下发进 `view.nodes[]` |
-| 3 | `queryVictoryProgress.routes[].goals` 内部形状 | 1.0 只给到 `goals` 一层 | `TODO(需核对)` |
+| 3 | `queryVictoryProgress.routes[].goals` 内部形状 | 1.0 只给到 `goals` 一层 | **已回填（R7）**：1.0 `entity/VictoryGoal.java` 五字段 `{name, current, target, unit, description}` + 四个派生方法 `getRatio()`/`isMet()`/`missingText()`/`valueText()` → 2.0 落为 **9 键** `{name, current, target, unit, description, ratio, met, missingText, valueText}`，**派生值一并下发**（客户端零规则，不得自行除算比例或拼差距文案）。`ratio = clamp(current/target, 0, 1)`（`target<=0` 视为 1.0）；`missingText` 仅在 `met=false` 时非空 |
 | 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | **已回填（R6）**：`effects{}` = `{outputBonus, spiritPowerBonus, cultivationBonus, combatBonus, stabilityPerTurn, prestigePerTurn}`（前四项为**百分比小数**，后两项为**每回合增量**；合计只经 `PolicyRules.effect_sum` 一个出口，`policy.enabled=false` 时全零）；`governments[].slots{}` = `{economy, military, governance}` 三个整数槽位（键名与 `data/gameConfig.json` **逐字一致**——PRD §4.13「原外交槽 2.0 改治理」把 1.0 的 `diplomacy` 换成了 `governance`，写成 `culture` 会让 `used_slots` 恒 0、治理卡永远「槽位已满」），**读自 `policy.governments[].slots` 配置**而非硬编码（R6 裁决四） |
 | 5 | 地形 blocker 的归属 | PRD §6.7 末注：山岳不可建城/不可通行、雾泽、缺水由 `querySpiritPeakBlocker` / `queryBuildOptions` / `queryMoveRange` 返回 | `TODO(需核对)`：`querySpiritPeakBlocker` **不在 69 条命令清单内**（PRD §6.7 未登记），需确认它是否为新增命令或应并入 `queryBuildOptions`；本文**不新增命令**，故仅在 `foundSpiritPeak`/`queryMoveRange` 的说明中引用该语义 |
 | 6 | `awaitInput.options` 的 `routeId`/`description` 之外是否另有字段 | PRD §6.3 给出 `routeId`/`description` | 已按 PRD §6.3 落地，无 TODO |

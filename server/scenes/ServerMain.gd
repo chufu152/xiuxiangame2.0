@@ -109,9 +109,14 @@ func _on_client_disconnected(_peer: WebSocketPeer, _code: int, _reason: String) 
 
 
 ## 单会话顺序处理：收到即分发，事件顺序 == 结算顺序（§6.1）。
+## R7：响应发出后再检查是否有新的 `awaitInput`（主动消息，只在 reqId 变化时推一次；
+## `loadGame` 回到待决点会重推）。这样客户端总能先拿到命令回包，再收到待决弹窗。
 func _on_text_received(peer: WebSocketPeer, text: String) -> void:
 	var response: Dictionary = _dispatcher.dispatch_text(text)
 	_server.send_json(peer, response)
+	var pending: Variant = _dispatcher.poll_await_input()
+	if pending != null:
+		_server.send_json(peer, pending)
 
 
 # ---------------------------------------------------------------------------

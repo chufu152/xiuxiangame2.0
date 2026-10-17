@@ -50,6 +50,16 @@ var capturedFromSectId: String = ""
 ## R6 新增：正在执行探索任务的节点 id（机缘/秘境；任务结束清空）。
 ## 对齐 `queryDiscipleDetail.missionNodeId`；驻守用 `garrisonNodeId`，两者互斥。
 var missionNodeId: String = ""
+## R7 新增：已渡劫飞升（`tribulate` 成功即置位）。家族流胜利按它计 `ascensionCount`，
+## 分数公式按它计「飞升数 × `ascensionWeight`」；飞升后仍在宗门名册上（1.0 同语义，不删除实体）。
+var ascended: bool = false
+## R7 新增：道侣 id（`BloodlineRules.marry` 双向写入，空串 = 未婚）。
+## 出处：1.0 `entity/Disciple.java` 的 `spouseId`。
+var spouseId: String = ""
+## R7 新增：父/母 id（`BloodlineRules.inherit_child` 写入，空串 = 开宗弟子/收徒所得）。
+## 出处：1.0 `entity/Disciple.java` 的 `fatherId` / `motherId`；近亲判定与代数继承都读它。
+var fatherId: String = ""
+var motherId: String = ""
 
 func to_dict() -> Dictionary:
 	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges, "battleXp": battleXp, "battleLevel": battleLevel, "promotionPoints": promotionPoints, "promotions": promotions.duplicate(), "reclassCooldown": reclassCooldown, "garrisonNodeId": garrisonNodeId}
