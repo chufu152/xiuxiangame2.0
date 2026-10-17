@@ -222,7 +222,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅ ← 当�
 
 `ConfigValidator` 增 9 个 `faction.*` 键的类型校验。
 
-**验收**：`R3_PASS 279 → 297`（新增 `_test_faction_traits` 18 项：三流派造价/工期纯函数断言、家族与宗门端到端扣款、`queryBuildOptions` 双价字段）；`R4_PASS 169 → 174`（家族血脉/祖祠/非血脉/宗门流血脉弟子共 5 项）；`R1 79458`/`R2 220`/`R3_CLIENT 43`/`R4_CLIENT 69` 无回归。
+**验收**：`R3_PASS 279 → 297`（新增 `_test_faction_traits` 18 项：三流派造价/工期纯函数断言、家族与宗门端到端扣款、`queryBuildOptions` 双价字段）；`R4_PASS 169 → 174`（家族血脉/祖祠/非血脉/宗门流血脉弟子共 5 项）；`R1 79458`/`R2 220`/`R3_CLIENT 43`/`R4_CLIENT 69` 无回归；`check.ps1` 17 阶段 **97/97**、`check_protocol.ps1` **35/35** 全绿。已提交 `1c82f68` 并推送。
 
 **顺带修正的既有测试口径**：`R3Test._test_buildings` 与 `_test_districts` 原先直接拿 `building.costs`/`building.turns` 当期望值，流派特性落地后必然失败。已改为**在测试内用 config + PRD 口径独立复算**（不调用 `FactionRules`），避免「用被测函数当自己的 oracle」。
 
