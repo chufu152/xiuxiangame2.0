@@ -40,7 +40,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
   - R4 收尾 `603987b docs(r4): record delivered r4 commit hash in roadmap`
   - R3/R4 补充（三流派特性）`1c82f68 feat(faction): implement three-faction traits (build speed, sub-peak cost, bloodline cultivation)`（见 §4.5）
   - R3/R4 补充收尾 `44ba556 docs(faction): record delivered commit hash for three-faction traits`
-  - R5 `feat(r5): ten unit classes, combat preview and resolution, zoc, teleport, garrison, reclass promote`（见 §4.4）
+  - R5 `442f701 feat(r5): ten unit classes, combat preview and resolution, zoc, teleport, garrison, reclass promote`（见 §4.4）
 
 ### 1.2 已交付并验证的资产
 
