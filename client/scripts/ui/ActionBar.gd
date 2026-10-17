@@ -32,17 +32,17 @@ func setup() -> void:
 	anchor_top = 1.0
 	anchor_bottom = 1.0
 	offset_left = 0.0
-	offset_right = -SIDEBAR_WIDTH
+	offset_right = 0.0
 	offset_top = -BAR_HEIGHT
 	offset_bottom = 0.0
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.11, 0.16, 0.15, 0.92)
-	style.border_color = Color("4d5f57")
+	# 与顶栏同一条「纸带」：宣纸半透明 + 上缘金线，避免底部一条深色横杠压住画面。
+	var style: StyleBoxFlat = UiTheme.bar()
+	style.border_width_bottom = 0
 	style.border_width_top = 1
 	style.content_margin_left = 14.0
 	style.content_margin_right = 14.0
-	style.content_margin_top = 6.0
-	style.content_margin_bottom = 6.0
+	style.content_margin_top = 5.0
+	style.content_margin_bottom = 5.0
 	add_theme_stylebox_override("panel", style)
 
 	row = HBoxContainer.new()
@@ -53,8 +53,8 @@ func setup() -> void:
 	status_label = Label.new()
 	status_label.name = "BarHint"
 	status_label.text = "左键选中 / 悬停预览 · 空格或 End 结束回合 · G 网格 · B 边框"
-	status_label.add_theme_font_size_override("font_size", 12)
-	status_label.add_theme_color_override("font_color", Color("9aa8a0"))
+	status_label.add_theme_font_size_override("font_size", 11)
+	status_label.add_theme_color_override("font_color", UiTheme.INK_FAINT)
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(status_label)

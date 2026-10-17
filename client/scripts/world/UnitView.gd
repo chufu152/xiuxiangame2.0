@@ -1,9 +1,16 @@
 class_name UnitView
 extends Node3D
-## 单位表现层（R2：新增选中标记）。
+## 单位表现层（R2：新增选中标记；R8：改为「小人」形象）。
 ##
 ## 位置一律以服务端 `view` 的 `tileId` 为准，**不做任何本地位置推导**；
 ## 标记只是底座描边，不改变权威位置。
+##
+## 硬约束：
+##   - **每个弟子只产生一个顶层子节点**，根节点 `position.y` 恒等于格顶面高度
+##     （`R1ClientTest` 断言 `position.y == 1.7`）；
+##   - 影子/袍/躯干/头一律挂在根节点之下，不额外占顶层计数；
+##   - `_apply_class_silhouette` 仍是「十兵种互不相同」的唯一出口
+##     （`R5ClientTest` 直接调它并比对 `(mesh class, aabb.size)`）。
 
 ## 当前选中的弟子 id（空串 = 未选中）。
 var selected_disciple_id: String = ""
@@ -24,6 +31,11 @@ const PLACEHOLDER_SHAPES: Dictionary = {
 	Enums.UnitClass.JI_GUAN_JUN_TUAN: ["box", Vector3(0.64, 0.56, 0.64)],
 }
 
+## 肤色（宣纸工笔的暖白）。
+const SKIN: Color = Color("e8d5b8")
+## 影子色。
+const SHADOW: Color = Color(0.18, 0.22, 0.20, 0.26)
+
 
 func render_view(view: Dictionary, map: HexMap, assets: AssetLibrary, fog: Fog, selected_id: String = "") -> void:
 	selected_disciple_id = selected_id
@@ -32,23 +44,84 @@ func render_view(view: Dictionary, map: HexMap, assets: AssetLibrary, fog: Fog, 
 		child.queue_free()
 	for sect: Dictionary in view.get("sects", []):
 		var offsets: Dictionary = {}
+		var sect_color: Color = Color.from_string(str(sect.get("color", "#387f78")), Color("387f78"))
 		for disciple: Dictionary in sect.get("disciples", []):
 			var tile_id: String = str(disciple.get("tileId", ""))
 			if not map.tiles.has(tile_id) or fog.state_for(tile_id) != Fog.State.VISIBLE:
 				continue
 			var unit_class: String = str(disciple.get("unitClass", Enums.UnitClass.PU_TONG))
+			var disciple_id: String = str(disciple.get("id", "Disciple"))
 			var model: Node3D = assets.instantiate_model("unit.%s" % unit_class, str(disciple.get("name", "弟子")))
-			model.name = str(disciple.get("id", "Disciple"))
+			if model.has_meta("placeholder"):
+				model.free()
+				model = Node3D.new()
+				model.name = disciple_id
+				_build_figure(model, unit_class, sect_color)
+			else:
+				model.name = disciple_id
 			var offset: int = int(offsets.get(tile_id, 0))
 			offsets[tile_id] = offset + 1
-			model.position = map.top_position(tile_id) + Vector3(-0.4 + offset * 0.34, 0, -0.35)
-			if model.has_meta("placeholder"):
-				var mesh: MeshInstance3D = model.get_child(0) as MeshInstance3D
-				mesh.material_override = HexMap.solid(Color.from_string(str(sect.get("color", "#387f78")), Color("387f78")))
-				_apply_class_silhouette(mesh, unit_class)
-			if str(disciple.get("id", "")) == selected_disciple_id:
+			model.position = map.top_position(tile_id) + Vector3(-0.34 + offset * 0.30, 0, -0.30)
+			if disciple_id == selected_disciple_id:
 				_attach_marker(model)
 			add_child(model)
+
+
+# ---------------------------------------------------------------------------
+# 小人形象（程序化）
+# ---------------------------------------------------------------------------
+
+## 一个小人：椭圆影 + 宗门色袍摆 + 兵种躯干 + 头 + 发冠。
+## 躯干形状走 `_apply_class_silhouette`，故十兵种在画面里仍可区分。
+func _build_figure(parent: Node3D, unit_class: String, sect_color: Color) -> void:
+	var spec: Array = PLACEHOLDER_SHAPES.get(unit_class, PLACEHOLDER_SHAPES[Enums.UnitClass.PU_TONG])
+	var size: Vector3 = spec[1]
+	# 身高/体宽按兵种微调：重甲更矮壮、剑修更瘦高。
+	var height: float = 0.56 + size.y * 0.20
+	var width: float = 0.10 + size.x * 0.13
+
+	# ① 影子：贴地扁圆，让单位「站」在格面上而不是飘着。
+	var shadow_mesh: CylinderMesh = CylinderMesh.new()
+	shadow_mesh.top_radius = width * 1.35
+	shadow_mesh.bottom_radius = width * 1.55
+	shadow_mesh.height = 0.006
+	shadow_mesh.radial_segments = 10
+	var shadow_material: StandardMaterial3D = HexMap.solid(SHADOW)
+	shadow_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shadow_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var shadow: MeshInstance3D = HexMap.add_mesh(parent, "Shadow", shadow_mesh,
+		Vector3(0, 0.012, 0), shadow_material)
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	# ② 袍摆：下宽上窄的圆台，用宗门色，一眼分辨敌我。
+	var robe: CylinderMesh = CylinderMesh.new()
+	robe.top_radius = width * 0.62
+	robe.bottom_radius = width * 1.18
+	robe.height = height * 0.46
+	robe.radial_segments = 8
+	var robe_color: Color = sect_color.lerp(Color("f2ece0"), 0.18)
+	HexMap.add_mesh(parent, "Robe", robe, Vector3(0, height * 0.23, 0), HexMap.solid(robe_color))
+
+	# ③ 躯干：形状来自十兵种剪影表（缩放后作为上半身）。
+	var torso: MeshInstance3D = MeshInstance3D.new()
+	torso.name = "Torso"
+	parent.add_child(torso)
+	_apply_class_silhouette(torso, unit_class)
+	torso.scale = Vector3.ONE * 0.46
+	torso.position = Vector3(0, height * 0.62, 0)
+	torso.material_override = HexMap.solid(robe_color.darkened(0.12))
+	torso.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	# ④ 头 + 发冠（小方块），工笔人物的「一点」。
+	var head_mesh: SphereMesh = SphereMesh.new()
+	head_mesh.radius = height * 0.105
+	head_mesh.height = height * 0.21
+	head_mesh.radial_segments = 10
+	head_mesh.rings = 6
+	HexMap.add_mesh(parent, "Head", head_mesh, Vector3(0, height * 0.90, 0), HexMap.solid(SKIN))
+	var crown: BoxMesh = BoxMesh.new()
+	crown.size = Vector3(height * 0.16, height * 0.055, height * 0.16)
+	HexMap.add_mesh(parent, "Crown", crown, Vector3(0, height * 1.00, 0), HexMap.solid(robe_color.darkened(0.32)))
 
 
 ## 把占位网格换成该兵种的剪影（仅占位资源生效；正式模型原样保留）。

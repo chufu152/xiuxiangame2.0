@@ -42,7 +42,7 @@ func configure(view: Dictionary, fog: Fog) -> void:
 		var q: int = int(tile.get("q", 0))
 		var r: int = int(tile.get("r", 0))
 		var state: int = int(fog.state_for(tile_id)) if fog != null else 2
-		var color: Color = Color("efe9d8")
+		var color: Color = Color(0.34, 0.39, 0.37, 0.70)
 		if state != 0:
 			color = _terrain_color(str(tile.get("baseTerrain", "")))
 			var owner_id: String = str(tile.get("ownerSectId", ""))
@@ -59,11 +59,19 @@ func configure(view: Dictionary, fog: Fog) -> void:
 		queue_redraw()
 		return
 	_bounds = Rect2(minimum, maximum - minimum)
+	_rebuild_points()
+	queue_redraw()
+
+
+## 按当前控件尺寸重算各格屏幕坐标。
+## 必须每次绘制/命中前重算：`PanelContainer` 会异步改变子控件尺寸，
+## 若只在 `configure` 里算一次，缩略图会挤在左上角一小块。
+func _rebuild_points() -> void:
+	_points.clear()
 	for tile_id: String in tiles:
 		var item: Dictionary = tiles[tile_id]
 		var flat: Vector2 = Vector2(float(item["q"]) * 1.5, (float(item["r"]) + float(item["q"]) * 0.5) * Hex.SQRT3)
 		_points[tile_id] = _to_control(flat)
-	queue_redraw()
 
 
 func set_view(center: Vector3, ortho_size: float) -> void:
@@ -73,29 +81,42 @@ func set_view(center: Vector3, ortho_size: float) -> void:
 
 
 func _to_control(flat: Vector2) -> Vector2:
+	var canvas: Vector2 = _canvas()
 	var span: Vector2 = _bounds.size
-	var usable: Vector2 = Vector2(MAP_SIZE - PADDING * 2.0, MAP_SIZE - PADDING * 2.0)
+	var usable: Vector2 = Vector2(canvas.x - PADDING * 2.0, canvas.y - PADDING * 2.0)
 	var scale_value: float = minf(usable.x / maxf(span.x, 0.001), usable.y / maxf(span.y, 0.001))
 	var center_flat: Vector2 = _bounds.position + span * 0.5
-	return Vector2(MAP_SIZE * 0.5, MAP_SIZE * 0.5) + (flat - center_flat) * scale_value
+	return canvas * 0.5 + (flat - center_flat) * scale_value
+
+
+## 实际绘制区尺寸（`PanelContainer` 会把控件拉到内容区，不能用常量硬算）。
+func _canvas() -> Vector2:
+	var value: Vector2 = size
+	if value.x < 8.0 or value.y < 8.0:
+		return Vector2(MAP_SIZE, MAP_SIZE)
+	return value
 
 
 func _draw() -> void:
-	var background: Color = Color(0.93, 0.90, 0.82, 0.92)
-	draw_rect(Rect2(Vector2.ZERO, Vector2(MAP_SIZE, MAP_SIZE)), background, true)
-	draw_rect(Rect2(Vector2.ZERO, Vector2(MAP_SIZE, MAP_SIZE)), Color("b6ad8b"), false, 1.5)
+	_rebuild_points()
+	var canvas: Vector2 = _canvas()
+	# 深墨底 + 金边：与参考图的「世界地图」小窗一致，压在山水的暗部不抢视线。
+	draw_rect(Rect2(Vector2.ZERO, canvas), Color(0.169, 0.227, 0.216, 0.96), true)
+	draw_rect(Rect2(Vector2.ZERO, canvas), Color(0.72, 0.57, 0.18, 0.85), false, 1.5)
 	for tile_id: String in _points:
 		var point: Vector2 = _points[tile_id] as Vector2
 		var color: Color = (tiles[tile_id] as Dictionary)["color"] as Color
-		draw_circle(point, 2.4, color)
+		draw_circle(point, 2.6, color)
 	# 视口框：世界坐标 → 小地图坐标（与地块同一线性映射）。
+	# 注意：`_points` 用的是 `Hex.to_world` 的 (x, z) 原值，故这里也必须直接用 (x, z)，
+	# 若再除一次 √3 会把框推到左上角（曾出现过的偏移 bug）。
 	var corners: PackedVector2Array = PackedVector2Array()
 	var half: float = view_size * 0.5
 	for offset: Vector2 in [Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]:
 		var world: Vector3 = view_center + Vector3(offset.x, 0.0, offset.y)
-		var flat: Vector2 = Vector2(world.x / (Hex.SQRT3 * 1.0) * 1.0, world.z / (Hex.SQRT3 * 1.0) * 1.0)
-		corners.append(_to_control(flat))
-	draw_polyline(corners + PackedVector2Array([corners[0]]), Color(0.85, 0.64, 0.24, 0.95), 1.5)
+		corners.append(_to_control(Vector2(world.x, world.z)))
+	if corners.size() == 4:
+		draw_polyline(corners + PackedVector2Array([corners[0]]), Color(0.95, 0.82, 0.42, 0.95), 1.6)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -109,6 +130,7 @@ func _gui_input(event: InputEvent) -> void:
 
 ## 命中最近的缩略点（半径 6px 内）。
 func tile_at(position: Vector2) -> String:
+	_rebuild_points()
 	var best: String = ""
 	var best_distance: float = 6.0
 	for tile_id: String in _points:
@@ -132,7 +154,7 @@ func last_picked() -> String:
 
 func _terrain_color(base_terrain: String) -> Color:
 	match base_terrain:
-		"LING_FIELDS": return Color("9bb98b")
-		"SPIRIT_PLAIN": return Color("bed0ac")
-		"BARREN": return Color("d0b894")
-	return Color("e7e2d3")
+		"LING_FIELDS": return Color("a8c48d")
+		"SPIRIT_PLAIN": return Color("b9cfa2")
+		"BARREN": return Color("cfbb95")
+	return Color("d8d2bf")

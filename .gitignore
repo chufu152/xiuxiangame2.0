@@ -55,3 +55,5 @@ node_modules/
 
 # ===== 验收产物（确定性双跑导出，可由自测重新生成，不入库）=====
 /outputs/
+# Godot 的 res:// 是工程根，故客户端产物实际落在 client/outputs/（WorldShot 截图、探针脚本）
+/client/outputs/

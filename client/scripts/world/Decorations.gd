@@ -13,8 +13,8 @@ extends Node3D
 const DAY_CYCLE_SECONDS: float = 180.0
 ## 泼墨转场时长（秒）。
 const INK_FADE_SECONDS: float = 0.55
-## 网格线颜色（淡墨）。
-const GRID_COLOR: Color = Color(0.20, 0.26, 0.24, 0.35)
+## 网格线颜色（参考图为「淡白细线压在青绿山水上」，故用近白半透明而非深墨）。
+const GRID_COLOR: Color = Color(1.0, 0.99, 0.94, 0.34)
 ## 宗门边框厚度（世界单位）。
 const BORDER_HEIGHT: float = 0.05
 
@@ -88,15 +88,17 @@ func _apply_day_phase() -> void:
 	var azimuth: float = -110.0 + 220.0 * clampf((day_phase - 0.25) / 0.5, 0.0, 1.0)
 	sun.rotation_degrees = Vector3(-maxf(elevation, -18.0), azimuth, 0.0)
 	var daylight: float = clampf(sin((day_phase - 0.25) * TAU), 0.0, 1.0)
-	sun.light_energy = 0.18 + 1.05 * daylight
+	sun.light_energy = 0.30 + 0.72 * daylight
 	sun.light_color = Color(1.0, 0.93, 0.82).lerp(Color(1.0, 0.86, 0.66), 1.0 - daylight)
 	if environment == null:
 		return
-	var night_ambient: Color = Color("4a5a6b")
-	var day_ambient: Color = Color("fff6e2")
-	environment.ambient_light_color = night_ambient.lerp(day_ambient, daylight)
-	environment.ambient_light_energy = 0.42 + 0.55 * daylight
-	environment.background_color = Color("2b3542").lerp(Color("e7e2d3"), daylight)
+	# 水墨长卷的「夜」不是黑：只是纸色转冷、墨色略沉。若按真实夜色压暗背景，
+	# 整幅画会变成灰底，与参考图的米白宣纸完全相反（这是本项的关键修正）。
+	var night_paper: Color = Color("cfcabc")
+	var day_paper: Color = Color("efe9d9")
+	environment.ambient_light_color = night_paper.lerp(Color("fff8ea"), daylight)
+	environment.ambient_light_energy = 0.72 + 0.40 * daylight
+	environment.background_color = night_paper.lerp(day_paper, daylight)
 
 
 ## 切换到指定相位（自动验收用，立即生效）。
@@ -142,7 +144,7 @@ func build_grid(map: HexMap) -> void:
 			a.y = top.y
 			b.y = top.y
 			var shape: BoxMesh = BoxMesh.new()
-			shape.size = Vector3(0.022, 0.008, a.distance_to(b))
+			shape.size = Vector3(0.016, 0.006, a.distance_to(b))
 			var material: StandardMaterial3D = HexMap.solid(GRID_COLOR)
 			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

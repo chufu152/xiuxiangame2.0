@@ -23,9 +23,9 @@ const QUEUE_PANEL_HEIGHT: float = 320.0
 ## R5 战斗预览/结算面板（右下角，紧贴侧栏左侧，不改相机）。
 const COMBAT_PANEL_WIDTH: float = 360.0
 const COMBAT_PANEL_HEIGHT: float = 300.0
-## R5 弟子详情面板（左下角，与城市面板互斥，不改相机）。
-const UNIT_PANEL_WIDTH: float = 400.0
-const UNIT_PANEL_HEIGHT: float = 400.0
+## R5 弟子详情面板（右下角，与城市面板互斥，不改相机）。
+const UNIT_PANEL_WIDTH: float = 340.0
+const UNIT_PANEL_HEIGHT: float = 196.0
 
 var map: HexMap = null
 var fog: Fog = null
@@ -150,6 +150,8 @@ func _ready() -> void:
 	fog = get_node("Fog") as Fog
 	units = get_node("UnitView") as UnitView
 	sects = get_node("SectView") as SectView
+	# 统一水墨主题：必须在建任何面板之前挂到窗口根节点，子控件才会继承。
+	_build_ui_theme()
 	_build_lighting()
 	_build_sidebar()
 	_build_topbar()
@@ -235,7 +237,7 @@ func _render(view: Dictionary) -> void:
 	sects.render_view(view, map, assets, fog)
 	sect_count = (view.get("sects", []) as Array).size()
 	_cache_dao_data(view)
-	var bounds: Dictionary = _view_bounds(view)
+	var bounds: Dictionary = _framing_bounds(view)
 	Session.camera_rig.frame_once(bounds["center"], bounds["span"])
 	if not _selected.is_empty():
 		_set_selection(_selected)
@@ -299,6 +301,46 @@ func _view_bounds(view: Dictionary) -> Dictionary:
 	}
 
 
+## 首帧取景用的包围盒：**只按已探索地块**算，再留一圈余量并夹到合理区间。
+##
+## 理由：若按全图取景，开局已探索只有十几格，画面会被大片未探索留白淹没；
+## 按已探索取景则能看清地形、建筑与单位（参考图的构图即如此）。
+## 另做两处构图补偿：
+##   ① 系数 0.84——参考图里地图约占画面八成，按 1.15 取景会留太多空白；
+##   ② 中心沿**屏幕右方**平移半个侧栏宽——侧栏压住右侧，不补偿则地图偏右。
+## 注意：`frame_once` 只生效一次（`CameraRig.framed`），故此后任何刷新都不再改取景。
+func _framing_bounds(view: Dictionary) -> Dictionary:
+	var full: Dictionary = _view_bounds(view)
+	var tiles: Dictionary = view.get("tiles", {})
+	var min_x: float = INF
+	var max_x: float = -INF
+	var min_z: float = INF
+	var max_z: float = -INF
+	var counted: int = 0
+	for tile_id: String in tiles:
+		if fog != null and fog.state_for(tile_id) == Fog.State.UNEXPLORED:
+			continue
+		var tile: Dictionary = tiles[tile_id]
+		var point: Vector3 = Hex.to_world(int(tile.get("q", 0)), int(tile.get("r", 0)))
+		min_x = minf(min_x, point.x)
+		max_x = maxf(max_x, point.x)
+		min_z = minf(min_z, point.z)
+		max_z = maxf(max_z, point.z)
+		counted += 1
+	if counted == 0:
+		return full
+	var center: Vector3 = Vector3((min_x + max_x) / 2.0, 0.0, (min_z + max_z) / 2.0)
+	var explored_span: float = maxf(max_x - min_x, max_z - min_z) + 4.0
+	var span: float = clampf(explored_span * 0.84, 11.0, maxf(float(full["span"]), 11.0))
+	# 相机 yaw 45° → 屏幕右方 = 世界 (0.707, 0, -0.707)。把相机朝右推，地图即在屏幕上左移。
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var world_per_px: float = span / maxf(viewport_size.y, 1.0)
+	var shift: float = SIDEBAR_WIDTH * 0.5 * world_per_px
+	center.x += shift * 0.7071
+	center.z -= shift * 0.7071
+	return {"center": center, "span": span}
+
+
 # ---------------------------------------------------------------------------
 # 选中格
 # ---------------------------------------------------------------------------
@@ -312,6 +354,104 @@ func _set_selection(tile_id: String) -> void:
 	selection_text = _describe(tile_id)
 	if sidebar != null:
 		sidebar.text = selection_text
+	_refresh_tile_card(tile_id)
+
+
+## 右侧地块卡（参考图的「灵脉山」面板）：标题 / 类型·归属 / 可获取资源 / 风物小注。
+##
+## **只读 view**：不臆造产出数值（view 的 `tiles[]` 不下发 yield），
+## 未探索格一律不泄露任何地形字段。
+func _refresh_tile_card(tile_id: String) -> void:
+	if tile_card_title == null:
+		return
+	if tile_id.is_empty():
+		tile_card_title.text = "山河画卷"
+		tile_card_meta.text = "点击地块查看详情"
+		tile_card_yield.text = ""
+		tile_card_desc.text = ""
+		return
+	if map == null or not map.tiles.has(tile_id):
+		tile_card_title.text = "地块 %s" % tile_id
+		tile_card_meta.text = "（尚未载入）"
+		tile_card_yield.text = ""
+		tile_card_desc.text = ""
+		return
+	if fog.state_for(tile_id) == Fog.State.UNEXPLORED:
+		tile_card_title.text = "未探索区域"
+		tile_card_meta.text = "类型：？\n归属：？"
+		tile_card_yield.text = ""
+		tile_card_desc.text = "云雾未开，山形不可辨。"
+		return
+	var data: Dictionary = (map.tiles[tile_id] as Node3D).get_meta("display_data")
+	var node_id: String = str(data.get("nodeId", ""))
+	var nodes: Dictionary = Session.current_view.get("nodes", {})
+	var node_name: String = ""
+	var node_type: String = ""
+	if not node_id.is_empty() and nodes.has(node_id):
+		var info: Dictionary = nodes[node_id]
+		node_name = str(info.get("name", ""))
+		node_type = str(info.get("type", ""))
+	var base: String = str(data.get("baseTerrain", ""))
+	var relief: String = str(data.get("relief", ""))
+	var title_text: String = node_name if not node_name.is_empty() else _terrain_label(base)
+	tile_card_title.text = title_text
+	# 归属：优先宗门显示名，其次「无人占领」。
+	var owner_id: String = str(data.get("ownerSectId", ""))
+	var owner_text: String = "无人占领"
+	if not owner_id.is_empty():
+		owner_text = owner_id
+		for sect: Dictionary in Session.current_view.get("sects", []):
+			if str(sect.get("id", "")) == owner_id:
+				owner_text = str(sect.get("name", owner_id))
+				break
+	tile_card_meta.text = "类型：%s%s\n归属：%s\n海拔：%s" % [
+		_terrain_label(base),
+		"" if node_type.is_empty() else " · %s" % HexMap.node_label(node_type),
+		owner_text,
+		_relief_label(relief),
+	]
+	# 可获取资源：只列 view 里真实存在的三类（节点 / 奢侈 / 地貌）。
+	var lines: PackedStringArray = PackedStringArray()
+	if not node_id.is_empty():
+		lines.append("◆ %s" % (node_name if not node_name.is_empty() else node_id))
+	var luxury: String = str(data.get("luxuryType", ""))
+	if not luxury.is_empty():
+		lines.append("◆ %s" % luxury)
+	for feature: Variant in data.get("features", []):
+		lines.append("◆ %s" % _feature_label(str(feature)))
+	if not (data.get("riverEdges", []) as Array).is_empty():
+		lines.append("◆ 河流（灌溉）")
+	tile_card_yield.text = "" if lines.is_empty() else "可获取资源：\n" + "\n".join(lines)
+	tile_card_desc.text = _tile_flavor(base, relief, bool(data.get("danger", false)))
+
+
+static func _terrain_label(base: String) -> String:
+	return str({
+		"LING_FIELDS": "灵田", "SPIRIT_PLAIN": "灵壤", "BARREN": "荒地",
+	}.get(base, base if not base.is_empty() else "未知"))
+
+
+static func _relief_label(relief: String) -> String:
+	return str({"FLAT": "平川", "HILL": "丘陵", "MOUNTAIN": "山岳"}.get(relief, relief))
+
+
+static func _feature_label(feature: String) -> String:
+	return str({"SPIRIT_FOREST": "灵林", "MIRE": "雾泽"}.get(feature, feature))
+
+
+## 风物小注：纯文案，不含任何规则或数值。
+static func _tile_flavor(base: String, relief: String, danger: bool) -> String:
+	if danger:
+		return "此地煞气盘结，行旅多有折损。"
+	if relief == "MOUNTAIN":
+		return "山势峻拔，云气自岩隙涌出，宜设阵据守。"
+	if relief == "HILL":
+		return "丘陵起伏，林泉相间，颇利修行。"
+	match base:
+		"LING_FIELDS": return "灵田连绵，禾气氤氲，乃宗门粮秣所出。"
+		"SPIRIT_PLAIN": return "地势平阔，灵气徐行，可容万人结庐。"
+		"BARREN": return "土薄石露，草木稀疏，非久居之地。"
+	return "山水清远，静待有缘人。"
 
 
 func _describe(tile_id: String) -> String:
@@ -607,60 +747,98 @@ func _build_topbar() -> void:
 	topbar.name = "TopBar"
 	topbar.layer = 2
 	add_child(topbar)
+	# 参考图的顶栏是一条横贯全屏的「纸带」：只有下缘一条金线，不画四边框。
 	var panel: PanelContainer = PanelContainer.new()
 	panel.anchor_left = 0.0
 	panel.anchor_right = 1.0
 	panel.offset_left = 0.0
-	panel.offset_right = -SIDEBAR_WIDTH
+	panel.offset_right = 0.0
 	panel.offset_top = 0.0
 	panel.offset_bottom = TOPBAR_HEIGHT
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.11, 0.16, 0.15, 0.90)
-	style.border_color = Color("4d5f57")
-	style.border_width_bottom = 1
-	style.content_margin_left = 16.0
-	style.content_margin_right = 16.0
-	style.content_margin_top = 6.0
-	style.content_margin_bottom = 6.0
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UiTheme.bar())
 	topbar.add_child(panel)
 
 	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 22)
+	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 
-	topbar_turn_label = _topbar_label(row, "第 ? 回合")
-	topbar_phase_label = _topbar_label(row, "阶段 ?")
-	# R8：资源栏改为 13 项「图标 + 数值」（7 基础 + 3 材料 + 3 奢侈品）。
+	# ① 回合（文本格式被 `R2ClientTest` 逐字断言，不得改动）。
+	topbar_turn_label = UiTheme.title_label("第 ? 回合", 17, UiTheme.INK)
+	topbar_turn_label.custom_minimum_size = Vector2(92, 0)
+	topbar_turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(topbar_turn_label)
+	row.add_child(_topbar_divider())
+	# ② 季节 · 阶段（参考图的「春 · 修行期」）。
+	topbar_phase_label = UiTheme.title_label("春 · 修行期", 13, UiTheme.INK_SOFT)
+	topbar_phase_label.custom_minimum_size = Vector2(96, 0)
+	topbar_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(topbar_phase_label)
+	row.add_child(_topbar_divider())
+
+	# ③ 资源栏：13 项「圆形徽章 + 数值」。
 	# `topbar_resource_label` 保留为**文本镜像**（`visible=false`），供既有断言与 tooltip 复用，
 	# 避免 R1–R7 的文本断言因改版而回归。
 	var chips: HBoxContainer = HBoxContainer.new()
 	chips.name = "ResourceChips"
-	chips.add_theme_constant_override("separation", 12)
+	chips.add_theme_constant_override("separation", 7)
 	chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chips.alignment = BoxContainer.ALIGNMENT_BEGIN
 	row.add_child(chips)
 	_build_r8_resource_chips(chips)
 	topbar_resource_label = _topbar_label(row, "")
 	topbar_resource_label.visible = false
 
-	# R8：面板入口（道统 / 队列 / 政令 / 自动 / 胜负 / 存档 / 结局）**已迁到页面底部操作栏**
-	# （§8.4 布局：顶部资源栏 / 底部操作栏 / 左侧城市弟子 / 右侧势力胜利）。
-	# 顶栏只保留「回合 · 阶段 · 13 项资源 · 结束回合」。
+	# ④ 结束回合：圆形青玉印章（参考图右上角的「结束回合」圆章）。
 	end_turn_button = Button.new()
 	end_turn_button.name = "EndTurnButton"
-	end_turn_button.text = "结束回合（空格）"
+	end_turn_button.text = "结束\n回合"
 	end_turn_button.tooltip_text = "先 finishTurn 再 beginPlayerTurn；期间相机角度与缩放保持不变"
+	end_turn_button.custom_minimum_size = Vector2(54, 44)
+	end_turn_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	end_turn_button.add_theme_stylebox_override("normal", UiTheme.seal(UiTheme.JADE_DEEP, UiTheme.GOLD_LIGHT))
+	var seal_hover: StyleBoxFlat = UiTheme.seal(UiTheme.JADE, UiTheme.GOLD_LIGHT)
+	end_turn_button.add_theme_stylebox_override("hover", seal_hover)
+	var seal_pressed: StyleBoxFlat = UiTheme.seal(UiTheme.JADE_DEEP.darkened(0.20), UiTheme.GOLD)
+	end_turn_button.add_theme_stylebox_override("pressed", seal_pressed)
+	var seal_disabled: StyleBoxFlat = UiTheme.seal(Color(0.55, 0.58, 0.55, 0.55), Color(UiTheme.GOLD.r, UiTheme.GOLD.g, UiTheme.GOLD.b, 0.25))
+	end_turn_button.add_theme_stylebox_override("disabled", seal_disabled)
+	end_turn_button.add_theme_color_override("font_color", UiTheme.PAPER)
+	end_turn_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	end_turn_button.add_theme_color_override("font_disabled_color", Color(0.88, 0.87, 0.83, 0.70))
+	end_turn_button.add_theme_font_size_override("font_size", 12)
 	end_turn_button.pressed.connect(func() -> void: Session.request_end_turn_sequence())
 	row.add_child(end_turn_button)
+
+
+## 顶栏里的一条竖金线分隔。
+func _topbar_divider() -> ColorRect:
+	var line: ColorRect = ColorRect.new()
+	line.color = Color(UiTheme.GOLD.r, UiTheme.GOLD.g, UiTheme.GOLD.b, 0.35)
+	line.custom_minimum_size = Vector2(1, 18)
+	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return line
 
 
 func _topbar_label(parent: Node, text: String) -> Label:
 	var label: Label = Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 15)
-	label.add_theme_color_override("font_color", Color("e9e2ce"))
+	label.add_theme_color_override("font_color", UiTheme.PAPER)
 	parent.add_child(label)
 	return label
+
+
+## 季节：与回合数同步轮转（纯表现，不参与任何玩法判定）。
+const SEASON_NAMES: Array[String] = ["春", "夏", "秋", "冬"]
+## 阶段中文名（服务端 `Enums.Phase.ALL` 的展示映射，纯文案）。
+const PHASE_LABELS: Dictionary = {
+	"TURN_START": "回合开始",
+	"SPIRIT_PEAK": "灵峰",
+	"PLAYER_ACTION": "修行期",
+	"SETTLEMENT": "结算",
+	"AI_ACTION": "敌宗行动",
+	"VICTORY_CHECK": "胜负判定",
+}
 
 
 func _refresh_topbar() -> void:
@@ -671,7 +849,8 @@ func _refresh_topbar() -> void:
 	if topbar_turn_label != null:
 		topbar_turn_label.text = "第 %d 回合" % turn
 	if topbar_phase_label != null:
-		topbar_phase_label.text = "阶段 %s" % phase
+		var season: String = SEASON_NAMES[0] if SEASON_NAMES.is_empty() else SEASON_NAMES[maxi(turn - 1, 0) % SEASON_NAMES.size()]
+		topbar_phase_label.text = "%s · %s" % [season, str(PHASE_LABELS.get(phase, phase))]
 	if topbar_resource_label != null:
 		topbar_resource_label.text = _resource_text(view)
 
@@ -708,24 +887,17 @@ func _build_city_panel() -> void:
 	add_child(city_panel)
 
 	var panel: PanelContainer = PanelContainer.new()
+	panel.name = "CityCard"
 	panel.anchor_left = 0.0
 	panel.anchor_right = 0.0
 	panel.anchor_top = 1.0
 	panel.anchor_bottom = 1.0
-	panel.offset_left = 0.0
-	panel.offset_right = CITY_PANEL_WIDTH
-	panel.offset_top = -CITY_PANEL_MAX_HEIGHT
-	panel.offset_bottom = 0.0
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.965, 0.957, 0.925, 0.94)
-	style.border_color = Color("b6ad8b")
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.content_margin_left = 14.0
-	style.content_margin_right = 14.0
-	style.content_margin_top = 10.0
-	style.content_margin_bottom = 10.0
-	panel.add_theme_stylebox_override("panel", style)
+	panel.offset_left = 12.0
+	panel.offset_right = 12.0 + CITY_PANEL_WIDTH
+	# 抬到小地图之上（左下角从上到下依次是：城市面板 → 小地图 → 底部操作栏）。
+	panel.offset_bottom = -(ActionBar.BAR_HEIGHT + Minimap.MAP_SIZE + 30.0)
+	panel.offset_top = panel.offset_bottom - CITY_PANEL_MAX_HEIGHT
+	panel.add_theme_stylebox_override("panel", UiTheme.paper(0.94, 8, 1.0))
 	city_panel.add_child(panel)
 
 	var column: VBoxContainer = VBoxContainer.new()
@@ -734,15 +906,15 @@ func _build_city_panel() -> void:
 
 	var header: HBoxContainer = HBoxContainer.new()
 	column.add_child(header)
-	city_title_label = Label.new()
-	city_title_label.text = "城市面板（点选己方灵峰）"
-	city_title_label.add_theme_font_size_override("font_size", 17)
-	city_title_label.add_theme_color_override("font_color", Color("294e48"))
+	city_title_label = UiTheme.title_label("城市面板（点选己方灵峰）", 15, UiTheme.INK)
 	city_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(city_title_label)
 	var close: Button = Button.new()
-	close.text = "关闭"
+	close.text = "×"
+	close.tooltip_text = "关闭城市面板"
+	close.custom_minimum_size = Vector2(24, 22)
 	close.pressed.connect(func() -> void: _clear_city_state())
+	UiTheme.style_plain(close)
 	header.add_child(close)
 
 	city_info_label = Label.new()
@@ -903,6 +1075,9 @@ func _on_r3_result_received(command: String, result: Dictionary) -> void:
 func _render_city_panel() -> void:
 	if city_title_label == null or city_info_label == null or city_list == null:
 		return
+	# 未选中灵峰时整块卡片收起（否则左下角会常驻一张空白纸片，观感很差）。
+	if city_panel != null:
+		city_panel.visible = not selected_peak_id.is_empty()
 	for child: Node in city_list.get_children():
 		city_list.remove_child(child)
 		child.queue_free()
@@ -1669,65 +1844,76 @@ func _build_unit_panel() -> void:
 	unit_panel.visible = false
 	add_child(unit_panel)
 
+	# 参考图布局：单位卡在**右下角**（左侧是立绘，右侧是属性），压在地块卡下方。
 	var panel: PanelContainer = PanelContainer.new()
-	panel.anchor_left = 0.0
-	panel.anchor_right = 0.0
+	panel.name = "UnitCard"
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
 	panel.anchor_top = 1.0
 	panel.anchor_bottom = 1.0
-	panel.offset_left = 0.0
-	panel.offset_right = UNIT_PANEL_WIDTH
-	panel.offset_top = -UNIT_PANEL_HEIGHT
-	panel.offset_bottom = 0.0
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.965, 0.957, 0.925, 0.96)
-	style.border_color = Color("b6ad8b")
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.content_margin_left = 14.0
-	style.content_margin_right = 14.0
-	style.content_margin_top = 10.0
-	style.content_margin_bottom = 10.0
-	panel.add_theme_stylebox_override("panel", style)
+	panel.offset_left = -(UNIT_PANEL_WIDTH + 10.0)
+	panel.offset_right = -10.0
+	panel.offset_top = -(ActionBar.BAR_HEIGHT + UNIT_PANEL_HEIGHT + 12.0)
+	panel.offset_bottom = -(ActionBar.BAR_HEIGHT + 12.0)
+	panel.add_theme_stylebox_override("panel", UiTheme.paper(0.95, 8, 1.0))
 	unit_panel.add_child(panel)
 
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	panel.add_child(row)
+
+	# 立绘：宣纸小框 + 姓氏大字（真立绘缺失时也不空着）。
+	var portrait_frame: PanelContainer = PanelContainer.new()
+	portrait_frame.name = "Portrait"
+	portrait_frame.custom_minimum_size = Vector2(54, 68)
+	portrait_frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var portrait_style: StyleBoxFlat = UiTheme.paper(0.99, 4, 1.0)
+	portrait_style.bg_color = Color("efe6d2")
+	portrait_frame.add_theme_stylebox_override("panel", portrait_style)
+	row.add_child(portrait_frame)
+	var portrait_label: Label = Label.new()
+	portrait_label.name = "PortraitGlyph"
+	portrait_label.text = "修"
+	portrait_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	portrait_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	portrait_label.add_theme_font_size_override("font_size", 26)
+	portrait_label.add_theme_color_override("font_color", UiTheme.JADE_DEEP)
+	portrait_frame.add_child(portrait_label)
+
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
-	panel.add_child(column)
+	column.add_theme_constant_override("separation", 4)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(column)
 
 	var header: HBoxContainer = HBoxContainer.new()
 	column.add_child(header)
-	unit_title_label = Label.new()
-	unit_title_label.text = "弟子详情（点选己方弟子）"
-	unit_title_label.add_theme_font_size_override("font_size", 17)
-	unit_title_label.add_theme_color_override("font_color", Color("294e48"))
+	unit_title_label = UiTheme.title_label("弟子详情（点选己方弟子）", 15, UiTheme.INK)
 	unit_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(unit_title_label)
 	var close: Button = Button.new()
-	close.text = "关闭"
+	close.text = "×"
+	close.tooltip_text = "关闭弟子详情"
+	close.custom_minimum_size = Vector2(24, 22)
 	close.pressed.connect(func() -> void: _clear_move_state())
+	UiTheme.style_plain(close)
 	header.add_child(close)
 
-	unit_info_label = Label.new()
-	unit_info_label.add_theme_font_size_override("font_size", 13)
-	unit_info_label.add_theme_color_override("font_color", Color("3c4b45"))
-	unit_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_label = UiTheme.body_label("", 12, UiTheme.INK_SOFT)
 	column.add_child(unit_info_label)
 
-	column.add_child(HSeparator.new())
+	column.add_child(UiTheme.hairline())
 
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 150)
+	scroll.custom_minimum_size = Vector2(0, 54)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(scroll)
 	unit_list = VBoxContainer.new()
 	unit_list.add_theme_constant_override("separation", 3)
 	unit_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(unit_list)
 
-	unit_status_label = Label.new()
-	unit_status_label.add_theme_font_size_override("font_size", 12)
-	unit_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
-	unit_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_status_label = UiTheme.body_label("", 11, UiTheme.CINNABAR)
 	column.add_child(unit_status_label)
 
 
@@ -2238,19 +2424,67 @@ func query_attack_preview(tile_id: String) -> String:
 # 场景自建节点（避免 .tscn 里塞非必要子资源）
 # ---------------------------------------------------------------------------
 
+func _build_ui_theme() -> void:
+	# 全局主题：所有 Button / Label / LineEdit / ScrollContainer 自动继承，
+	# 不必在每个面板里逐个 `add_theme_*_override`。显式 override 仍然优先。
+	ui_theme = Theme.new()
+	ui_theme.set_stylebox("normal", "Button", UiTheme.plain_button())
+	var hover: StyleBoxFlat = UiTheme.plain_button()
+	hover.bg_color = Color(0.996, 0.984, 0.949, 1.0)
+	hover.border_color = UiTheme.GOLD
+	ui_theme.set_stylebox("hover", "Button", hover)
+	var pressed: StyleBoxFlat = UiTheme.plain_button()
+	pressed.bg_color = Color(0.906, 0.882, 0.824, 1.0)
+	ui_theme.set_stylebox("pressed", "Button", pressed)
+	var disabled: StyleBoxFlat = UiTheme.plain_button()
+	disabled.bg_color = Color(0.929, 0.918, 0.886, 0.70)
+	disabled.border_color = Color(UiTheme.GOLD.r, UiTheme.GOLD.g, UiTheme.GOLD.b, 0.18)
+	ui_theme.set_stylebox("disabled", "Button", disabled)
+	ui_theme.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	ui_theme.set_color("font_color", "Button", UiTheme.INK)
+	ui_theme.set_color("font_hover_color", "Button", UiTheme.INK)
+	ui_theme.set_color("font_pressed_color", "Button", UiTheme.INK)
+	ui_theme.set_color("font_disabled_color", "Button", UiTheme.INK_FAINT)
+	ui_theme.set_font_size("font_size", "Button", 13)
+	ui_theme.set_color("font_color", "Label", UiTheme.INK_SOFT)
+	ui_theme.set_color("default_color", "RichTextLabel", UiTheme.INK_SOFT)
+	ui_theme.set_font_size("normal_font_size", "RichTextLabel", 13)
+	ui_theme.set_stylebox("panel", "PanelContainer", UiTheme.paper(0.94, 8, 1.0))
+	# 滚动条压成细金线，避免默认灰色方块破坏画面。
+	var grabber: StyleBoxFlat = StyleBoxFlat.new()
+	grabber.bg_color = Color(UiTheme.GOLD.r, UiTheme.GOLD.g, UiTheme.GOLD.b, 0.45)
+	grabber.corner_radius_top_left = 2
+	grabber.corner_radius_top_right = 2
+	grabber.corner_radius_bottom_left = 2
+	grabber.corner_radius_bottom_right = 2
+	ui_theme.set_stylebox("grabber", "VScrollBar", grabber)
+	ui_theme.set_stylebox("grabber_highlight", "VScrollBar", grabber)
+	ui_theme.set_stylebox("grabber_pressed", "VScrollBar", grabber)
+	var scroll_bg: StyleBoxFlat = StyleBoxFlat.new()
+	scroll_bg.bg_color = Color(0, 0, 0, 0.04)
+	ui_theme.set_stylebox("scroll", "VScrollBar", scroll_bg)
+	ui_theme.set_stylebox("separator", "HSeparator", StyleBoxLine.new())
+	# 挂到窗口根节点：本场景内所有 Control 自动继承（MainMenu 是另一个场景，互不影响）。
+	var window: Window = get_tree().root
+	if window != null:
+		window.theme = ui_theme
+
+
 func _build_lighting() -> void:
 	var sun: DirectionalLight3D = DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.rotation_degrees = Vector3(-52.0, -38.0, 0.0)
-	sun.light_energy = 1.15
+	sun.light_energy = 1.05
+	sun.light_color = Color(1.0, 0.95, 0.86)
 	sun.shadow_enabled = false
 	add_child(sun)
 	var environment: Environment = Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("e7e2d3")
+	# 宣纸底：略暖的米白，远山向它 lerp 即得「渐远渐无」的空气透视。
+	environment.background_color = Color("e9e4d5")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("fff6e2")
-	environment.ambient_light_energy = 0.95
+	environment.ambient_light_color = Color("fff8ea")
+	environment.ambient_light_energy = 1.0
 	var world_environment: WorldEnvironment = WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = environment
@@ -2260,93 +2494,115 @@ func _build_lighting() -> void:
 	world_environment_node = world_environment
 
 
+## 远景：地图外围的层叠远山 + 流动云带。地块数变化时才重建（节流）。
+## 注意：必须用**取景包围盒**而非全图包围盒——远景要落在取景之内才看得见。
+func _refresh_scenery(view: Dictionary) -> void:
+	if scenery == null:
+		return
+	var tiles: Dictionary = view.get("tiles", {})
+	if tiles.is_empty():
+		return
+	if tiles.size() == _scenery_tile_count:
+		return
+	_scenery_tile_count = tiles.size()
+	var background: Color = Color("efe9d9")
+	if world_environment_node != null and world_environment_node.environment != null:
+		background = world_environment_node.environment.background_color
+	scenery.build(_framing_bounds(view), background)
+
+
 func _build_sidebar() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
 	layer.name = "Hud"
 	add_child(layer)
 
+	# 右侧「地块卡」：参考图的灵脉山面板——宣纸卡片 + 细金边，上缘留出顶栏高度。
 	var panel: PanelContainer = PanelContainer.new()
+	panel.name = "SideCard"
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.anchor_top = 0.0
 	panel.anchor_bottom = 1.0
 	panel.offset_left = -SIDEBAR_WIDTH
-	panel.offset_right = 0.0
-	panel.offset_top = 0.0
-	panel.offset_bottom = 0.0
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.965, 0.957, 0.925, 0.94)
-	style.border_color = Color("b6ad8b")
-	style.border_width_left = 2
-	style.content_margin_left = 18.0
-	style.content_margin_right = 18.0
-	style.content_margin_top = 16.0
-	style.content_margin_bottom = 16.0
-	panel.add_theme_stylebox_override("panel", style)
+	panel.offset_right = -10.0
+	panel.offset_top = TOPBAR_HEIGHT + 10.0
+	panel.offset_bottom = -(ActionBar.BAR_HEIGHT + UNIT_PANEL_HEIGHT + 24.0)
+	panel.add_theme_stylebox_override("panel", UiTheme.paper(0.93, 8, 1.0))
 	layer.add_child(panel)
 
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", 7)
 	panel.add_child(column)
 
-	var title: Label = Label.new()
-	title.text = "山河画卷 · R5"
-	title.add_theme_font_size_override("font_size", 20)
-	title.add_theme_color_override("font_color", Color("294e48"))
-	column.add_child(title)
+	# ① 地块名（参考图的「灵脉山」大字标题）。
+	tile_card_title = UiTheme.title_label("山河画卷", 18, UiTheme.INK)
+	column.add_child(tile_card_title)
+	column.add_child(UiTheme.hairline())
+	# ② 类型 / 归属 / 灵气（参考图的三行键值对）。
+	tile_card_meta = UiTheme.body_label("点击地块查看详情", 12, UiTheme.INK_SOFT)
+	column.add_child(tile_card_meta)
+	# ③ 可获取资源（只列 view 里真实存在的字段，不臆造产出数值）。
+	tile_card_yield = UiTheme.body_label("", 12, UiTheme.JADE_DEEP)
+	column.add_child(tile_card_yield)
+	# ④ 描述（风物小注，纯文案）。
+	tile_card_desc = UiTheme.body_label("", 11, UiTheme.INK_FAINT)
+	column.add_child(tile_card_desc)
+	column.add_child(UiTheme.hairline())
 
 	status_label = Label.new()
-	status_label.add_theme_font_size_override("font_size", 13)
-	status_label.add_theme_color_override("font_color", Color("5d6b64"))
+	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.add_theme_color_override("font_color", UiTheme.INK_SOFT)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(status_label)
 
-	column.add_child(HSeparator.new())
+	column.add_child(UiTheme.hairline())
 
 	sidebar = RichTextLabel.new()
 	sidebar.fit_content = false
 	sidebar.scroll_active = true
 	sidebar.selection_enabled = false
 	sidebar.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sidebar.add_theme_font_size_override("normal_font_size", 15)
+	sidebar.add_theme_font_size_override("normal_font_size", 13)
+	sidebar.add_theme_color_override("default_color", UiTheme.INK_SOFT)
 	sidebar.text = "点击地块查看详情"
 	column.add_child(sidebar)
 
-	column.add_child(HSeparator.new())
+	column.add_child(UiTheme.hairline())
 
 	# R7：事件栏（AI 行动 / 胜负 / 宗主外出等）。占位展示，真回放留 R8。
-	var event_title: Label = Label.new()
-	event_title.text = "事件"
-	event_title.add_theme_font_size_override("font_size", 14)
-	event_title.add_theme_color_override("font_color", Color("294e48"))
+	var event_title: Label = UiTheme.title_label("事件", 13, UiTheme.INK)
 	column.add_child(event_title)
 	event_label = RichTextLabel.new()
 	event_label.fit_content = false
 	event_label.scroll_active = true
 	event_label.selection_enabled = false
-	event_label.custom_minimum_size = Vector2(0, 96)
-	event_label.add_theme_font_size_override("normal_font_size", 13)
+	event_label.custom_minimum_size = Vector2(0, 84)
+	event_label.add_theme_font_size_override("normal_font_size", 12)
+	event_label.add_theme_color_override("default_color", UiTheme.INK_SOFT)
 	event_label.text = "（暂无事件）"
 	column.add_child(event_label)
 
-	column.add_child(HSeparator.new())
+	column.add_child(UiTheme.hairline())
 
 	var buttons: HBoxContainer = HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 6)
 	column.add_child(buttons)
 	var refresh: Button = Button.new()
-	refresh.text = "刷新 view"
+	refresh.text = "刷新"
 	refresh.tooltip_text = "向服务端请求 getState，相机角度与缩放保持不变"
 	refresh.pressed.connect(func() -> void: Session.request_refresh())
+	UiTheme.style_plain(refresh)
 	buttons.add_child(refresh)
 	var back: Button = Button.new()
 	back.text = "返回菜单"
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	UiTheme.style_plain(back)
 	buttons.add_child(back)
 
 	var hint: Label = Label.new()
-	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 青高亮=可移动、赭红=可攻击 · 悬停可攻击格看胜率预览 · Shift+点选多选后点高亮格批量移动 · 左下弟子详情可转职/晋升/传送/驻守/撤退 · 顶栏「道统」「队列」 · 结束回合"
-	hint.add_theme_font_size_override("font_size", 12)
-	hint.add_theme_color_override("font_color", Color("6d7470"))
+	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 淡黄=可移动、赭红=可攻击 · Shift 多选批量移动 · 空格结束回合 · G 网格 · B 边框 · M 小地图 · F1 引导"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", UiTheme.INK_FAINT)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(hint)
 
@@ -3108,6 +3364,8 @@ func close_victory_panel() -> void:
 func _on_victory_progress_received(result: Dictionary) -> void:
 	victory_progress = result
 	_render_victory_panel()
+	# 左上目标卡片与胜负面板同源（`routes[].goals[]`），一并刷新。
+	_render_objectives()
 
 
 ## `queryVictoryChoice` 回包：待决时把路线并进结局屏展示。
@@ -3588,6 +3846,22 @@ func r7_button_state(button_name: String) -> Dictionary:
 
 ## R8 装饰层（昼夜 / 网格 / 边框 / 粒子 / 飞鸟 / 泼墨转场）。
 var decorations: Decorations = null
+## R8 打磨：地图外围的水墨远景（层叠远山 + 流动云带）。
+var scenery: Scenery = null
+## 远景重建节流：地块数变化（换局/读档）时才重建，避免每帧铺景。
+var _scenery_tile_count: int = -1
+## 左上「当前目标」卡片（绑定 `victoryProgress.routes[].goals[]`）。
+var objectives_panel: CanvasLayer = null
+var objectives_list: VBoxContainer = null
+var objectives_title_label: Label = null
+var _objectives_requested: bool = false
+## 右侧「地块卡」（参考图的灵脉山面板：类型/归属/可获取资源/描述）。
+var tile_card_title: Label = null
+var tile_card_meta: Label = null
+var tile_card_yield: Label = null
+var tile_card_desc: Label = null
+## 统一水墨主题（`_build_ui_theme()` 填充，挂到窗口根节点供所有面板继承）。
+var ui_theme: Theme = null
 ## R8：昼夜循环要改的两个节点（由 `_build_lighting()` 填充）。
 var sun_light: DirectionalLight3D = null
 var world_environment_node: WorldEnvironment = null
@@ -3623,11 +3897,19 @@ func _build_r8() -> void:
 	decorations.setup(sun_light, null if world_environment_node == null else world_environment_node.environment)
 	decorations.day_night_enabled = bool(_r8_pref("dayNight", true))
 
+	# ①.5 远景：地图外围的层叠远山 + 流动云带（参考图的大面积留白与远山）。
+	scenery = Scenery.new()
+	scenery.name = "Scenery"
+	add_child(scenery)
+
 	# ② HUD 层：小地图 + Toast。
 	r8_hud_layer = CanvasLayer.new()
 	r8_hud_layer.name = "R8Hud"
 	r8_hud_layer.layer = 2
 	add_child(r8_hud_layer)
+
+	# ②.5 左上「当前目标」卡片（参考图左上的目标面板）。
+	_build_objectives_panel()
 
 	var minimap_holder: PanelContainer = PanelContainer.new()
 	minimap_holder.name = "MinimapHolder"
@@ -3636,21 +3918,11 @@ func _build_r8() -> void:
 	minimap_holder.anchor_top = 1.0
 	minimap_holder.anchor_bottom = 1.0
 	minimap_holder.offset_left = 12.0
-	minimap_holder.offset_right = 12.0 + Minimap.MAP_SIZE + 8.0
-	minimap_holder.offset_top = -(ActionBar.BAR_HEIGHT + Minimap.MAP_SIZE + 20.0)
+	minimap_holder.offset_right = 12.0 + Minimap.MAP_SIZE + 10.0
+	minimap_holder.offset_top = -(ActionBar.BAR_HEIGHT + Minimap.MAP_SIZE + 26.0)
 	minimap_holder.offset_bottom = -(ActionBar.BAR_HEIGHT + 12.0)
-	var holder_style: StyleBoxFlat = StyleBoxFlat.new()
-	holder_style.bg_color = Color(0.96, 0.95, 0.92, 0.88)
-	holder_style.border_color = Color("b6ad8b")
-	holder_style.border_width_left = 1
-	holder_style.border_width_right = 1
-	holder_style.border_width_top = 1
-	holder_style.border_width_bottom = 1
-	holder_style.content_margin_left = 4.0
-	holder_style.content_margin_right = 4.0
-	holder_style.content_margin_top = 4.0
-	holder_style.content_margin_bottom = 4.0
-	minimap_holder.add_theme_stylebox_override("panel", holder_style)
+	# 参考图的小地图是深墨底板 + 金边（压在山水的暗部，不与纸色卡片混淆）。
+	minimap_holder.add_theme_stylebox_override("panel", UiTheme.board(0.96))
 	r8_hud_layer.add_child(minimap_holder)
 
 	minimap = Minimap.new()
@@ -3698,6 +3970,78 @@ func _build_r8() -> void:
 	_register_r8_commands()
 	_refresh_r8_topbar_resources()
 	_apply_r8_prefs()
+
+
+# ---------------------------------------------------------------------------
+# 左上「当前目标」卡片（参考图布局）
+# ---------------------------------------------------------------------------
+
+## 三条目标取自 `queryVictoryProgress.routes[].goals[]`（服务端已算好 `current`/`target`/`met`）。
+## **客户端零推导**：不自己算比例、不自己拼「差多少」文案。
+func _build_objectives_panel() -> void:
+	objectives_panel = CanvasLayer.new()
+	objectives_panel.name = "Objectives"
+	objectives_panel.layer = 2
+	add_child(objectives_panel)
+	var card: PanelContainer = PanelContainer.new()
+	card.name = "ObjectivesCard"
+	card.anchor_left = 0.0
+	card.anchor_right = 0.0
+	card.anchor_top = 0.0
+	card.anchor_bottom = 0.0
+	card.offset_left = 12.0
+	card.offset_top = TOPBAR_HEIGHT + 10.0
+	card.offset_right = 12.0 + 236.0
+	card.offset_bottom = TOPBAR_HEIGHT + 10.0 + 118.0
+	card.add_theme_stylebox_override("panel", UiTheme.paper(0.92, 6, 1.0))
+	objectives_panel.add_child(card)
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	card.add_child(column)
+	objectives_title_label = UiTheme.title_label("◆ 当前目标", 14, UiTheme.INK)
+	column.add_child(objectives_title_label)
+	column.add_child(UiTheme.hairline())
+	objectives_list = VBoxContainer.new()
+	objectives_list.add_theme_constant_override("separation", 2)
+	column.add_child(objectives_list)
+	_render_objectives()
+
+
+func _render_objectives() -> void:
+	if objectives_list == null:
+		return
+	for child: Node in objectives_list.get_children():
+		objectives_list.remove_child(child)
+		child.queue_free()
+	var goals: Array = []
+	for entry: Variant in victory_progress.get("routes", []):
+		var route: Dictionary = entry
+		var route_goals: Array = route.get("goals", [])
+		if route_goals.is_empty():
+			continue
+		for goal: Variant in route_goals:
+			goals.append(goal)
+		break
+	if goals.is_empty():
+		objectives_list.add_child(UiTheme.body_label("（等待服务端胜利进度…）", 12, UiTheme.INK_FAINT))
+		return
+	var shown: int = 0
+	for entry: Variant in goals:
+		if shown >= 3:
+			break
+		var goal: Dictionary = entry
+		var met: bool = bool(goal.get("met", false))
+		var line: String = "◇ %s（%d/%d）" % [
+			str(goal.get("name", "")),
+			int(goal.get("current", 0)),
+			int(goal.get("target", 0)),
+		]
+		var row: Label = UiTheme.body_label(line, 12, UiTheme.JADE_DEEP if met else UiTheme.INK_SOFT)
+		row.tooltip_text = str(goal.get("description", ""))
+		objectives_list.add_child(row)
+		shown += 1
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -3880,22 +4224,39 @@ const R8_RESOURCE_ICONS: Dictionary = {
 func _build_r8_resource_chips(parent: Node) -> void:
 	var assets: AssetLibrary = Session.assets
 	for key: String in R8_RESOURCE_KEYS:
+		var label_text: String = str(R8_RESOURCE_LABELS.get(key, key))
 		var holder: HBoxContainer = HBoxContainer.new()
 		holder.name = "Chip_" + key.replace(".", "_")
-		holder.add_theme_constant_override("separation", 2)
+		holder.add_theme_constant_override("separation", 4)
+		holder.tooltip_text = label_text
+		holder.mouse_filter = Control.MOUSE_FILTER_PASS
+		# 圆形徽章：底衬用该资源的工笔颜料色（向纸色提亮，避免深底吞掉深色图标）。
+		var badge: PanelContainer = PanelContainer.new()
+		badge.custom_minimum_size = Vector2(20, 20)
+		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var tint: Color = UiTheme.resource_color(key)
+		badge.add_theme_stylebox_override("panel",
+			UiTheme.seal(tint.lerp(UiTheme.PAPER, 0.62), tint.darkened(0.06)))
+		holder.add_child(badge)
 		var icon: TextureRect = TextureRect.new()
-		icon.custom_minimum_size = Vector2(18, 18)
+		icon.custom_minimum_size = Vector2(13, 13)
+		# 必须忽略纹理原始尺寸，否则 32×32 的图标会把徽章撑到 32px，13 项就顶出屏幕。
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var texture: Resource = assets.resource_for(str(R8_RESOURCE_ICONS.get(key, "")), "texture") if assets != null else null
 		if texture is Texture2D:
 			icon.texture = texture as Texture2D
-		holder.add_child(icon)
+		badge.add_child(icon)
 		var value: Label = Label.new()
 		value.name = "Value_" + key.replace(".", "_")
-		value.text = "%s 0" % str(R8_RESOURCE_LABELS.get(key, key))
-		value.add_theme_font_size_override("font_size", 13)
-		value.add_theme_color_override("font_color", Color("e9e2ce"))
+		value.text = "%s 0" % label_text
+		value.add_theme_font_size_override("font_size", 11)
+		value.add_theme_color_override("font_color", UiTheme.INK)
+		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(value)
 		parent.add_child(holder)
 		resource_chips[key] = value
@@ -3929,6 +4290,12 @@ func _refresh_r8_topbar_resources() -> void:
 ## 注意：本函数**不触碰相机**（不调 frame_once、不写 rotation/size）。
 func _refresh_r8(view: Dictionary) -> void:
 	_refresh_r8_topbar_resources()
+	_refresh_scenery(view)
+	# 目标卡片需要 `queryVictoryProgress` 的数据；首次拿到 view 后静默拉一次（只读命令）。
+	if not _objectives_requested and not view.is_empty() and Session.supports(Commands.QUERY_VICTORY_PROGRESS):
+		_objectives_requested = true
+		Session.request_query_victory_progress(player_sect_id())
+	_render_objectives()
 	if decorations != null and map != null:
 		var tiles: Dictionary = view.get("tiles", {})
 		if tiles.size() != _grid_tile_count:

@@ -457,6 +457,45 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - **设置项 `applied` 恒为 `false` 是正确的**：`setSetting` 的回包语义是「服务端收到了、但不改服务端状态」，客户端不应等 `applied=true` 才生效，否则设置面板会永远显示「未生效」。`SettingsPanel.on_setting_confirmed` 据此只更新状态文案。
 - **资源包是程序化生成的「占位级美术」**：可复现、可审阅、零外部依赖，但**不是**成品美术。真实美术同名覆盖 `assets/art/default/**` 即可生效，无需改任何代码（`assets/README.md` 已写明覆盖方式与再生成命令）。
 
+### 4.9 R8 视觉对齐参考图（收尾打磨，服务端零改动）
+
+R8 交付后追加了一轮「按水墨长卷参考图贴近」的表现层改造。**只改表现层**：`data/gameConfig.json`、`commands.gd`、`CommandDispatcher`、`TurnProcessor`、`StateView` 与全部服务端文件**一行未改**；协议 70 条命令入口不变。
+
+**新增 3 个文件**
+
+| 文件 | 职责 | 关键设计 |
+|---|---|---|
+| `world/Scenery.gd` | 地图外围的层叠远山 + 流动云带 | 三层环状远山（每层 10 座，每座 3 个七棱锥叠成连绵山形）+ 8 片极淡云；半径以**取景包围盒**为基准（`0.60/0.73/0.86 × span`），且**只铺画面远侧半圈**（`(dx+dz) > 0.16·span` 跳过），否则近侧的山会挡住地块；颜色向背景纸色 lerp `0.62→0.86` 做空气透视；云 alpha 仅 `0.03~0.08` |
+| `ui/UiTheme.gd` | 水墨 UI 主题工厂 | `paper()` 宣纸卡片（细金边 + 内边距）/ `bar()` 顶底栏纸带（只有下缘金线）/ `board()` 小地图深墨板 / `seal()` 正圆印章（`corner_radius=64`）/ `primary_button()`/`plain_button()` / `title_label()`/`body_label()`/`hairline()` / `resource_color()` 13 项资源各一工笔颜料色 |
+| `tools/WorldShot.gd` + `.tscn` | **真实渲染截图**工具 | 拉起服务端 → `newGame(seed=864213, 26×18)` → 装配 `World` → 90 帧预热 → `RenderingServer.frame_post_draw` → `save_png("res://outputs/ui_preview_map.png")`。**必须非 headless**（否则无渲染设备），命令见文件头注释 |
+
+**改造要点（按参考图逐项对齐）**
+
+| 参考图特征 | 落地方式 |
+|---|---|
+| 宣纸米白底、大面积留白 | `Decorations._apply_day_phase` 的夜色由 `2b3542`（深蓝灰）改为 `cfcabc`（冷纸色），昼色 `efe9d9`；**未探索地块的柱/顶面照建但 `visible=false`**（节点与 meta 保留，`R1ClientTest` 的 `get_child_count()==2` 锚点不破），未知区即纯纸底 |
+| 地图约占画面八成 | `_framing_bounds()` 取景系数 `1.15 → 0.84`、下限 `14 → 11`；并沿**屏幕右方**（世界 `(0.707,0,-0.707)`）平移半个侧栏宽，补偿右侧 320px 侧栏的遮挡 |
+| 顶栏是横贯全屏的「纸带」 | `_build_topbar()` 全量重写：`UiTheme.bar()` + 左「第 N 回合」/「春 · 修行期」+ 13 项圆形资源徽章 + 右上圆形青玉「结束回合」印章。`topbar_resource_label` 保留为 `visible=false` 文本镜像，R2/R3/R4 断言不受影响 |
+| 13 项圆形彩色徽章 | `_build_r8_resource_chips()`：`PanelContainer`（20×20，`seal(资源色.lerp(纸色,0.62))`）+ 13×13 图标 + 11 号字。**关键坑**：`TextureRect` 默认 `expand_mode=KEEP_SIZE` 会被 32×32 图标撑到 32px，13 项直接顶出屏幕——必须显式 `EXPAND_IGNORE_SIZE` |
+| 左上小目标卡 | 新增 `_build_objectives_panel()` / `_render_objectives()`：取 `victory_progress.routes[0].goals` 前 3 条，`◇ 名称（进度/目标）`，达成转青玉色 |
+| 右侧宣纸卡片（地块信息） | `_build_sidebar()` 重写为 `SideCard`：标题 / 类型·归属·海拔键值对 / 可获取资源 / 风物小注 / 事件 / 刷新·返回。新增 `_refresh_tile_card()`，未探索时显示「云雾未开，山形不可辨」 |
+| 左下深墨小地图 + 金色视口框 | `UiTheme.board()` 底板 + `Minimap._rebuild_points()`（`PanelContainer` 异步改尺寸，必须在 `_draw()`/`tile_at()` 前重算）。**修掉一处真 bug**：视口框原先把世界坐标再除一次 `√3`，导致金框偏到左上角 |
+| 底栏通栏纸带 | `ActionBar` 由 `offset_right = -SIDEBAR_WIDTH` 改为 `0.0`，样式换 `UiTheme.bar()` + 上缘金线 |
+| 中式楼阁建筑 | `SectView._build_pavilion()` 重写：石台基（两级须弥座）→ 米色墙 + 4 朱红柱 + 额枋 → 宽出檐下檐（青瓦）→ 薄「平座」→ 二层墙 → 上檐（金瓦）→ 金色宝顶 + 屋脊金棱。**楼阁整体转 -45°**（正立面朝相机），屋顶再转 +45° 抵消（四坡顶仍与屏幕轴平行）；主峰 `tier_scale=1.40`、附属建筑 `0.78` |
+| 竖幅宗门旗 | `_build_banner()`：细杆 + 横担（沿局部 z 铺，屏幕上才水平）+ 竖长旗面 + 逐字换行 `Label3D`。**关键坑**：`Label3D` 若只转 yaw，45° 俯视会把竖排字压成横杠——须 `rotation_degrees = (-45, 90, 0)` 让文字平面垂直于视线 |
+| 单位小人 | `UnitView._build_figure()`：影子（贴地扁圆）→ 宗门色袍（圆台）→ 躯干（走 `_apply_class_silhouette`，`scale 0.46`）→ 头（球）+ 发冠（小方块）。`PLACEHOLDER_SHAPES` 10 项与 `_apply_class_silhouette` **一字未改**（R5 断言依赖） |
+| 青绿山水配色 | `HexMap.base_color()`：灵田 `a8c48d` / 灵原 `b9cfa2` / 荒地 `cfbb95` / 默认 `e6e0cd`；侧面山岳 `5e7d70` / 丘陵 `98a583` / 平地 `bdbd9c`；网格线由深墨改**近白半透明** `Color(1,0.99,0.94,0.34)` |
+
+**验收**
+- 客户端单元 `R1 52 / R2 5 / R3 5 / R4 8 / R5 8 / R6 9 / R7 14 / R8 44` 全绿（`*_CLIENT_RESULT=OK failures=0`）
+- `tools/check.ps1` **24 阶段全绿**；交付物清单 R8 由 16 项扩为 **20 项**（新增 `Scenery.gd`/`UiTheme.gd`/`WorldShot.gd`/`.tscn`）
+- 截图工具可复现：`Godot --path client res://tools/WorldShot.tscn` → `outputs/ui_preview_map.png`（1600×900）
+
+**偏差登记**
+- **截图是「观感核对」而非「像素基线」**：`outputs/` 在 `.gitignore` 内，不参与 CI 断言。原因：不同 GPU/驱动的抗锯齿与阴影差异会让像素比对必然假红；真正的回归保护仍是 R1–R8 的结构断言。
+- **远山只铺半圈**是有意为之：完整环在 45° 俯视下，近侧的山会压在地块前，观感像「山从地图里长出来」。若后续相机可自由旋转，需要按相机方向动态重铺（当前相机铁律锁定 45°，故静态铺一次即可）。
+- **未探索格保留空节点**：为不破坏 `R1ClientTest` 的 `get_child_count()==2` 锚点，柱与顶面照建但隐藏。代价是每格多 2 个不可见 `MeshInstance3D`（`visible=false` 不参与绘制），352 格共 704 个空节点，实测无性能影响。
+
 ---
 
 ## 五、风险登记表

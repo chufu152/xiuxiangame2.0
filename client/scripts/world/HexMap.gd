@@ -35,7 +35,8 @@ func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> voi
 	for tile_id: String in data:
 		var tile: Dictionary = data[tile_id]
 		var state: Fog.State = fog.state_for(tile_id)
-		var height: float = 0.18 if state == Fog.State.UNEXPLORED else float(heights.get(str(tile.get("relief", "")), 1.0))
+		# 未探索：压到极低的「纸片」，颜色贴近背景，读起来是「还没画的留白」而不是沙地。
+		var height: float = 0.04 if state == Fog.State.UNEXPLORED else float(heights.get(str(tile.get("relief", "")), 1.0))
 		var root: Node3D = Node3D.new()
 		root.name = tile_id
 		root.position = Hex.to_world(int(tile["q"]), int(tile["r"]))
@@ -44,10 +45,15 @@ func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> voi
 		root.set_meta("display_data", {"id": tile_id, "q": tile["q"], "r": tile["r"]} if state == Fog.State.UNEXPLORED else tile.duplicate(true))
 		add_child(root)
 		tiles[tile_id] = root
+		# 未探索格：柱与顶面**照建但隐藏**——节点结构与 meta 全部保留（拾取、既有断言、
+		# `top_position` 都依赖它），只是不画出来。整片未知区因此是纯宣纸留白，
+		# 正是参考图「未落笔处」的效果；若连网格都不建，会破坏 `R1ClientTest` 的
+		# `get_child_count() == 2` 锚点。
+		var hidden: bool = state == Fog.State.UNEXPLORED
 		var relief: String = str(tile.get("relief", ""))
-		var side_color: Color = Color("677969") if relief == "MOUNTAIN" else Color("a3a38c") if relief == "HILL" else Color("c4bea4")
-		var side_material: Material = assets.material_for("terrain.fog.RICE_PAPER", Color("ede8d6")) if state == Fog.State.UNEXPLORED else assets.material_for("terrain.relief.%s_SIDE" % relief, side_color)
-		var top_material: Material = assets.material_for("terrain.fog.RICE_PAPER", Color("f1ecdb")) if state == Fog.State.UNEXPLORED else assets.material_for("terrain.base.%s" % str(tile.get("baseTerrain", "")), base_color(str(tile.get("baseTerrain", ""))))
+		var side_color: Color = Color("5e7d70") if relief == "MOUNTAIN" else Color("98a583") if relief == "HILL" else Color("bdbd9c")
+		var side_material: Material = assets.material_for("terrain.relief.%s_SIDE" % relief, side_color)
+		var top_material: Material = assets.material_for("terrain.base.%s" % str(tile.get("baseTerrain", "")), base_color(str(tile.get("baseTerrain", ""))))
 		var side: CylinderMesh = CylinderMesh.new()
 		side.top_radius = 1.0
 		side.bottom_radius = 1.0
@@ -62,7 +68,9 @@ func render_view(view: Dictionary, library: AssetLibrary, fog_layer: Fog) -> voi
 		top.height = 0.012
 		top.radial_segments = 6
 		add_mesh(root, "Top", top, Vector3(0, height, 0), top_material).rotation.y = PI / 6.0
-		if state == Fog.State.UNEXPLORED:
+		if hidden:
+			(root.get_node("Side") as Node3D).visible = false
+			(root.get_node("Top") as Node3D).visible = false
 			continue
 		if relief == "MOUNTAIN":
 			var cone: CylinderMesh = CylinderMesh.new()
@@ -189,8 +197,8 @@ func show_move_range(tile_ids: Array, costs: Dictionary, origin: String) -> void
 		disc.height = 0.02
 		disc.radial_segments = 6
 		var is_origin: bool = tile_id == origin
-		# 起点用金边强调，其余用淡墨青，均半透明；不遮挡地形与单位。
-		var color: Color = Color(0.85, 0.64, 0.24, 0.62) if is_origin else Color(0.24, 0.55, 0.49, 0.34)
+		# 起点用金边强调，其余用淡黄；均半透明，贴合参考图的「浅黄可达格」。
+		var color: Color = Color(0.93, 0.78, 0.34, 0.66) if is_origin else Color(0.95, 0.90, 0.60, 0.40)
 		var material: StandardMaterial3D = solid(color)
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		var instance: MeshInstance3D = add_mesh(highlight_root, "Highlight", disc, top_position(tile_id) + Vector3(0, 0.03, 0), material)
@@ -279,10 +287,10 @@ func pick_tile(camera: Camera3D, screen_position: Vector2) -> String:
 
 static func base_color(terrain: String) -> Color:
 	match terrain:
-		"LING_FIELDS": return Color("9bb98b")
-		"SPIRIT_PLAIN": return Color("bed0ac")
-		"BARREN": return Color("d0b894")
-	return Color("ede8d6")
+		"LING_FIELDS": return Color("a8c48d")
+		"SPIRIT_PLAIN": return Color("b9cfa2")
+		"BARREN": return Color("cfbb95")
+	return Color("e6e0cd")
 
 static func node_label(kind: String) -> String:
 	return str({"LING_TIAN": "灵田", "LING_MAI": "灵脉", "JI_YUAN": "机缘", "MI_JING": "秘境", "LING_QUAN": "灵泉", "LING_FENG": "灵峰"}.get(kind, kind))
