@@ -30,14 +30,18 @@ const QUEUE_PANEL_HEIGHT: float = 320.0
 const COMBAT_PANEL_WIDTH: float = 360.0
 const COMBAT_PANEL_HEIGHT: float = 300.0
 ## R5 弟子详情面板（右下角，与城市面板互斥，不改相机）。
-const UNIT_PANEL_WIDTH: float = 340.0
-const UNIT_PANEL_HEIGHT: float = 196.0
+## R10：340×196 太小——属性 6 行 + 十来个按钮挤在 54px 的滚动区里，
+## 玩家截图反馈「这个界面这么小能干什么」，按钮还会被裁掉半行。
+const UNIT_PANEL_WIDTH: float = 430.0
+const UNIT_PANEL_HEIGHT: float = 330.0
 
 var map: HexMap = null
 var fog: Fog = null
 var units: UnitView = null
 var sects: SectView = null
 var sidebar: RichTextLabel = null
+## 右侧情境面板本体（文明六式：无选中、无事件时整块收起，把画面让给地图）。
+var sidebar_panel: PanelContainer = null
 var status_label: Label = null
 
 ## 顶部 TopBar（第 N 回合 / 阶段 / 玩家资源 / 结束回合）。
@@ -232,6 +236,19 @@ func _process(_delta: float) -> void:
 	# busy 期间禁用「结束回合」，避免 finishTurn/beginPlayerTurn 序列被重入。
 	if end_turn_button != null:
 		end_turn_button.disabled = Session.busy or not Session.supports(Commands.FINISH_TURN)
+	_refresh_sidebar_visibility()
+
+
+## 文明六式「情境面板」：右侧地块卡只在**有选中**或**有事件**时出现，
+## 其余时间整块收起——否则常驻一块 320px 的面板会永久压掉四分之一幅地图。
+func _refresh_sidebar_visibility() -> void:
+	if sidebar_panel == null:
+		return
+	var has_focus: bool = (not _selected.is_empty() or not selected_disciple_id.is_empty()
+		or not selected_peak_id.is_empty())
+	var wanted: bool = has_focus or not event_lines.is_empty()
+	if sidebar_panel.visible != wanted:
+		sidebar_panel.visible = wanted
 
 
 func _on_view_changed(view: Dictionary) -> void:
@@ -2039,15 +2056,16 @@ func _populate_unit_actions() -> void:
 	unit_list.add_child(_city_section_label("开拓"))
 	var found_peak: Button = Button.new()
 	found_peak.name = "FoundSpiritPeak"
-	found_peak.text = "在选中地块开辟灵峰（%s）" % (_selected if not _selected.is_empty() else "未选地块")
-	found_peak.tooltip_text = "foundSpiritPeak：需己方弟子位于该地块；费用/间距/地形由服务端判定"
-	found_peak.disabled = _selected.is_empty()
 	# **R10 修复：开峰的目标格必须是弟子脚下的格子。**
 	# `select_disciple()` 会把 `_selected` 清空（选中弟子≠选中地块），而服务端
 	# `CityRules.can_found_peak` 的判据是「弟子需身处目标地块方可开辟灵峰」——
-	# 原先这里传 `_selected`，点完弟子再点「开峰」发出去的是空串，必然被拒（玩家看到的
-	# 就是「无法开拓灵峰」）。改为按 discipleId 反查其 tileId，与规则口径一致。
-	found_peak.tooltip_text = "在弟子当前所在格开辟灵峰（需金丹以上、该格无归属、灵力足够）"
+	# 原先这里既用 `_selected` 作禁用条件、又把它当 tileId 发出去，于是点完弟子后按钮永远是灰的
+	# （玩家看到「在选中地块开辟灵峰（未选地块）」），就算点下去也只会发空串被拒。
+	# 现在目标格统一由 discipleId 反查，按钮文案直接写清「就地」。
+	var peak_tile_id: String = _disciple_tile_id(selected_disciple_id)
+	found_peak.text = "就地开辟灵峰（%s）" % (peak_tile_id if not peak_tile_id.is_empty() else "弟子所在格未知")
+	found_peak.tooltip_text = "foundSpiritPeak：在弟子当前所在格开辟灵峰；需金丹以上、该格无归属、灵力足够，费用/间距/地形由服务端判定"
+	found_peak.disabled = peak_tile_id.is_empty()
 	found_peak.pressed.connect(func() -> void:
 		var tile_id: String = _disciple_tile_id(selected_disciple_id)
 		if tile_id.is_empty():
@@ -2154,6 +2172,13 @@ func _populate_unit_actions() -> void:
 	tribulate.tooltip_text = "tribulate：成功率/心魔/陨落由服务端掷骰（仅经 GameState.rng，确定性）"
 	tribulate.pressed.connect(func() -> void: Session.request_tribulate(selected_disciple_id))
 	unit_list.add_child(tribulate)
+
+	# 统一按钮高度与字号：面板加宽到 430 后，默认行高仍偏窄、点起来发虚。
+	for child: Node in unit_list.get_children():
+		var button: Button = child as Button
+		if button != null:
+			button.custom_minimum_size.y = 30
+			button.add_theme_font_size_override("font_size", 13)
 
 
 ## 灵峰 id → 名称（`view.sects[player].spiritPeaks[]`；找不到回空串）。
@@ -2609,6 +2634,7 @@ func _build_sidebar() -> void:
 	panel.offset_bottom = -(ActionBar.BAR_HEIGHT + UNIT_PANEL_HEIGHT + 24.0)
 	panel.add_theme_stylebox_override("panel", UiTheme.paper(0.93, 8, 1.0))
 	layer.add_child(panel)
+	sidebar_panel = panel
 
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 7)

@@ -14,7 +14,9 @@ extends PanelContainer
 ## 用户点击某个入口时抛出命令名（World 据此执行）。
 signal command_pressed(command: String)
 
-const BAR_HEIGHT: float = 52.0
+## 底栏高度。R10 从 52 压到 40：文明六的 HUD 是「薄边条 + 角落卡片」，
+## 整条 52px 的按钮带会把地图压掉一条边；40 仍能放下 11px 字与 30px 按钮。
+const BAR_HEIGHT: float = 40.0
 const SIDEBAR_WIDTH: float = 320.0
 
 ## command → { kind: "button"|"gesture"|"auto", label: String, button: Button|null }
@@ -52,7 +54,7 @@ func setup() -> void:
 
 	status_label = Label.new()
 	status_label.name = "BarHint"
-	status_label.text = "左键选中 / 悬停预览 · 空格或 End 结束回合 · G 网格 · B 边框"
+	status_label.text = "空格 结束回合 · G 网格 · B 边框 · M 小地图 · F1 引导"
 	status_label.add_theme_font_size_override("font_size", 11)
 	status_label.add_theme_color_override("font_color", UiTheme.INK_FAINT)
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -84,6 +86,9 @@ func add(command: String, text: String, tooltip: String, callback: Callable,
 	button.text = text
 	button.tooltip_text = tooltip
 	button.focus_mode = Control.FOCUS_NONE
+	# 与 40px 的底栏对齐：按钮压到 28px 高、12px 字，否则会被挤出条外。
+	button.custom_minimum_size = Vector2(0, 28)
+	button.add_theme_font_size_override("font_size", 12)
 	button.pressed.connect(func() -> void:
 		command_pressed.emit(command)
 		callback.call())
@@ -104,6 +109,8 @@ func add_plain(text: String, tooltip: String, callback: Callable, group_name: St
 	button.text = text
 	button.tooltip_text = tooltip
 	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, 28)
+	button.add_theme_font_size_override("font_size", 12)
 	button.pressed.connect(callback)
 	var parent: Node = _groups.get(group_name, row)
 	parent.add_child(button)
