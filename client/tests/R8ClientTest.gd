@@ -138,6 +138,16 @@ func _ready() -> void:
 	# ⑪ 资源缺失只 WARN 不崩：最小包 ID 不再 WARN，未覆盖分组仍回退
 	await _assert_asset_fallback(session)
 
+	# ⑫ 启动入口真的会拨号（R10）：`run/main_scene` 是 MainMenu.tscn，而
+	# `Session.start_connection()` 原先只有客户端测试在调——正式启动永远停在「尚未连接」，
+	# `supports(newGame)` 恒 false，「开宗·展卷」永远置灰。这里做源码级守门，防止再次漏接。
+	var menu_source: String = FileAccess.get_file_as_string("res://scripts/ui/MainMenu.gd")
+	check(menu_source.contains("Session.start_connection()"), "主菜单 _ready 会拨号（Session.start_connection）")
+	check(menu_source.contains("MAP_TILE_SOFT_LIMIT"), "主菜单对超大尺寸地图有软限制（避免卡在「请求中」）")
+	var project_text: String = FileAccess.get_file_as_string("res://project.godot")
+	check(project_text.contains('run/main_scene="res://scenes/MainMenu.tscn"'),
+		"主场景仍是 MainMenu.tscn（拨号点与入口脚本一致）")
+
 	world.queue_free()
 	world = null
 	await get_tree().process_frame

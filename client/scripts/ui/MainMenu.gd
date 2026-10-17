@@ -2,6 +2,13 @@ extends Control
 
 const FACTIONS: Array[String] = ["ZONG_MEN", "JIA_ZU", "GUO_JIA"]
 const DIFFICULTIES: Array[String] = ["easy", "normal", "hard"]
+## 客户端能流畅渲染的地块数上限（软限制，**不改服务端规则**）。
+##
+## 服务端 `map.setup` 允许到 128×128 / 16384 格，那是给批量工具留的上限；
+## 客户端要为每格生成地形、网格线、边框、迷雾与小地图缩略点，几千格会让「开宗·展卷」
+## 长时间停在「请求中」（实测 99×50 = 4950 格：服务端 CPU 破百秒、客户端内存 400MB+）。
+## 超限时直接禁用开局并说明原因，好过让玩家干等。
+const MAP_TILE_SOFT_LIMIT: int = 2000
 
 var faction: OptionButton = null
 var difficulty: OptionButton = null
@@ -25,6 +32,13 @@ func _ready() -> void:
 	Session.game_started.connect(_enter_world)
 	Session.saves_received.connect(_on_saves_received)
 	_update_status()
+	# **R10 修复：生产入口从不拨号。** `run/main_scene` 是 `MainMenu.tscn`，而
+	# `Session.start_connection()` 全仓只有 `client/tests/R*ClientTest.gd` 在调——
+	# 于是正式启动的客户端状态栏永远停在初始值「尚未连接」，`supports(newGame)` 恒为 false，
+	# 「开宗·展卷」永远是灰的（玩家看到的就是「无法开局」）。
+	# `Session` 里「连不上就自己拉起本地服务端」的完整链路（`_on_connect_failed` →
+	# `Launcher.launch` → `_await_server_ready`）早就写好了，只差这一次拨号。
+	Session.start_connection()
 
 func build_params() -> Dictionary:
 	var params: Dictionary = {"playerFaction": FACTIONS[faction.selected], "sectName": sect_name.text.strip_edges(), "mapWidth": int(width_input.value), "mapHeight": int(height_input.value), "difficultyId": DIFFICULTIES[difficulty.selected]}
@@ -35,9 +49,20 @@ func build_params() -> Dictionary:
 	return params
 
 func _update_status() -> void:
+	if start_button == null:
+		return
 	var valid: bool = not sect_name.text.strip_edges().is_empty() and (seed_input.text.strip_edges().is_empty() or seed_input.text.strip_edges().is_valid_int())
-	start_button.disabled = Session.busy or not Session.supports(Commands.NEW_GAME) or not valid
-	start_button.tooltip_text = "需要服务端 hello 支持 newGame、非空名称与整数种子" if start_button.disabled else "向本地服务端请求开局"
+	var tiles: int = int(width_input.value) * int(height_input.value)
+	var too_large: bool = tiles > MAP_TILE_SOFT_LIMIT
+	start_button.disabled = Session.busy or not Session.supports(Commands.NEW_GAME) or not valid or too_large
+	if too_large:
+		start_button.tooltip_text = "地图过大（%d×%d = %d 格 > %d），客户端会长时间卡在生成；建议 20×15" % [
+			int(width_input.value), int(height_input.value), tiles, MAP_TILE_SOFT_LIMIT]
+	elif start_button.disabled:
+		start_button.tooltip_text = "需要服务端 hello 支持 newGame、非空名称与整数种子"
+	else:
+		start_button.tooltip_text = "向本地服务端请求开局（%d×%d = %d 格）" % [
+			int(width_input.value), int(height_input.value), tiles]
 	if load_button != null:
 		load_button.disabled = Session.busy or not Session.supports(Commands.LOAD_GAME)
 	status_label.text = Session.status
@@ -140,6 +165,10 @@ func _build_ui() -> void:
 		dimensions.add_child(input)
 	width_input.value = 20
 	height_input.value = 15
+	# 宽高变化立刻重算「能否开局」（过大时禁用）。必须在默认值设好之后再连：
+	# 否则 `value_changed` 会在 `start_button` 尚未创建时触发 `_update_status`。
+	width_input.value_changed.connect(func(_value: float) -> void: _update_status())
+	height_input.value_changed.connect(func(_value: float) -> void: _update_status())
 	_label(column, "随机种子（留空由服务端随机）", 16)
 	seed_input = LineEdit.new()
 	seed_input.placeholder_text = "可选 · 64 位整数"
