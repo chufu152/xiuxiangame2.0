@@ -69,7 +69,12 @@ static func build(state: GameState, config: Dictionary) -> Dictionary:
 				peaks.append(remembered)
 		public["disciples"] = disciples
 		public["spiritPeaks"] = peaks
-		if sect.player: public["resources"] = sect.resources.duplicate(true)
+		if sect.player:
+			public["resources"] = sect.resources.duplicate(true)
+			# R4：道统树面板数据。**仅己方**下发（敌方道统属隐藏信息）。
+			# 三态与 blocker 由服务端算好，客户端零规则（PROTOCOL §12.4）。
+			public["unlockedDaoIds"] = sect.unlockedDaoIds.duplicate()
+			public["daoOptions"] = _dao_options(state, config, sect)
 		sects.append(public)
 	var heights: Dictionary = {}
 	for relief: String in Enums.Relief.ALL: heights[relief] = config["map"]["relief"][relief]["height"]
@@ -84,3 +89,19 @@ static func _improvement_by_id(state: GameState, improvement_id: String) -> Impr
 			if improvement.id == improvement_id:
 				return improvement
 	return null
+
+
+## R4：21 条道法的面板视图（含三态 `state` 与 `blocker`、按本宗折扣后的实际费用与工期）。
+static func _dao_options(state: GameState, config: Dictionary, sect: Sect) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for dao: Dao in DaoRules.all_daos(config):
+		var status: Dictionary = DaoRules.dao_state(state, config, sect, dao.id)
+		var entry: Dictionary = dao.to_dict()
+		entry["eraIndex"] = DaoRules.era_index(config, dao.era)
+		entry["daoPointCost"] = DaoRules.dao_point_cost(config, dao)
+		entry["spiritPowerCost"] = DaoRules.work_cost(config, dao)
+		entry["turns"] = DaoRules.research_turns(config, sect, dao)
+		entry["state"] = str(status["state"])
+		entry["blocker"] = str(status["blocker"])
+		out.append(entry)
+	return out

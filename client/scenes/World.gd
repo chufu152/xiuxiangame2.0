@@ -15,6 +15,11 @@ const TOPBAR_HEIGHT: float = 46.0
 ## R3 城市面板（左下角，覆盖在地图之上，不改相机）。
 const CITY_PANEL_WIDTH: float = 400.0
 const CITY_PANEL_MAX_HEIGHT: float = 360.0
+## R4 道统树面板（左侧竖排，与城市面板/队列面板互斥，不改相机）。
+const DAO_PANEL_WIDTH: float = 440.0
+## R4 项目/研究队列面板（左下角，两列并排，不改相机）。
+const QUEUE_PANEL_WIDTH: float = 620.0
+const QUEUE_PANEL_HEIGHT: float = 320.0
 
 var map: HexMap = null
 var fog: Fog = null
@@ -53,6 +58,30 @@ var city_pending_district_type: String = ""
 ## 改良查询所针对的地块（来自最近一次点选的普通地块）。
 var city_improvement_tile: String = ""
 
+## R4 道统树面板（左）。数据全部来自 `view.sects[player].daoOptions`（服务端算好三态与 blocker）。
+var dao_panel: CanvasLayer = null
+var dao_title_label: Label = null
+var dao_info_label: Label = null
+var dao_list: VBoxContainer = null
+var dao_status_label: Label = null
+var dao_open: bool = false
+## 最近一次 view 里的 `daoOptions`（21 条，客户端零规则）。
+var dao_options: Array = []
+## 最近一次 view 里的 `unlockedDaoIds`。
+var unlocked_dao_ids: Array = []
+
+## R4 项目/研究队列面板（左下）。`projects[]` 属灵峰、`researchQueue[]` 属宗门，两列不混。
+var queue_panel: CanvasLayer = null
+var queue_title_label: Label = null
+var queue_build_list: VBoxContainer = null
+var queue_research_list: VBoxContainer = null
+var queue_status_label: Label = null
+var queue_open: bool = false
+## 最近一次 `queryProjectQueue` 回包（只读，客户端不推导）。
+var project_queue: Dictionary = {}
+## 队列面板当前针对的灵峰（打开面板时锁定，避免中途切换导致回包错位）。
+var queue_peak_id: String = ""
+
 ## 当前选中格的文字描述（供 UI 与自动验收断言）。
 var selection_text: String = ""
 ## 最近一次 view 里的势力数量。
@@ -82,6 +111,8 @@ func _ready() -> void:
 	_build_sidebar()
 	_build_topbar()
 	_build_city_panel()
+	_build_dao_panel()
+	_build_queue_panel()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -92,6 +123,8 @@ func _ready() -> void:
 	Session.assignable_tiles_received.connect(_on_assignable_tiles_received)
 	Session.improvement_options_received.connect(_on_improvement_options_received)
 	Session.r3_result_received.connect(_on_r3_result_received)
+	Session.project_queue_received.connect(_on_project_queue_received)
+	Session.r4_result_received.connect(_on_r4_result_received)
 	if not Session.current_view.is_empty():
 		_render(Session.current_view)
 	else:
@@ -99,6 +132,8 @@ func _ready() -> void:
 		_refresh_status()
 		_refresh_topbar()
 		_render_city_panel()
+		_render_dao_panel()
+		_render_queue_panel()
 
 
 func _process(_delta: float) -> void:
@@ -122,6 +157,7 @@ func _render(view: Dictionary) -> void:
 	units.render_view(view, map, assets, fog, selected_disciple_id)
 	sects.render_view(view, map, assets, fog)
 	sect_count = (view.get("sects", []) as Array).size()
+	_cache_dao_data(view)
 	var bounds: Dictionary = _view_bounds(view)
 	Session.camera_rig.frame_once(bounds["center"], bounds["span"])
 	if not _selected.is_empty():
@@ -131,6 +167,22 @@ func _render(view: Dictionary) -> void:
 	_refresh_status()
 	_refresh_topbar()
 	_render_city_panel()
+	_render_dao_panel()
+	_render_queue_panel()
+
+
+## 从 view 缓存己方 `daoOptions` / `unlockedDaoIds`（客户端不推导任何道法规则）。
+func _cache_dao_data(view: Dictionary) -> void:
+	dao_options.clear()
+	unlocked_dao_ids.clear()
+	for sect: Dictionary in view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for entry: Variant in sect.get("daoOptions", []):
+			dao_options.append(entry)
+		for dao_id: Variant in sect.get("unlockedDaoIds", []):
+			unlocked_dao_ids.append(str(dao_id))
+		return
 
 
 func _view_bounds(view: Dictionary) -> Dictionary:
@@ -325,9 +377,17 @@ func _describe_disciple(disciple_id: String, range_result: Dictionary) -> String
 		"弟子 %s" % str(disciple.get("name", disciple_id)),
 		"境界 %s" % str(disciple.get("realm", "?")),
 		"灵根 %s" % _list_of(disciple, "spiritRoots"),
+		"灵根品阶 %d" % int(disciple.get("rootGrade", 0)),
 		"兵种 %s" % str(disciple.get("unitClass", "?")),
 		"移动力 %d/%d" % [move_points, int(disciple.get("maxMovePoints", 0))],
 	])
+	# R4 弟子详情（字段全部来自 view，客户端不推导修炼/心魔规则）。
+	lines.append("修为进度 %d" % int(disciple.get("cultivationProgress", 0)))
+	lines.append("心魔 %d" % int(disciple.get("heartDevil", 0)))
+	lines.append("伤势 %s" % ("受伤" if bool(disciple.get("injured", false)) else "无恙"))
+	lines.append("入门 %d 回合" % int(disciple.get("turnsInSect", 0)))
+	if int(disciple.get("builderCharges", 0)) > 0:
+		lines.append("建造次数 %d" % int(disciple.get("builderCharges", 0)))
 	if not range_result.is_empty():
 		lines.append("可达格 %d" % int(range_result.get("tileCount", 0)))
 	if hover_cost >= 0:
@@ -379,6 +439,18 @@ func _build_topbar() -> void:
 	topbar_phase_label = _topbar_label(row, "阶段 ?")
 	topbar_resource_label = _topbar_label(row, "")
 	topbar_resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# R4：道统树 / 项目队列入口（两面板互斥，均不触碰相机）。
+	var dao_button: Button = Button.new()
+	dao_button.text = "道统"
+	dao_button.tooltip_text = "打开道统树（21 条道法，三态由服务端判定）；相机角度与缩放保持不变"
+	dao_button.pressed.connect(func() -> void: toggle_dao_panel())
+	row.add_child(dao_button)
+	var queue_button: Button = Button.new()
+	queue_button.text = "队列"
+	queue_button.tooltip_text = "打开项目/研究队列（projects[] 与 researchQueue[] 两列不混）；相机角度与缩放保持不变"
+	queue_button.pressed.connect(func() -> void: open_queue_panel())
+	row.add_child(queue_button)
 
 	end_turn_button = Button.new()
 	end_turn_button.text = "结束回合"
@@ -507,6 +579,10 @@ func _build_city_panel() -> void:
 ## 故 `queryBuildOptions` 不能与 `queryCityDetail` 连发，改为在详情回包后链式触发
 ## （见 `_on_city_detail_received`）。
 func select_peak(peak_id: String) -> void:
+	# 城市面板与 R4 道统/队列面板互斥（同一屏幕区域），选中灵峰即收起 R4 面板。
+	_close_r4_panels()
+	if city_panel != null:
+		city_panel.visible = true
 	_clear_move_state()
 	_exit_city_mode()
 	selected_peak_id = peak_id
@@ -801,6 +877,499 @@ func city_candidate_count() -> int:
 	return city_candidate_ids.size()
 
 
+# ---------------------------------------------------------------------------
+# R4 道统树面板（21 条道法 · 5 个时代 · 三态由服务端判定）
+# ---------------------------------------------------------------------------
+
+func _build_dao_panel() -> void:
+	dao_panel = CanvasLayer.new()
+	dao_panel.name = "DaoPanel"
+	dao_panel.layer = 3
+	dao_panel.visible = false
+	add_child(dao_panel)
+
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 0.0
+	panel.offset_right = DAO_PANEL_WIDTH
+	panel.offset_top = TOPBAR_HEIGHT
+	panel.offset_bottom = 0.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.96)
+	style.border_color = Color("b6ad8b")
+	style.border_width_right = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	dao_panel.add_child(panel)
+
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+
+	var header: HBoxContainer = HBoxContainer.new()
+	column.add_child(header)
+	dao_title_label = Label.new()
+	dao_title_label.text = "道统树"
+	dao_title_label.add_theme_font_size_override("font_size", 17)
+	dao_title_label.add_theme_color_override("font_color", Color("294e48"))
+	dao_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(dao_title_label)
+	var close: Button = Button.new()
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_dao_panel())
+	header.add_child(close)
+
+	dao_info_label = Label.new()
+	dao_info_label.add_theme_font_size_override("font_size", 13)
+	dao_info_label.add_theme_color_override("font_color", Color("3c4b45"))
+	dao_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(dao_info_label)
+
+	column.add_child(HSeparator.new())
+
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 200)
+	column.add_child(scroll)
+	dao_list = VBoxContainer.new()
+	dao_list.add_theme_constant_override("separation", 3)
+	dao_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(dao_list)
+
+	dao_status_label = Label.new()
+	dao_status_label.add_theme_font_size_override("font_size", 12)
+	dao_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	dao_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(dao_status_label)
+
+
+## 打开道统树：与城市面板/队列面板互斥（同一片屏幕区域），纯读 view，不请求服务端。
+func open_dao_panel() -> void:
+	_close_r4_panels()
+	city_panel.visible = false
+	dao_open = true
+	dao_panel.visible = true
+	_render_dao_panel()
+
+
+func close_dao_panel() -> void:
+	dao_open = false
+	if dao_panel != null:
+		dao_panel.visible = false
+	if city_panel != null:
+		city_panel.visible = true
+
+
+func toggle_dao_panel() -> void:
+	if dao_open:
+		close_dao_panel()
+	else:
+		open_dao_panel()
+
+
+func _close_r4_panels() -> void:
+	dao_open = false
+	queue_open = false
+	if dao_panel != null:
+		dao_panel.visible = false
+	if queue_panel != null:
+		queue_panel.visible = false
+
+
+func _render_dao_panel() -> void:
+	if dao_title_label == null or dao_list == null:
+		return
+	for child: Node in dao_list.get_children():
+		dao_list.remove_child(child)
+		child.queue_free()
+	if not dao_open:
+		return
+	if dao_options.is_empty():
+		dao_title_label.text = "道统树（未开局）"
+		dao_info_label.text = "开局后显示 21 条道法、三态与阻塞原因。"
+		dao_status_label.text = ""
+		return
+	var available: int = 0
+	var researching: int = 0
+	for entry: Dictionary in dao_options:
+		match str(entry.get("state", "")):
+			"AVAILABLE": available += 1
+			"RESEARCHING": researching += 1
+	dao_title_label.text = "道统树 · 已解锁 %d / %d" % [unlocked_dao_ids.size(), dao_options.size()]
+	dao_info_label.text = "可研究 %d · 推演中 %d（三态与 blocker 由服务端判定）" % [available, researching]
+	# 按 eraIndex 分列（时代名取自 view，客户端不内置任何道法表）。
+	var era_order: Array[int] = []
+	for entry: Dictionary in dao_options:
+		var era_index: int = int(entry.get("eraIndex", 0))
+		if not era_order.has(era_index):
+			era_order.append(era_index)
+	era_order.sort()
+	for era_index: int in era_order:
+		var era_name: String = ""
+		for entry: Dictionary in dao_options:
+			if int(entry.get("eraIndex", 0)) == era_index:
+				era_name = str(entry.get("era", ""))
+				break
+		dao_list.add_child(_city_section_label("【%s】" % era_name))
+		for entry: Dictionary in dao_options:
+			if int(entry.get("eraIndex", 0)) != era_index:
+				continue
+			dao_list.add_child(_dao_button(entry))
+
+
+func _dao_button(entry: Dictionary) -> Button:
+	var state: String = str(entry.get("state", "BLOCKED"))
+	var dao_id: String = str(entry.get("id", ""))
+	var button: Button = Button.new()
+	button.name = "Dao_" + dao_id
+	button.text = "%s %s（道点%d · 工力%d · %d回合）" % [
+		_dao_state_mark(state),
+		str(entry.get("name", dao_id)),
+		int(entry.get("daoPointCost", 0)),
+		int(entry.get("spiritPowerCost", 0)),
+		int(entry.get("turns", 0)),
+	]
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var tooltip: PackedStringArray = PackedStringArray()
+	var desc: String = str(entry.get("desc", ""))
+	if not desc.is_empty():
+		tooltip.append(desc)
+	var prerequisites: Array = entry.get("prerequisiteDaoIds", [])
+	if not prerequisites.is_empty():
+		var names: PackedStringArray = PackedStringArray()
+		for prerequisite: Variant in prerequisites:
+			names.append(_dao_name(str(prerequisite)))
+		tooltip.append("前置：" + "、".join(names))
+	if not str(entry.get("factionOnly", "")).is_empty():
+		tooltip.append("流派专属：%s" % str(entry.get("factionOnly", "")))
+	if bool(entry.get("requiresBloodLine", false)):
+		tooltip.append("需血脉")
+	var blocker: String = str(entry.get("blocker", ""))
+	if not blocker.is_empty():
+		tooltip.append("阻塞：%s" % blocker)
+	button.tooltip_text = "\n".join(tooltip)
+	button.disabled = state != "AVAILABLE"
+	match state:
+		"UNLOCKED": button.add_theme_color_override("font_color", Color("1f6b3a"))
+		"RESEARCHING": button.add_theme_color_override("font_color", Color("8a5a12"))
+		"BLOCKED": button.add_theme_color_override("font_color", Color("8b8f8c"))
+		_: button.add_theme_color_override("font_color", Color("294e48"))
+	button.pressed.connect(func() -> void: Session.request_research_dao(player_sect_id(), dao_id))
+	return button
+
+
+static func _dao_state_mark(state: String) -> String:
+	match state:
+		"UNLOCKED": return "✓"
+		"RESEARCHING": return "⏳"
+		"AVAILABLE": return "◻"
+		"BLOCKED": return "✗"
+	return "?"
+
+
+func _dao_name(dao_id: String) -> String:
+	for entry: Dictionary in dao_options:
+		if str(entry.get("id", "")) == dao_id:
+			return str(entry.get("name", dao_id))
+	return dao_id
+
+
+# ---------------------------------------------------------------------------
+# R4 项目 / 研究队列面板（projects[] 属灵峰、researchQueue[] 属宗门，两列不混）
+# ---------------------------------------------------------------------------
+
+func _build_queue_panel() -> void:
+	queue_panel = CanvasLayer.new()
+	queue_panel.name = "QueuePanel"
+	queue_panel.layer = 4
+	queue_panel.visible = false
+	add_child(queue_panel)
+
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 0.0
+	panel.offset_right = QUEUE_PANEL_WIDTH
+	panel.offset_top = -QUEUE_PANEL_HEIGHT
+	panel.offset_bottom = 0.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.96)
+	style.border_color = Color("b6ad8b")
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	queue_panel.add_child(panel)
+
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+
+	var header: HBoxContainer = HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	column.add_child(header)
+	queue_title_label = Label.new()
+	queue_title_label.text = "项目队列"
+	queue_title_label.add_theme_font_size_override("font_size", 17)
+	queue_title_label.add_theme_color_override("font_color", Color("294e48"))
+	queue_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(queue_title_label)
+	var recruit: Button = Button.new()
+	recruit.text = "收徒大典"
+	recruit.tooltip_text = "holdRecruitment：扣工力入项目队列，落成后新增外门弟子"
+	recruit.pressed.connect(func() -> void: Session.request_hold_recruitment(active_peak_id()))
+	header.add_child(recruit)
+	var refresh: Button = Button.new()
+	refresh.text = "刷新"
+	refresh.pressed.connect(func() -> void: Session.request_query_project_queue(queue_peak_id))
+	header.add_child(refresh)
+	var close: Button = Button.new()
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_queue_panel())
+	header.add_child(close)
+
+	column.add_child(HSeparator.new())
+
+	var columns: HBoxContainer = HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 12)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(columns)
+
+	queue_build_list = _queue_column(columns, "建造项目 projects[]（灵峰）")
+	queue_research_list = _queue_column(columns, "道法研究 researchQueue[]（宗门）")
+
+	queue_status_label = Label.new()
+	queue_status_label.add_theme_font_size_override("font_size", 12)
+	queue_status_label.add_theme_color_override("font_color", Color("7a5a2c"))
+	queue_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(queue_status_label)
+
+
+func _queue_column(parent: Node, title: String) -> VBoxContainer:
+	var wrapper: VBoxContainer = VBoxContainer.new()
+	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrapper.add_theme_constant_override("separation", 4)
+	parent.add_child(wrapper)
+	wrapper.add_child(_city_section_label(title))
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 120)
+	wrapper.add_child(scroll)
+	var list: VBoxContainer = VBoxContainer.new()
+	list.add_theme_constant_override("separation", 3)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	return list
+
+
+## 队列面板定位用的灵峰：优先当前选中灵峰，否则回退己方主峰（服务端权威字段 `capital`）。
+func active_peak_id() -> String:
+	if not selected_peak_id.is_empty():
+		return selected_peak_id
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for peak: Dictionary in sect.get("spiritPeaks", []):
+			if bool(peak.get("capital", false)):
+				return str(peak.get("id", ""))
+		for peak: Dictionary in sect.get("spiritPeaks", []):
+			return str(peak.get("id", ""))
+	return ""
+
+
+func open_queue_panel() -> void:
+	_close_r4_panels()
+	city_panel.visible = false
+	queue_open = true
+	queue_panel.visible = true
+	queue_peak_id = active_peak_id()
+	project_queue.clear()
+	_render_queue_panel()
+	if not queue_peak_id.is_empty():
+		Session.request_query_project_queue(queue_peak_id)
+	else:
+		queue_status_label.text = "✗ 己方无灵峰，无法查询项目队列"
+
+
+func close_queue_panel() -> void:
+	queue_open = false
+	if queue_panel != null:
+		queue_panel.visible = false
+	if city_panel != null:
+		city_panel.visible = true
+
+
+func _render_queue_panel() -> void:
+	if queue_title_label == null or queue_build_list == null:
+		return
+	for list: VBoxContainer in [queue_build_list, queue_research_list]:
+		for child: Node in list.get_children():
+			list.remove_child(child)
+			child.queue_free()
+	if not queue_open:
+		return
+	if project_queue.is_empty():
+		queue_title_label.text = "项目队列（查询中…）"
+		return
+	if not bool(project_queue.get("found", false)):
+		queue_title_label.text = "项目队列 · 灵峰不存在"
+		return
+	queue_title_label.text = "项目队列 · %s" % str(project_queue.get("peakName", queue_peak_id))
+	var projects: Array = project_queue.get("projects", [])
+	var research: Array = project_queue.get("researchQueue", [])
+	if projects.is_empty():
+		queue_build_list.add_child(_queue_hint("（无建造项目）"))
+	else:
+		for entry: Dictionary in projects:
+			queue_build_list.add_child(_queue_row(entry, false))
+	if research.is_empty():
+		queue_research_list.add_child(_queue_hint("（无研究项目）"))
+	else:
+		for entry: Dictionary in research:
+			queue_research_list.add_child(_queue_row(entry, true))
+
+
+func _queue_hint(text: String) -> Label:
+	var label: Label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color("6d7470"))
+	return label
+
+
+## 单条队列行：`名称（剩 N/M 回合）` + 回合数输入 + 加速 + 取消。
+func _queue_row(entry: Dictionary, research: bool) -> HBoxContainer:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var label: Label = Label.new()
+	label.text = "%s（剩 %d/%d 回合）" % [
+		str(entry.get("name", entry.get("id", "?"))),
+		int(entry.get("turnsRemaining", 0)),
+		int(entry.get("turnsRequired", 0)),
+	]
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color("3c4b45"))
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var turns_input: SpinBox = SpinBox.new()
+	turns_input.min_value = 1.0
+	turns_input.max_value = 99.0
+	turns_input.step = 1.0
+	turns_input.value = 1.0
+	turns_input.custom_minimum_size = Vector2(64, 0)
+	turns_input.tooltip_text = "加速回合数（accelerateProject.turns）"
+	row.add_child(turns_input)
+	var project_id: String = str(entry.get("id", ""))
+	var accelerate: Button = Button.new()
+	accelerate.text = "加速"
+	accelerate.tooltip_text = "消耗 accelerateStonePerTurn × 回合数 灵石；剩 0 回合即刻完成"
+	accelerate.pressed.connect(func() -> void: Session.request_accelerate_project(queue_peak_id, project_id, int(turns_input.value), research))
+	row.add_child(accelerate)
+	var cancel: Button = Button.new()
+	cancel.text = "取消"
+	cancel.tooltip_text = "按 building.refundRate 返还已支付代价"
+	cancel.pressed.connect(func() -> void: Session.request_cancel_project(queue_peak_id, project_id))
+	row.add_child(cancel)
+	return row
+
+
+# --- R4 服务端回包 ---
+
+func _on_project_queue_received(result: Dictionary) -> void:
+	if str(result.get("peakId", "")) != queue_peak_id:
+		return
+	project_queue = result.duplicate(true)
+	_render_queue_panel()
+
+
+func _on_r4_result_received(command: String, result: Dictionary) -> void:
+	# 只读 `query*` 的 result 不带 `success`（由各自 `*_received` 信号处理）。
+	if not result.has("success"):
+		return
+	var message: String = str(result.get("message", ""))
+	var text: String = ("✓ " if bool(result.get("success", false)) else "✗ ") + (message if not message.is_empty() else "操作失败")
+	if dao_status_label != null:
+		dao_status_label.text = text
+	if queue_status_label != null:
+		queue_status_label.text = text
+	if not bool(result.get("success", false)):
+		return
+	# 写命令成功后重查队列（单请求语义：回包到达时 busy 已释放）。
+	if queue_open and command in [
+		Commands.RESEARCH_DAO, Commands.HOLD_RECRUITMENT,
+		Commands.CANCEL_PROJECT, Commands.ACCELERATE_PROJECT,
+	]:
+		if not queue_peak_id.is_empty():
+			Session.request_query_project_queue(queue_peak_id)
+
+
+# --- 供自动验收断言 ---
+
+func dao_panel_visible() -> bool:
+	return dao_open
+
+func dao_button_count() -> int:
+	return dao_list.get_child_count() if dao_list != null else 0
+
+func dao_option_count() -> int:
+	return dao_options.size()
+
+func dao_state_of(dao_id: String) -> String:
+	for entry: Dictionary in dao_options:
+		if str(entry.get("id", "")) == dao_id:
+			return str(entry.get("state", ""))
+	return ""
+
+func dao_blocker_of(dao_id: String) -> String:
+	for entry: Dictionary in dao_options:
+		if str(entry.get("id", "")) == dao_id:
+			return str(entry.get("blocker", ""))
+	return ""
+
+## 按道法 id 找到道统树里的按钮（按钮名 `Dao_<daoId>`）。
+func dao_button(dao_id: String) -> Button:
+	if dao_list == null:
+		return null
+	return dao_list.get_node_or_null(NodePath("Dao_" + dao_id)) as Button
+
+func queue_panel_visible() -> bool:
+	return queue_open
+
+func queue_build_count() -> int:
+	return _queue_row_count(queue_build_list)
+
+func queue_research_count() -> int:
+	return _queue_row_count(queue_research_list)
+
+## 只数「条目行」（HBoxContainer）；空列表占位是 Label，不计入。
+static func _queue_row_count(list: VBoxContainer) -> int:
+	if list == null:
+		return 0
+	var count: int = 0
+	for child: Node in list.get_children():
+		if child is HBoxContainer:
+			count += 1
+	return count
+
+func queue_status_text() -> String:
+	return queue_status_label.text if queue_status_label != null else ""
+
+func disciple_detail_text(disciple_id: String) -> String:
+	return _describe_disciple(disciple_id, {})
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		# 仅在移动模式下做悬停代价提示，避免常态下每帧射线拾取。
@@ -879,7 +1448,7 @@ func _build_sidebar() -> void:
 	panel.add_child(column)
 
 	var title: Label = Label.new()
-	title.text = "山河画卷 · R3"
+	title.text = "山河画卷 · R4"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color("294e48"))
 	column.add_child(title)
@@ -916,7 +1485,7 @@ func _build_sidebar() -> void:
 	buttons.add_child(back)
 
 	var hint: Label = Label.new()
-	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 点高亮格移动/选址/指派 · 结束回合"
+	hint.text = "正交 45° · 滚轮缩放 · 中/右键平移 · 左键选中弟子/灵峰/地块 · 点高亮格移动/选址/指派 · 顶栏「道统」看道法树、「队列」看项目与研究 · 结束回合"
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color("6d7470"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

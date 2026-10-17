@@ -107,10 +107,12 @@ static func road_move_bonus(state: GameState, config: Dictionary, tile: HexTile)
 	return int(config["improvement"]["roadMoveBonus"])
 
 
-## 该宗是否已推演某道法。R3 尚无道统系统（R4），一律视为未推演。
-static func _has_unlocked_dao(_sect: Sect, _dao_key: String) -> bool:
-	# TODO(R4): 接入道统树已解锁集合后改为真实判定（当前恒 false，故需道法的改良在 R3 不可建）。
-	return false
+## 该宗是否已推演某道法（R4 回填：R3 时恒 false）。
+## `requiredDaoKey` 约定取**道法 id**（PROTOCOL §11.1 #13），故直接查 `Sect.unlockedDaoIds`。
+static func _has_unlocked_dao(sect: Sect, dao_key: String) -> bool:
+	if sect == null:
+		return false
+	return sect.unlockedDaoIds.has(dao_key)
 
 
 # ---------------------------------------------------------------------------

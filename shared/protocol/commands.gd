@@ -34,3 +34,10 @@ const QUERY_CITY_DETAIL: String = "queryCityDetail"
 const BUILD_IMPROVEMENT: String = "buildImprovement"
 const REPAIR_IMPROVEMENT: String = "repairImprovement"
 const QUERY_IMPROVEMENT_OPTIONS: String = "queryImprovementOptions"
+
+# --- R4：道统科技树 + 修炼/突破/渡劫 + 项目/研究队列 + 收徒 ---
+const RESEARCH_DAO: String = "researchDao"
+const HOLD_RECRUITMENT: String = "holdRecruitment"
+const QUERY_PROJECT_QUEUE: String = "queryProjectQueue"
+const CANCEL_PROJECT: String = "cancelProject"
+const ACCELERATE_PROJECT: String = "accelerateProject"

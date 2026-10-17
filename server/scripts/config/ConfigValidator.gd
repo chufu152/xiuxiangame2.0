@@ -106,6 +106,35 @@ static func validate(config: Dictionary) -> Array[String]:
 	var classes: Variant = _lookup(config, "warfare.unitClasses")
 	if typeof(classes) == TYPE_DICTIONARY and classes.size() != 10: errors.append("必须恰好10兵种")
 	_validate_rows(config, errors)
+	# R4：道统树结构（5 时代 / 藏经阁道点 / 节点道点表）。分布 3-4-7-4-3 由 `R4Test` 断言。
+	var eras: Variant = _lookup(config, "daoTree.eras")
+	if typeof(eras) != TYPE_ARRAY or (eras as Array).size() != 5: errors.append("道统必须有5个时代")
+	_number(config, "daoTree.cangJingGePointsPerTurn", errors, true)
+	for key: String in ["lingMaiBase", "lingMaiPerLevel", "jiYuanBase", "jiYuanPerLevel", "miJingBase", "miJingPerLevel"]:
+		_number(config, "daoTree.nodeOutput." + key, errors, true)
+	var boosts: Variant = _lookup(config, "daoTree.boosts")
+	if typeof(boosts) == TYPE_ARRAY:
+		for boost: Variant in boosts:
+			if typeof(boost) != TYPE_DICTIONARY:
+				errors.append("道统成就必须对象")
+				continue
+			_require(boost, "id", TYPE_STRING, errors)
+			_require(boost, "condition", TYPE_STRING, errors)
+			for field: String in ["threshold", "points"]: _number(boost, field, errors, true)
+	# R4：修炼/心魔/收徒键（数值表缺项会让结算静默失真）
+	for key: String in ["baseSpeed", "rootGradeBonusPerGrade", "caveBonus", "zongMenBonus", "heartDevilPenaltyThreshold", "heartDevilPenalty", "spiritPowerCostPerTurn", "spiritPowerCostPerRealmLevel", "breakthroughFailHeartDevil", "breakthroughFailProgressRatio", "tribulationSpiritPowerCost", "tribulationSpiritStoneCost", "tribulationBaseSuccessChance", "tribulationDaoBonusPerUnlocked", "tribulationRootGradeBonusPerGrade", "tribulationFailHeartDevil", "tribulationFailFallChance"]:
+		_number(config, "disciple.cultivation." + key, errors)
+	for key: String in ["max", "injuryThreshold", "betrayThreshold", "overCapacityPerTurn", "injuryChance", "caveReduce", "betrayNeutralChance"]:
+		_number(config, "disciple.heartDevil." + key, errors)
+	for key: String in ["recruitmentBaseInterval", "promotionWaitTurns"]:
+		_number(config, "disciple." + key, errors, true)
+	_number(config, "disciple.injuryRecoveryChance", errors)
+	for key: String in ["recruitmentCost", "recruitmentTurns", "recruitmentBaseCount", "recruitmentPerLevel", "refundRate"]:
+		_number(config, "building." + key, errors)
+	_number(config, "economy.accelerateStonePerTurn", errors, true)
+	for realm: String in Enums.Realm.ALL:
+		_number(config, "disciple.cultivation.progressCapPerRealm." + realm, errors, true)
+		if realm != Enums.Realm.HUA_SHEN: _number(config, "disciple.cultivation.breakthroughChancePerRealm." + realm, errors)
 	_exact_keys(config, "map.baseTerrains", Enums.BaseTerrain.ALL, errors)
 	_exact_keys(config, "map.relief", Enums.Relief.ALL, errors)
 	_exact_keys(config, "map.features", Enums.Feature.ALL, errors)

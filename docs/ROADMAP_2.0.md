@@ -12,11 +12,11 @@
 ### 1.1 总体位置
 
 ```
-R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ R4 · R5 · R6 · R7 · R8 · R9
-骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 全部未开始
+R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅ ← 当前位置 ┃ R5 · R6 · R7 · R8 · R9
+骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 道统与修炼 ┃ 全部未开始
 ```
 
-**当前位置：R3「经济与城市」已完成 → 下一个里程碑 R4「道统与修炼」。**
+**当前位置：R4「道统与修炼」已完成 → 下一个里程碑 R5「探索与战斗」。**
 
 - 分支：`main`（WorkBuddy 在独立 worktree 工作，分支 `workbuddy/main-*`，统一推 `HEAD:main`）。
 - 里程碑提交：
@@ -31,32 +31,34 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
   - R3 提示词 `468fea2 docs(r3): add R3 milestone prompt`
   - R3 前置修复 `b0a9e41 fix(config): correct dangling improvement requiredDaoKey (lingtian_ti -> ling_tian_nong)`
   - R3 `b036bb4 feat(r3): economy settlement, spirit peak city, buildings districts workers improvements roads`
+  - R3 收尾 `e18db84 fix(r3): wire relief and river yield bonuses into tile output`
+  - R4 `feat(r4): dao tree research, cultivation breakthrough tribulation, project queue, recruitment`（见 §4.3）
 
 ### 1.2 已交付并验证的资产
 
 | 层 | 文件 | 状态 |
 |---|---|---|
-| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（**R3 起 23 条**：R2 的 8 条 + R3 城市/改良 15 条）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量；**R3 新增 `Building`（10 种 + `ALL`/`NAMES`/`CORE`）、`DistrictType`（首府区 + 5 可建 + `ALL`/`NAMES`/`BUILDABLE`）、`ImprovementType`（8 种 `ALL`）**）、`dto`（信封解析与构造） |
+| 共享协议 | `shared/protocol/{commands,msg,dto,enums}.gd` | ✅ `msg`（版本 2.0/存档 3.0/端口 9527/8 个错误码/16 MiB 帧缓冲）、`commands`（**R4 起 28 条**：R2 的 8 条 + R3 城市/改良 15 条 + R4 道统/队列 5 条）、`enums`（地形/节点/流派/境界/兵种/建筑/区域/改良/资源/阶段全量；**R3 新增 `Building`（10 种 + `ALL`/`NAMES`/`CORE`）、`DistrictType`（首府区 + 5 可建 + `ALL`/`NAMES`/`BUILDABLE`）、`ImprovementType`（8 种 `ALL`）**；**R4 新增 `Realm.NAMES`（炼气/筑基/金丹/元婴/化神）、`Position` 具名常量 + `NAMES`**）、`dto`（信封解析与构造） |
 | 共享几何 | `shared/geo/hex.gd` | ✅ 7 个静态函数（`id/coords/neighbors/distance/to_world/opposite/edge_vertices`）已按 R1 契约补齐，两端共用 |
-| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、**R3 起 23 条命令**、错误码口径、`view` 全量快照 + 迷雾快照；**R3 新增**：`view.improvements{}` 按 `Sect.improvementSnapshots` 做迷雾「最后可见」缓存下发 |
-| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算、移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机；**R3 新增**：`EconomyRules`（地块/灵峰产出、维护、安定、产出系数、粮食、`apply_settlement` 唯一入口、气运满溢吞并与灵峰晋升）、`CityRules`（工作半径/指派/住房/容量/区域产出与邻接/建城与建筑可建判定）、`ImprovementRules`（地形与道法/区域/节点门控、产出、洞府住房、道路机动、掠夺、修缮）、`RoadNetworkService`（路网连通度/减耗/起始格加成）、`CityAction`（开峰/建筑/洞府/加固/区域/劳力/项目队列推进/只读查询）、`ImprovementAction`（任命建造者/修筑/修缮/查询）；**R3 回填 R2 空钩子**：`MoveRules.step_cost` 与 `calculate_max_move_points` 改调 `RoadNetworkService`，`TurnProcessor` 的 `TURN_START` 调 `RoadNetworkService.refresh()`、`SPIRIT_PEAK` 推项目队列、`SETTLEMENT` 调 `EconomyRules.apply_settlement()` |
-| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`**；**R3 新增 `Project`/`District`/`Improvement`**，`SpiritPeak` 增 `food`/`foodProgress`/`freeWorkers`/`workedTileIds`/`projectQueue`、`Sect` 增 `improvements`/`improvementSnapshots`、`Disciple` 增 `builderCharges`、`GameState` 增 `projectSeq`/`improvementSeq` |
+| 服务端·网络 | `net/{NetServer,CommandDispatcher,StateView}.gd` | ✅ 监听 9527、hello 握手、**R4 起 28 条命令**、错误码口径、`view` 全量快照 + 迷雾快照；**R3 新增**：`view.improvements{}` 按 `Sect.improvementSnapshots` 做迷雾「最后可见」缓存下发；**R4 新增**：`view.sects[player].unlockedDaoIds[]` 与 `daoOptions[]`（21 条道法，含 `eraIndex`/折扣后 `daoPointCost`/工力总额 `spiritPowerCost`/加速后 `turns`/三态 `state`/`blocker`，**仅己方下发**） |
+| 服务端·规则 | `rules/{MapGenerator,SetupInitializer,VisionCalculator,MoveRules,MoveRangeCalculator,MoveAction,TurnProcessor}.gd`、`rng/RngService.gd` | ✅ 分层地形生成（基底/海拔/地貌/河流/险地/节点/奢侈，种子确定）、四宗初始化、视野计算、移动力公式/可通行/跨河/进入代价叠加、BFS 可达（与 `queryMoveRange` 同算法）、移动命令、六阶段回合状态机；**R3 新增**：`EconomyRules`（地块/灵峰产出、维护、安定、产出系数、粮食、`apply_settlement` 唯一入口、气运满溢吞并与灵峰晋升）、`CityRules`（工作半径/指派/住房/容量/区域产出与邻接/建城与建筑可建判定）、`ImprovementRules`（地形与道法/区域/节点门控、产出、洞府住房、道路机动、掠夺、修缮）、`RoadNetworkService`（路网连通度/减耗/起始格加成）、`CityAction`（开峰/建筑/洞府/加固/区域/劳力/项目队列推进/只读查询）、`ImprovementAction`（任命建造者/修筑/修缮/查询）；**R3 回填 R2 空钩子**：`MoveRules.step_cost` 与 `calculate_max_move_points` 改调 `RoadNetworkService`，`TurnProcessor` 的 `TURN_START` 调 `RoadNetworkService.refresh()`、`SPIRIT_PEAK` 推项目队列、`SETTLEMENT` 调 `EconomyRules.apply_settlement()`；**R4 新增**：`DaoRules`（21 道法查找/时代门控/前置链/费用与工期/`effect_sum` 唯一汇总出口/成就 boost）、`DiscipleRules`（修炼速度/进度上限/突破/渡劫/心魔/伤愈/洞府判定）、`ProjectRules`（逐回合工力摊销、研究推进与落成）、`DaoAction`（5 条命令的规则实现）；**R4 回填**：`ImprovementRules._has_unlocked_dao`（查 `unlockedDaoIds`）、`MoveRules` 接 `MOVE_BONUS`、`VisionCalculator` 接 `VISION_BONUS`、`CityAction._complete_project` 增 `TYPE_RECRUITMENT` + `complete_project_now()`、`TurnProcessor` 三阶段接修炼/项目推进/成就与心魔 |
+| 服务端·模型 | `model/{HexTile,GameNode,Sect,Disciple,SpiritPeak,GameState}.gd` | ✅ 纯数据 + `to_dict()`；**R2 起 `Disciple` 含 `maxMovePoints`/`turnsInSect`**；**R3 新增 `Project`/`District`/`Improvement`**，`SpiritPeak` 增 `food`/`foodProgress`/`freeWorkers`/`workedTileIds`/`projectQueue`、`Sect` 增 `improvements`/`improvementSnapshots`、`Disciple` 增 `builderCharges`、`GameState` 增 `projectSeq`/`improvementSeq`；**R4 新增 `Dao`/`ResearchProject`**，`Disciple` 增 `realmLevel`/`breakthroughPending`/`tribulating`/`lastReproduceTurn`、`Sect` 增 `unlockedDaoIds`/`researchQueue`/`boostFlags`/`recruitedTotal`/`enemiesDefeated`/`miJingExploredTotal`/`lastRecruitmentTurn`、`Project` 增 `TYPE_RECRUITMENT`、`GameState` 增 `discipleSeq` |
 | 服务端·配置 | `config/{ConfigLoader,ConfigValidator}.gd` | ✅ 加载 + 校验，缺字段/引用已删模块即非零退出；**R2 起 `map.dangerTileMoveCost = 1`**（险地附加，裁决二）；**R3 未新增顶层块**（`spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources` 均复用） |
-| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料 |
-| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`） |
+| 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料；**R4 新增**：`DaoPanel`（左侧竖排，按 `eraIndex` 分 5 列 + 三态标记 + `blocker` tooltip + 点击研究）、`QueuePanel`（左下，`projects[]`/`researchQueue[]` 两列并排不混池 + 回合数输入/加速/取消）、侧栏弟子详情追加修炼进度/心魔/伤势/入门回合/灵根品阶，三个面板互斥且均不触碰相机 |
+| 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command` |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
-| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R3 起 23 条标「已实现」**；`TODO(需核对)` 由 8 处增至 **11 处**（R3 新增 3 处缺口登记，见 §4.1）；校验脚本 35/35 全绿 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **15 阶段**（`[0/14]`–`[14/14]`），含 R0/R1/R2/R3 全量断言 + 协议契约校验（81/81 全绿） |
+| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R4 起 28 条标「已实现」**（R4 的 10 条 `待实现（R4）` 全部转正，残留 0）；`TODO(需核对)` 仍 **11 处**（R4 未新增臆造项，新增缺口均为已核实结论，见 §11.2 #10）；校验脚本 35/35 全绿 |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **17 阶段**（`[0/16]`–`[16/16]`），含 R0/R1/R2/R3/R4 全量断言 + 协议契约校验（**97/97** 全绿） |
 
-### 1.3 遗留缺口（进入 R4 前需知悉，不阻塞 R4）
+### 1.3 遗留缺口（进入 R5 前需知悉，不阻塞 R5）
 
 1. **美术资源实体文件为 0**（`assets/` 下除 `manifest.json` 外无实体文件）。**这是计划内状态**，不是缺陷：
    - `AssetLibrary` 对 manifest 里 60+ 逻辑 ID 缺失时**全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**。
    - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/14]` 断言 `同一缺失 logicalID 只 WARN 一次`。
    - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 新增：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）。**已消项**：原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）。**不阻塞 R4**，随对应里程碑逐条补齐。
-3. **R4–R9 提示词已全部预生成**（草案）；`R4_道统与修炼.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
+2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → **R4 未增不减仍 11 处**）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层。**不阻塞 R5**，随对应里程碑逐条补齐。
+3. **R5–R9 提示词已预生成**（草案）；`R5_*.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
 
@@ -120,9 +122,9 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
 
 ---
 
-## 四、R3 交付纪要 与 下一步（R4）
+## 四、R3/R4 交付纪要 与 下一步（R5）
 
-> R3 已于本里程碑完成并提交推送（见 §一 提交列表）。以下为**实际交付**与**R4 启动清单**。
+> R3、R4 均已在本里程碑完成并提交推送（见 §一 提交列表）。以下为**实际交付**与**下一里程碑启动清单**。
 
 ### 4.1 R3 实际交付（与本清单原始计划的偏差）
 
@@ -147,7 +149,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
 - **死键审计**（`city`/`economy`/`road`/`improvement`/`spiritPeak`/`building`/`qiYun` 全部标量键对照代码引用）：除上述已修与已登记项外，其余未读键均属后续里程碑计划内（`recruitment*`/`refundRate`/`accelerateStonePerTurn`/`prestigeCultivation*`/`qiYunPerUnlockedDao` → R4；`prestigePerBattleWin` → R5；`cityAutoBuild*`/`guoJiaGovernancePerTile` → R6），无遗漏。
 - **验收变化**：`R3_PASS checks=268 → 279`；`check.ps1` 仍 15 阶段全绿；`check_protocol.ps1` 仍 35/35（`TODO(需核对)` 计数 11 → 11：消 1 增 1，见上）。
 
-### 4.2 下一步 · R4「道统与修炼」启动清单
+### 4.2 下一步 · R4「道统与修炼」启动清单（已执行完毕，见 §4.3）
 
 **Step 0 · 核对 R4 提示词**
 - 按当时最新代码/config 重新核对 `docs/prompts/R4_道统与修炼.md` 的文件锚点与数值（`data/gameConfig.json` 的 `daoTree` / `cultivation` / `breakthrough` / `recruit` 等块）。
@@ -165,6 +167,42 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅ ← 当前位置 ┃ 
 **Step 4 · 验收与提交**
 - 扩展 `tools/check.ps1`：21 道法前置/时代/流派门控、进度/突破/渡劫、成就 boost 触发。
 - 全绿后：`git add -A && git commit -m "feat(r4): ..." && git push origin HEAD:main`。
+
+### 4.3 R4 实际交付（与本清单原始计划的偏差）
+
+- **服务端新增文件**：`model/{Dao,ResearchProject}.gd`、`rules/{DaoRules,DiscipleRules,ProjectRules,DaoAction}.gd`、`tests/{R4Test.gd,R4Test.tscn}`。
+- **服务端修改文件**：`model/{Disciple,Sect,Project,GameState}.gd`（`realmLevel`/`breakthroughPending`/`tribulating`/`lastReproduceTurn`、`unlockedDaoIds`/`researchQueue`/`boostFlags`/`recruitedTotal`/`enemiesDefeated`/`miJingExploredTotal`/`lastRecruitmentTurn`、`Project.TYPE_RECRUITMENT`、`discipleSeq`）、`net/{CommandDispatcher,StateView}.gd`（5 handler + `daoOptions[]`/`unlockedDaoIds[]`）、`rules/{ImprovementRules,MoveRules,VisionCalculator,CityAction,TurnProcessor,SetupInitializer}.gd`、`config/ConfigValidator.gd`、`shared/protocol/{commands,enums}.gd`。
+- **5 条命令**：`researchDao` / `holdRecruitment` / `queryProjectQueue` / `cancelProject` / `accelerateProject`。`hello.implementedCommands` 累计 **28 条**（23 → 28）。
+- **回合阶段（替换 R3 的 `# TODO(R4)`）**：`TURN_START` 增 伤愈（`DiscipleRules.heal_tick`）+ 修炼推进（`advance_cultivation`）；`SPIRIT_PEAK` 增 `ProjectRules.advance_projects`（先灵峰建造队列、后宗门研究队列，工力不足则暂停不扣）；`SETTLEMENT` 增 `DaoRules.check_boosts` + `_run_heart_devil`（心魔过高叛逃，原地 `while` 移除避免迭代失效）。仍留空：`# TODO(R5)` 围城断供、`# TODO(R6)` 政令、`# TODO(R7)` AI 行动/胜负判定。
+- **★ R4 回填（R3 遗留）**：① `ImprovementRules._has_unlocked_dao()` 由恒 `false` 改为查 `Sect.unlockedDaoIds`，`LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）随道法推演真正可建；② `MoveRules.calculate_max_move_points` 接入 `DaoRules.move_bonus`（`MOVE_BONUS`）；③ `VisionCalculator` 接入 `DaoRules.vision_bonus`（`VISION_BONUS`，按宗算一次后贯穿 `_reveal`）；④ `CityAction._complete_project` 增 `TYPE_RECRUITMENT` 分支 + 新增 `complete_project_now()` 包装，使 `accelerateProject` 走同一落成分发器而不绕过。
+- **道法树 21 条 / 5 时代**：`炼气篇 3 / 筑基篇 4 / 金丹篇 7 / 元婴篇 4 / 化神篇 3`；4 条 `factionOnly`（各流派 1 条）、2 条 `requiresBloodLine`；前置链无环无悬空，`hun_yuan ← ti_xiu + tian_ji`、`fei_sheng ← hun_yuan`。
+- **★ 时代门控（PRD 未给公式，登记 §11.1 #20）**：取 `sect_era_index`（已解锁道法所属最高时代）+ `ERA_LOOKAHEAD = 1`。理由：「同代才可研究」会死锁（炼气篇 3 条全解锁后宗门时代仍是炼气篇，筑基篇永久不可研究）。`ERA_LOOKAHEAD` 为唯一常量，不散落。
+- **★ 成就语义修正（登记 §11.1 #23）**：`初探秘境` 原按 1.0 口径「已探索地块中存在秘境节点」计数，2.0 实测发现该条件**开局即成立**（出生点视野内常含秘境节点），导致第 1 回合白送 30 道点且成就永久失效——由客户端端到端断言 `开局无任何 AVAILABLE 道法` 首次暴露。已改为「成功探索秘境次数」`Sect.miJingExploredTotal`（内部记账，R5 `exploreMiJing` 落地时递增），R4 期间恒 0、成就不可触发；并补两条回归断言（开局不触发任何成就、开局道点仍为 0）。
+- **客户端**：`World` 增 `DaoPanel`（左侧竖排，按 `eraIndex` 分 5 列，三态 ✓/⏳/◻/✗ + `blocker` tooltip + 点击发 `researchDao`）与 `QueuePanel`（左下，`projects[]` 与 `researchQueue[]` **两列并排不混池**，每条含「回合数 SpinBox + 加速 + 取消」），两面板与城市面板三者互斥（同屏区域）；侧栏弟子详情追加 `cultivationProgress`/`heartDevil`/`injured`/`turnsInSect`/`rootGrade`/`builderCharges`；TopBar 增「道统」「队列」入口（道点 R3 已加）。`Session` 增 5 条 `request_*` + `project_queue_received`/`r4_result_received` 两信号 + `_is_r4_command`。
+- **★ 客户端单请求语义再确认**：`Session._request` 单飞（`busy` 期间静默丢弃），故队列面板的「写命令成功后重查」放在 `_on_r4_result_received` 内（此时该请求的 `pending` 已 erase、`busy` 已释放），不在 `request_*` 前连发。
+- **协议契约**：`PROTOCOL_2.0.md` 10 条 `待实现（R4）`→`已实现（R4）`（残留 0）；§11.1 增 4 行（#20 时代门控、#21 研究费用/工期语义、#22 收徒人数公式、#23 成就语义修正），并回填 #18（道法门控改良在 R4 已可建）；§11.2 增 #10（前期道点断层）；§12.4 增 `unlockedDaoIds[]`/`daoOptions[]`（**仅己方**）；§12.5 增 5 组内部字段。`TODO(需核对)` 仍 11 处（R4 未新增臆造项，新增缺口均为已核实结论）。
+- **验收**：服务端 `R4_PASS checks=169`（11 组：注册/道法树/门控/研究队列/取消加速/收徒/修炼突破/渡劫/移动与视野加成/成就 boost/确定性）；R1/R2/R3 无回归（`R1_PASS 79458`、`R2_PASS 220`、`R3_PASS 279`）；客户端无头 `R4_CLIENT_RESULT=OK checks=8`、端到端 `R4_CLIENT_RESULT=OK checks=69`；`check.ps1` **17 阶段 97/97 全绿**；`check_protocol.ps1` 35/35（69 条分组点数 13/22/18/4/4/6/2 不变、**28 条**已实现）；无残留 godot 进程、无 `.java`。
+- **★ 端到端实测暴露的节奏问题（登记 §11.2 #10，不属缺陷）**：PRD 初始资源无道点、道点来源仅藏经阁（+2/回合）/节点/成就，而机缘（+20）与秘境（+40）属 R5 → 开局 21 条道法**全部 BLOCKED**，必须先建藏经阁（250 灵力/4 回合）再等 10 回合，**最早第 15 回合**才有首条可研究道法（`R4ClientTest` 实测 14 回合后道点 20）。与 1.0 一致（1.0 初值同为 0），R5 落地机缘/秘境后应复查节奏。
+
+### 4.4 下一步 · R5「探索与战斗」启动清单
+
+**Step 0 · 核对 R5 提示词**
+- 按 R4 后最新代码/config 重新核对 `docs/prompts/R5_*.md` 的文件锚点与数值（`jiYuan` / `miJing` / `battle` / `diplomacy` 等配置块）。
+
+**Step 1 · 服务端规则**
+- 机缘（`sendToJiYuan`）、秘境（`exploreMiJing`）、战斗（`attack`）、掠夺接线（`ImprovementRules.apply_pillage` 的移动/攻击触发点，见 §11.2 #7）。
+- **回填 R4 遗留**：① `Sect.miJingExploredTotal` 由 `exploreMiJing` 成功时递增（使 `boost_first_mijing` 真正可达，见 §11.1 #23）；② `Sect.enemiesDefeated` 由战斗胜利递增（`boost_first_win`）；③ `# TODO(R5)` 围城断供削减（`TurnProcessor` 的 `SPIRIT_PEAK` 段）。
+- **复查**：R5 落地机缘/秘境后，道点节奏是否达到设计预期（§11.2 #10）。
+
+**Step 2 · 协议命令**
+- 按 `PROTOCOL_2.0.md` §5（探索 4 条）/§3（单位组战斗命令）登记并在 `CommandDispatcher` 注册；`commands.gd` 追加后 `check_protocol.ps1` 的「已实现」断言自动跟随（动态读取常量）。
+
+**Step 3 · 客户端表现**
+- 探索面板（机缘/秘境）、战斗预览与结算提示；沿用「客户端零规则 + 面板与城市/道统/队列互斥 + 相机不重置」的既有约束。
+
+**Step 4 · 验收与提交**
+- 扩展 `tools/check.ps1`：机缘/秘境成功率与冷却、战斗结算与掠夺、`boost_first_mijing`/`boost_first_win` 触发、确定性。
+- 全绿后：`git add -A && git commit -m "feat(r5): ..." && git push origin HEAD:main`。
 
 ---
 

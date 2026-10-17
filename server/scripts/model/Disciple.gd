@@ -23,6 +23,21 @@ var injured: bool = false
 var cultivationProgress: float = 0.0
 ## R3 新增：建造者差事的剩余建造次数（`appointBuilder` 赋予 `improvement.builderCharges`）。
 var builderCharges: int = 0
+## R4 新增（**内部记账，不下发 view**，见 PROTOCOL §12.5）：
+## 境界等级（`Enums.Realm.ALL` 下标 +1，由 `realm` 派生并随突破/渡劫同步）。
+var realmLevel: int = 1
+## 修为已满、等待突破判定（`DiscipleRules.try_breakthrough` 前置）。
+var breakthroughPending: bool = false
+## 渡劫中（`DiscipleRules.tribulate` 期间置位；命令本体归 R7）。
+var tribulating: bool = false
+## 最近一次收徒大典产出此弟子的回合（繁衍冷却记账）。
+var lastReproduceTurn: int = 0
 
 func to_dict() -> Dictionary:
 	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges}
+
+
+## 由 `realm` 反推境界等级（1..5）；`realmLevel` 与 `realm` 必须同步。
+static func level_of(realm: String) -> int:
+	var index: int = Enums.Realm.ALL.find(realm)
+	return index + 1 if index >= 0 else 1

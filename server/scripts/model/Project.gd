@@ -9,13 +9,15 @@ extends RefCounted
 ## 项目队列挂在灵峰（`SpiritPeak.projectQueue`）——与 PROTOCOL §4 的 `queryProjectQueue{peakId,…}` 口径一致；
 ## 宗门级研究队列（`researchDao`）留到 R4。
 
-## 项目类型常量（与 1.0 `BuildAction` 同名，只取 R3 需要的 6 种）。
+## 项目类型常量（与 1.0 `BuildAction` 同名，R3 取 6 种 + R4 补 `RECRUITMENT`）。
 const TYPE_FOUND_PEAK: String = "FOUND_PEAK"
 const TYPE_BUILD: String = "BUILD"
 const TYPE_SUB_PEAK: String = "SUB_PEAK"
 const TYPE_CAVE: String = "CAVE"
 const TYPE_FORTIFY: String = "FORTIFY"
 const TYPE_DISTRICT: String = "DISTRICT"
+## R4 新增：收徒大典（`holdRecruitment` 入队，`DaoAction.complete_recruitment` 落成）。
+const TYPE_RECRUITMENT: String = "RECRUITMENT"
 
 var id: String = ""
 var type: String = ""

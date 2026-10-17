@@ -305,8 +305,15 @@ static func _complete_project(state: GameState, config: Dictionary, sect: Sect, 
 			state.eventLog.append("[灵峰] %s 防御加固完成, 防御 %d" % [peak.name, peak.defense])
 		Project.TYPE_DISTRICT:
 			_complete_district(state, config, sect, peak, project)
+		Project.TYPE_RECRUITMENT:
+			DaoAction.complete_recruitment(state, config, sect, peak, project)
 		_:
 			state.eventLog.append("[灵峰] 未知项目类型: " + project.type)
+
+
+## 公开入口：供 `accelerateProject` 在加速到 0 时即时落成（避免绕过 `_complete_project` 分派）。
+static func complete_project_now(state: GameState, config: Dictionary, sect: Sect, peak: SpiritPeak, project: Project) -> void:
+	_complete_project(state, config, sect, peak, project)
 
 
 ## 开峰落成：新增灵峰、接管地块与节点、铺首府区与首批人口、重算视野。

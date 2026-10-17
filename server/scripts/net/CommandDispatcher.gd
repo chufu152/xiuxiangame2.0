@@ -47,6 +47,12 @@ func _init(config: Dictionary = {}) -> void:
 	_handlers[Commands.BUILD_IMPROVEMENT] = Callable(self, "_handle_build_improvement")
 	_handlers[Commands.REPAIR_IMPROVEMENT] = Callable(self, "_handle_repair_improvement")
 	_handlers[Commands.QUERY_IMPROVEMENT_OPTIONS] = Callable(self, "_handle_query_improvement_options")
+	# R4：道统科技树 + 修炼/突破/渡劫 + 项目/研究队列 + 收徒
+	_handlers[Commands.RESEARCH_DAO] = Callable(self, "_handle_research_dao")
+	_handlers[Commands.HOLD_RECRUITMENT] = Callable(self, "_handle_hold_recruitment")
+	_handlers[Commands.QUERY_PROJECT_QUEUE] = Callable(self, "_handle_query_project_queue")
+	_handlers[Commands.CANCEL_PROJECT] = Callable(self, "_handle_cancel_project")
+	_handlers[Commands.ACCELERATE_PROJECT] = Callable(self, "_handle_accelerate_project")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -369,8 +375,96 @@ func _handle_query_improvement_options(request_id: String, params: Dictionary) -
 
 
 # ---------------------------------------------------------------------------
+# 处理器（R4：道统科技树 + 修炼/突破/渡劫 + 项目/研究队列 + 收徒）
+# ---------------------------------------------------------------------------
+# 只读 `queryProjectQueue` → view=null；写命令 → events = 本命令期间新增日志 + 实时 view。
+
+func _handle_research_dao(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var dao_check: Dictionary = _require_nonempty(params, "daoId")
+	if not bool(dao_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(dao_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = DaoAction.research_dao(state, _config, str(sect_check["value"]), str(dao_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_hold_recruitment(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = DaoAction.hold_recruitment(state, _config, str(peak_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_project_queue(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	return Dto.ok_response(request_id, [], null, DaoAction.query_project_queue(state, _config, str(peak_check["value"])))
+
+
+func _handle_cancel_project(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var project_check: Dictionary = _require_nonempty(params, "projectId")
+	if not bool(project_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(project_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = DaoAction.cancel_project(state, _config, str(peak_check["value"]), str(project_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## `accelerateProject`：`[peakId,] projectId, turns, [research=false]`（PROTOCOL §11.1 #4 参数顺序）。
+## `research=true` 时 `peakId` 可省——研究队列属宗门级，用己方主峰定位宗门即可。
+func _handle_accelerate_project(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var research: bool = bool(params.get("research", false))
+	var peak_id: String = ""
+	if params.has("peakId"):
+		var peak_check: Dictionary = _require_player_peak(request_id, params)
+		if not bool(peak_check["ok"]): return peak_check["response"]
+		peak_id = str(peak_check["value"])
+	else:
+		if not research:
+			return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "peakId 必填（仅 research=true 时可省略）")
+		peak_id = _player_capital_peak_id()
+		if peak_id.is_empty():
+			return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "己方无灵峰，无法定位宗门研究队列")
+	var project_check: Dictionary = _require_nonempty(params, "projectId")
+	if not bool(project_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(project_check["message"]))
+	var turns_check: Dictionary = _require_int(params, "turns")
+	if not bool(turns_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(turns_check["message"]))
+	if int(turns_check["value"]) <= 0: return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "turns 必须大于 0")
+	var before: int = state.eventLog.size()
+	var result: Dictionary = DaoAction.accelerate_project(state, _config, peak_id, str(project_check["value"]), int(turns_check["value"]), research)
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _player_capital_peak_id() -> String:
+	for sect: Sect in state.sects:
+		if sect.id != state.playerSectId:
+			continue
+		for peak: SpiritPeak in sect.spiritPeaks:
+			if peak.capital:
+				return peak.id
+		if not sect.spiritPeaks.is_empty():
+			return sect.spiritPeaks[0].id
+	return ""
+
+
+# ---------------------------------------------------------------------------
 # 参数校验辅助
 # ---------------------------------------------------------------------------
+
+## 校验整数参数（JSON 数字，允许 `TYPE_INT`/`TYPE_FLOAT` 但必须是整值且在安全范围内）。
+func _require_int(params: Dictionary, key: String) -> Dictionary:
+	var value: Variant = params.get(key)
+	if not _safe_integer(value):
+		return {"ok": false, "message": "%s 必须是整数" % key}
+	return {"ok": true, "value": int(value)}
 
 func _require_nonempty(params: Dictionary, key: String) -> Dictionary:
 	var value: Variant = params.get(key)

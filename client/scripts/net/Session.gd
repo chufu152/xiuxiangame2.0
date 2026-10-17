@@ -24,6 +24,12 @@ signal improvement_options_received(result: Dictionary)
 ## 任一 R3 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
 signal r3_result_received(command: String, result: Dictionary)
 
+# --- R4 道统/修炼/项目队列（只读命令把 result 交给世界层；写命令复用 view_changed）---
+## `queryProjectQueue` 结果（`projects[]` 与 `researchQueue[]` 两池，见 PROTOCOL §4）。
+signal project_queue_received(result: Dictionary)
+## 任一 R4 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
+signal r4_result_received(command: String, result: Dictionary)
+
 ## 拉起服务端后的就绪总超时。实测冷启动 2.18s / 6.49s / 19s 波动极大，故取 40s 留足余量。
 const SERVER_READY_TIMEOUT_SEC: float = 40.0
 ## 就绪轮询间隔：每 0.5s 尝试连接一次。
@@ -155,6 +161,32 @@ func request_repair_improvement(sect_id: String, disciple_id: String, tile_id: S
 func request_query_improvement_options(sect_id: String, tile_id: String) -> String:
 	return _request(Commands.QUERY_IMPROVEMENT_OPTIONS, {"sectId": sect_id, "tileId": tile_id})
 
+# ---------------------------------------------------------------------------
+# R4：道统 / 收徒 / 项目队列（5 条）
+# ---------------------------------------------------------------------------
+
+## 推演道法（写）。入队即扣道点，工力按回合摊销（PROTOCOL §11.1 #21）。
+func request_research_dao(sect_id: String, dao_id: String) -> String:
+	return _request(Commands.RESEARCH_DAO, {"sectId": sect_id, "daoId": dao_id})
+
+## 举办收徒大典（写）。落成后新增弟子数见 PROTOCOL §11.1 #22。
+func request_hold_recruitment(peak_id: String) -> String:
+	return _request(Commands.HOLD_RECRUITMENT, {"peakId": peak_id})
+
+## 查询项目/研究队列（只读）→ `project_queue_received`。
+## `projects[]` 属灵峰、`researchQueue[]` 属宗门，两池不混（R4 裁决二）。
+func request_query_project_queue(peak_id: String) -> String:
+	return _request(Commands.QUERY_PROJECT_QUEUE, {"peakId": peak_id})
+
+## 取消项目/研究（写）。`project_id` 可取自 `projects[]` 或 `researchQueue[]`。
+func request_cancel_project(peak_id: String, project_id: String) -> String:
+	return _request(Commands.CANCEL_PROJECT, {"peakId": peak_id, "projectId": project_id})
+
+## 加速项目/研究（写）。`research=true` 时服务端允许省略 peakId（PROTOCOL §11.1 #4），
+## 本封装仍显式传入，避免依赖「己方主峰」这一隐式定位。
+func request_accelerate_project(peak_id: String, project_id: String, turns: int, research: bool) -> String:
+	return _request(Commands.ACCELERATE_PROJECT, {"peakId": peak_id, "projectId": project_id, "turns": turns, "research": research})
+
 ## 「结束回合」顺序封装：**先 finishTurn，收到响应后再 beginPlayerTurn**
 ## （与 1.0 GUI 手动结束回合一致）。期间 busy；最终以 beginPlayerTurn 的 view 渲染。
 func request_end_turn_sequence() -> String:
@@ -194,6 +226,8 @@ func _on_response(response: Dictionary) -> void:
 		_set_status("%s：%s" % [str(response.get("errorCode", "请求失败")), str(response.get("message", ""))])
 		if _is_r3_command(command):
 			r3_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
+		if _is_r4_command(command):
+			r4_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -204,6 +238,8 @@ func _on_response(response: Dictionary) -> void:
 			move_result_received.emit(result)
 		if _is_r3_command(command):
 			r3_result_received.emit(command, result)
+		if _is_r4_command(command):
+			r4_result_received.emit(command, result)
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -225,8 +261,12 @@ func _on_response(response: Dictionary) -> void:
 		city_detail_received.emit(result)
 	elif command == Commands.QUERY_IMPROVEMENT_OPTIONS:
 		improvement_options_received.emit(result)
+	elif command == Commands.QUERY_PROJECT_QUEUE:
+		project_queue_received.emit(result)
 	if _is_r3_command(command):
 		r3_result_received.emit(command, result)
+	if _is_r4_command(command):
+		r4_result_received.emit(command, result)
 	_set_status("已同步服务端 view")
 	_advance_end_turn_sequence(command)
 
@@ -239,6 +279,14 @@ func _is_r3_command(command: String) -> bool:
 		Commands.FOUND_DISTRICT, Commands.QUERY_DISTRICT_SITES, Commands.ASSIGN_WORKER,
 		Commands.UNASSIGN_WORKER, Commands.QUERY_ASSIGNABLE_TILES, Commands.QUERY_CITY_DETAIL,
 		Commands.BUILD_IMPROVEMENT, Commands.REPAIR_IMPROVEMENT, Commands.QUERY_IMPROVEMENT_OPTIONS,
+	]
+
+
+## 是否为 R4 道统/项目队列命令（5 条）。
+func _is_r4_command(command: String) -> bool:
+	return command in [
+		Commands.RESEARCH_DAO, Commands.HOLD_RECRUITMENT, Commands.QUERY_PROJECT_QUEUE,
+		Commands.CANCEL_PROJECT, Commands.ACCELERATE_PROJECT,
 	]
 
 

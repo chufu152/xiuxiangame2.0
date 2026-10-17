@@ -51,9 +51,9 @@ func next_turn(state: GameState) -> Array[String]:
 # 各阶段
 # ---------------------------------------------------------------------------
 
-## TURN_START（R2 实做 + R3 回填道路刷新）：重算视野 → 刷新道路网 → 每名弟子重置出手、
-## 按公式恢复移动力（含本宗道路起点加成）、宗门停留回合 +1。
-## **不做**：传送清零（R5）、宗主外出（R7）、伤愈（R5）、修炼（R4）、自动化（R6）。
+## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼）：重算视野 → 刷新道路网 →
+## 每名弟子重置出手、按公式恢复移动力（含本宗道路起点加成）、宗门停留回合 +1 → 伤愈 → 修炼。
+## **不做**：传送清零（R5）、宗主外出（R7）、自动化（R6）。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
 	# R3 回填：道路网等级刷新（R2 留的 TODO）。
@@ -66,22 +66,46 @@ func _run_turn_start(state: GameState) -> void:
 			disciple.maxMovePoints = points
 			disciple.movePoints = points
 			disciple.turnsInSect += 1
-
-
-## SPIRIT_PEAK（R3 实做）：项目队列推进（`turnsRemaining -= 1`，归零则落成）。
-## **留空**：围城断供（R5）、研究队列推进（R4）。
-func _run_spirit_peak(state: GameState) -> void:
+	# R4 回填：伤愈 + 修炼（R2 留的修炼 TODO）。顺序固定（宗门序 → 弟子序），保证同种子逐字一致。
 	for sect: Sect in state.sects:
-		for peak: SpiritPeak in sect.spiritPeaks:
-			CityAction.advance_projects(state, _config, sect, peak)
-	# TODO(R5): 围城断供削减；TODO(R4): 研究队列推进（工力不足则暂停）。
+		for disciple: Disciple in sect.disciples:
+			if DiscipleRules.heal_tick(state, _config, disciple):
+				state.eventLog.append("[修炼] %s 伤愈" % disciple.name)
+			DiscipleRules.advance_cultivation(state, _config, disciple)
 
 
-## SETTLEMENT（R3 实做）：节点冷却 → 人口结算 → 经济结算（唯一入口 `EconomyRules.apply_settlement`）。
-## **留空**：道统成就 boost（R4）、心魔（R4）、政令（R6）。
+## SPIRIT_PEAK（R3 实做 + R4 回填研究队列）：灵峰建造项目推进 + 宗门研究队列推进（工力不足则暂停）。
+## **留空**：围城断供（R5）。
+func _run_spirit_peak(state: GameState) -> void:
+	# R4 回填：`ProjectRules.advance_projects` 内部分派灵峰项目（R3 逻辑不变）与宗门研究队列。
+	ProjectRules.advance_projects(state, _config)
+	# TODO(R5): 围城断供削减。
+
+
+## SETTLEMENT（R3 实做 + R4 回填道统/心魔）：节点冷却 → 人口结算 → 经济结算（唯一入口
+## `EconomyRules.apply_settlement`）→ 道统成就 boost → 心魔结算。
+## **留空**：政令（R6）。
 func _run_settlement(state: GameState) -> void:
 	EconomyRules.apply_settlement(state, _config)
-	# TODO(R4): 道统成就 boost；TODO(R4): 心魔结算；TODO(R6): 政令结算。
+	# R4 回填：道统成就 boost（一次性道点奖励，替代 1.0「顿悟」）。
+	for sect: Sect in state.sects:
+		DaoRules.check_boosts(state, _config, sect)
+	# R4 回填：心魔结算（超容量/受伤/叛逃）。
+	_run_heart_devil(state)
+	# TODO(R6): 政令结算。
+
+
+## 心魔结算：逐弟子推进；叛逃者从宗门移除（投中立，R7 前不建立中立势力实体）。
+func _run_heart_devil(state: GameState) -> void:
+	for sect: Sect in state.sects:
+		var index: int = 0
+		while index < sect.disciples.size():
+			var disciple: Disciple = sect.disciples[index]
+			var outcome: Dictionary = DiscipleRules.heart_devil_tick(state, _config, disciple)
+			if bool(outcome["betray"]):
+				sect.disciples.remove_at(index)
+				continue
+			index += 1
 
 
 func _run_ai_action(_state: GameState) -> void:

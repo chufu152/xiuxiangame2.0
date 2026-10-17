@@ -49,6 +49,8 @@ static func initialize(state: GameState, params: Dictionary, config: Dictionary,
 			disciple.sectId = sect.id
 			disciple.tileId = peak.tileId
 			disciple.realm = str(setup["leaderRealm"] if unit_index == 0 else setup["outerRealm"])
+			# R4：境界等级与 `realm` 同步（修炼灵力消耗、突破/渡劫判定依赖它）。
+			disciple.realmLevel = Disciple.level_of(disciple.realm)
 			disciple.position = str(setup["leaderPosition"] if unit_index == 0 else setup["outerPosition"])
 			disciple.rootGrade = int(setup["rootGrade"])
 			var roots: Array = setup["rootTypes"]

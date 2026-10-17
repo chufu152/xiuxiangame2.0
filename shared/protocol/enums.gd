@@ -46,9 +46,20 @@ class Realm:
 	const YUAN_YING: String = "YUAN_YING"
 	const HUA_SHEN: String = "HUA_SHEN"
 	const ALL: Array[String] = [LIAN_QI, ZHU_JI, JIN_DAN, YUAN_YING, HUA_SHEN]
+	## R4 新增：境界显示名（纯文案，供事件日志与客户端面板使用）。
+	const NAMES: Dictionary = {"LIAN_QI": "炼气", "ZHU_JI": "筑基", "JIN_DAN": "金丹", "YUAN_YING": "元婴", "HUA_SHEN": "化神"}
 
 class Position:
-	const ALL: Array[String] = ["ZA_YI", "WAI_MEN", "NEI_MEN", "QIN_CHUAN", "FENG_ZHU", "ZHANG_LAO", "ZONG_ZHU"]
+	const ZA_YI: String = "ZA_YI"
+	const WAI_MEN: String = "WAI_MEN"
+	const NEI_MEN: String = "NEI_MEN"
+	const QIN_CHUAN: String = "QIN_CHUAN"
+	const FENG_ZHU: String = "FENG_ZHU"
+	const ZHANG_LAO: String = "ZHANG_LAO"
+	const ZONG_ZHU: String = "ZONG_ZHU"
+	const ALL: Array[String] = [ZA_YI, WAI_MEN, NEI_MEN, QIN_CHUAN, FENG_ZHU, ZHANG_LAO, ZONG_ZHU]
+	## R4 新增：岗位显示名（纯文案）。
+	const NAMES: Dictionary = {"ZA_YI": "杂役", "WAI_MEN": "外门", "NEI_MEN": "内门", "QIN_CHUAN": "亲传", "FENG_ZHU": "峰主", "ZHANG_LAO": "长老", "ZONG_ZHU": "宗主"}
 
 class SpiritRootType:
 	const ALL: Array[String] = ["JIN", "MU", "SHUI", "HUO", "TU", "FENG", "LEI", "ZA"]

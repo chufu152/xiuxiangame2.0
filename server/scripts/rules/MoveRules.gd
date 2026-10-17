@@ -16,7 +16,8 @@ const IMPASSABLE: int = -1
 ## 裁决一：灵根加成对**所有**灵根按 rootMoveBonus 计（金木水火土风雷各 +1、杂灵根 -1），
 ## 不照搬 1.0 `MoveAction.calculateMaxMovePoints()` 里 `if (root == FENG || root == ZA)` 的 bug。
 ## R3 回填：传入 `state`/`sect` 时追加「回合开始身处本宗青石道路」的机动加成（数值取自 `RoadNetworkService`）；
-## 不传则等价 R2 口径（R2 测试与开局播种沿用）。
+## R4 回填：追加已解锁道法的 `MOVE_BONUS`（`dun_shu`/`qi_ji` 各 +1），经 `DaoRules.effect_sum` 唯一出口。
+## 不传 `state`/`sect` 则等价 R2 口径（R2 测试与开局播种沿用）。
 static func calculate_max_move_points(disciple: Disciple, config: Dictionary, state: GameState = null, sect: Sect = null) -> int:
 	var setup: Dictionary = config["map"]["setup"]
 	var total: int = int(config["disciple"]["baseMovePoints"])
@@ -24,8 +25,10 @@ static func calculate_max_move_points(disciple: Disciple, config: Dictionary, st
 	for root: String in disciple.spiritRoots:
 		total += int(setup["rootMoveBonus"][root])
 	total += int(config["warfare"]["unitClasses"][disciple.unitClass]["moveBonus"])
-	if state != null and sect != null and state.tiles.has(disciple.tileId):
-		total += RoadNetworkService.start_tile_bonus(state, config, sect, state.tiles[disciple.tileId])
+	if state != null and sect != null:
+		if state.tiles.has(disciple.tileId):
+			total += RoadNetworkService.start_tile_bonus(state, config, sect, state.tiles[disciple.tileId])
+		total += DaoRules.move_bonus(state, config, sect)
 	return total
 
 

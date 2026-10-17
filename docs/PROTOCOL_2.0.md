@@ -165,11 +165,11 @@
 | `buildImprovement` | 城市 | R3 | 是 | 否 | 已实现（R3） |
 | `repairImprovement` | 城市 | R3 | 是 | 否 | 已实现（R3） |
 | `queryImprovementOptions` | 城市 | R3 | 否 | 是 | 已实现（R3） |
-| `researchDao` | 城市 | R4 | 是 | 否 | 待实现（R4） |
-| `holdRecruitment` | 城市 | R4 | 是 | 否 | 待实现（R4） |
-| `queryProjectQueue` | 城市 | R4 | 否 | 是 | 待实现（R4） |
-| `cancelProject` | 城市 | R4 | 是 | 否 | 待实现（R4） |
-| `accelerateProject` | 城市 | R4 | 是 | 否 | 待实现（R4） |
+| `researchDao` | 城市 | R4 | 是 | 否 | 已实现（R4） |
+| `holdRecruitment` | 城市 | R4 | 是 | 否 | 已实现（R4） |
+| `queryProjectQueue` | 城市 | R4 | 否 | 是 | 已实现（R4） |
+| `cancelProject` | 城市 | R4 | 是 | 否 | 已实现（R4） |
+| `accelerateProject` | 城市 | R4 | 是 | 否 | 已实现（R4） |
 
 ### 探索（4）
 
@@ -1063,7 +1063,7 @@
 - **events**：研究入队事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R4。
-- **状态**：待实现（R4）。
+- **状态**：已实现（R4）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3；2.0 PRD §7（R4）。
 
 ### `holdRecruitment`
@@ -1080,7 +1080,7 @@
 - **events**：收徒事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R4。
-- **状态**：待实现（R4）。
+- **状态**：已实现（R4）。
 - **出处**：1.0 `PROTOCOL.md` §11.3；`COMMAND_MAP.md` §3；2.0 PRD §7（R4）。
 
 ### `queryProjectQueue`
@@ -1097,7 +1097,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R4。
-- **状态**：待实现（R4）。
+- **状态**：已实现（R4）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；2.0 PRD §7（R4）。
 
 ### `cancelProject`
@@ -1115,7 +1115,7 @@
 - **events**：取消事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R4。
-- **状态**：待实现（R4）。
+- **状态**：已实现（R4）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3；2.0 PRD §7（R4）。
 
 ### `accelerateProject`
@@ -1135,7 +1135,7 @@
 - **events**：加速事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R4。
-- **状态**：待实现（R4）。
+- **状态**：已实现（R4）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §3（参数顺序与本文不同，见 §11 冲突 #4）。
 
 ---
@@ -1507,8 +1507,12 @@
 | 15 | 区域枚举类名 `Enums.District` | 1.0 `DistrictType` 为独立枚举类 | 同 #14：R1 内层枚举类 `Enums.District` **改名** `Enums.DistrictType`（`ALL`/`NAMES`/`BUILDABLE` 取值不变），以让位 2.0 全局 `class_name District`（`server/scripts/model/District.gd`） | 同上 |
 | 16 | `improvement` 对象字段 `networkLevel` | 1.0 `Improvement` 无该字段 | 2.0 **只加** `networkLevel`（青石道路网络等级缓存：`0`=无 / `1`=连 / `2`=枢纽），由 `RoadNetworkService.refresh()` 维护；随 `view.improvements{}` 与 `queryCityDetail` 相关查询下发 | 2.0 代码 `RoadNetworkService.gd`、`Improvement.to_dict` |
 | 17 | `queryCityDetail.districts[].buildings` 元素类型 | 1.0 `District.buildings` 为 `List<BuildingType>` | 2.0 为**建筑类型字符串数组**（如 `["SHAN_MEN","CANG_JING_GE"]`），非对象数组 | 2.0 代码 `CityAction.query_city_detail` |
-| 18 | 道法门控改良在 R3 不可建 | 1.0 改良门控与道法同里程碑生效 | 2.0 道法系统属 **R4**（本里程碑非目标），故 `ImprovementRules._has_unlocked_dao()` 在 R3 **恒返回 false**（`# TODO(R4)`）：`LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）在 R3 `queryImprovementOptions.buildable=false`、`rejection` 提示「需道法」；R4 回填 | R3 提示词「非目标」（道法属 R4）；2.0 代码 `ImprovementRules` |
+| 18 | 道法门控改良在 R3 不可建 | 1.0 改良门控与道法同里程碑生效 | 2.0 道法系统属 **R4**（R3 非目标），故 `ImprovementRules._has_unlocked_dao()` 在 R3 **恒返回 false**（`# TODO(R4)`）：`LING_TIAN_TI_TIAN`（需 `ling_tian_nong`）与 `JU_LING_ZHEN`（需 `ju_ling_zhen`）在 R3 `queryImprovementOptions.buildable=false`、`rejection` 提示「需道法」。**R4 已回填**：改为查 `Sect.unlockedDaoIds`（`requiredDaoKey` 约定取道法 id），两条改良随对应道法推演完成而可建 | R3 提示词「非目标」（道法属 R4）；2.0 代码 `ImprovementRules` |
 | 19 | 海拔/河流产出加成的配置落点 | 1.0 `EconomyCalculator` 无「丘陵石+1」「沿河粮+1」实现（`grep foodBonus`/`HILL` 于 1.0 全仓无命中），该加成为 **2.0 PRD 新增** | 2.0 按 PRD 既有写法落为配置键：`map.relief[].yield`（形状对齐 `map.features[].yield`，`HILL` 取 `{spiritStones:1}`、`FLAT`/`MOUNTAIN` 空表，依据 PRD §4.1.3 表「丘陵…石 +1」）与 `map.river.foodBonus`（**该键 2.0 配置与 `ConfigValidator` 早已存在但此前无代码读取**，依据 PRD §4.1.5 L280「沿河地块：粮 +1」）。产出顺序 = 基底 → 海拔 → 地貌 → 河流 → 节点 → 改良（PRD §4.1.9 L315）。R3 收尾完善时回填，`EconomyRules.tile_yield_preview` 唯一出口 | PRD §4.1.3 / §4.1.5 L280 / §4.1.9 L315；2.0 代码 `EconomyRules`、`ConfigValidator` |
+| 20 | 道法「时代未到」的判定公式 | 1.0 只有前置链，无独立时代门控（时代是展示分组） | PRD §4.9 给出 5 时代与分布但**未定义门控公式**。若取「同代才可研究」：炼气篇 3 条全解锁后宗门时代仍是炼气篇，筑基篇永久不可研究（**死锁**）。故 2.0 取 **`sect_era_index`（已解锁道法所属最高时代，无解锁时为 0）+ `ERA_LOOKAHEAD`(1)**：可研究「当前时代及其后一代」的道法。`DaoRules.ERA_LOOKAHEAD` 是唯一常量，不散落 | PRD §4.9（未定义 → 取不死锁的最窄解释）；2.0 代码 `DaoRules.can_research` |
+| 21 | `researchDao` 的费用与工期语义 | 1.0 `BuildAction.researchDao`：**入队即扣道点**，`dao.spiritPowerCost` 实为**工力总额**，逐回合按 `ceil(总额/回合)` 从 `workPower` 扣，不足则项目暂停 | 2.0 完全沿用 1.0 口径。故 `BuildResult.spiritPowerCost` 对研究命令返回的是**工力总额**（不是灵力）；`queryProjectQueue.researchQueue[].spiritPowerCost` 同义。工期倍率 = `(1−宗门研究加速)×(1−长老数×zhangLaoResearchSpeedBonus)×(1−RESEARCH_BONUS)`，下限 `0.3`，与 1.0 同式 | 1.0 `BuildAction.researchDao/advanceProject`；2.0 代码 `DaoRules.research_turns`、`ProjectRules.advance_research` |
+| 22 | `holdRecruitment` 落成人数公式 | 1.0 `completeRecruitment`：`recruitmentBaseCount + peak.level × recruitmentPerLevel`（1 级峰 = 3 人） | 2.0 按 R4 提示词取 **`recruitmentBaseCount + recruitmentPerLevel × (峰级 − 1)`**（1 级峰 = 2 人）。与 1.0 相差 1 人/次，属里程碑规格明示的差异，登记备查 | R4 提示词自动验收 #5；1.0 `BuildAction.completeRecruitment` |
+| 23 | 道统成就「初探秘境」的判定语义 | 1.0 以「已探索地块中存在秘境节点」计数（`sect.exploredTiles` 含秘境节点所在格即算达成） | 该口径在 2.0 会**开局即成立**：出生点视野内常含秘境节点，导致第 1 回合白送 30 道点、且成就永久失效（R4 客户端端到端实测暴露，见 `R4_CLIENT_FAIL: 开局无任何 AVAILABLE 道法`）。故 2.0 改为**成功探索秘境次数** `Sect.miJingExploredTotal`（内部记账，不下发 view）：`exploreMiJing` 成功才递增，R5 落地该命令时回填；R4 期间恒为 `0`，成就不可触发。`ownLingMai`/`recruited`/`enemyDefeated` 三个成就的计数口径不受影响 | PRD §4.9「道统成就 boost（一次性道点奖励）」；2.0 代码 `DaoRules._boost_progress` |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
@@ -1523,6 +1527,7 @@
 | 7 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | `TODO(需核对)`：掠夺触发点在移动路径（R2 `MoveAction`）与攻击路径（R5 `attack`），**R3 未接线**；待对应里程碑落地时调用，避免提前改动已验证的移动规则 |
 | 8 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
 | 9 | 灵泉衰减/修缮恢复的生效口径 | 配置含 `economy.lingQuanDecayRate` 0.02 / `lingQuanMinOutput` 3 / `improvement.lingQuanRestorePerTurn` 0.05，PRD §4.4 记「灵泉修缮：灵泉每回合恢复 5%」；但 2.0 配置**无 `lingQuanBaseOutput`**（1.0 有，值 15），而 2.0 节点产出改由 `city.workYieldByNode.LING_QUAN`（`spiritPower:6`）给出，衰减下限 `minFactor` 的分母无权威取值 | `TODO(需核对)`：1.0 `EconomyCalculator.settleLingQuanDecay()` 以 `lingQuanMinOutput / lingQuanBaseOutput` 求下限、以 `node.decayRate` 乘算产出；2.0 改用 `workYieldByNode` 后分母应取哪个键未定。**R3 未实现衰减与恢复**（灵泉枯竭属 PRD §5.1「灾劫」，归 R6 判定），待 R6 落地时一并回填，避免臆造系数 |
+| 10 | 前期「道点不可得」的跨里程碑断层 | PRD §5.1 L345 初始资源为 灵力400/灵石300/工力120/声望0，**无道点**；PRD §4.9 L455 道点来源为藏经阁（+2/回合）、灵脉/机缘/秘境节点、道统成就 boost。而 `sendToJiYuan`（机缘，成功 +20 道点）与 `exploreMiJing`（秘境，富裕 +40 道点）属 **R5**，节点占领亦无对应命令 | 结果为 R4 实测：开局 21 条道法**全部 `BLOCKED`**（`tu_na` blocker =「道点不足: 需要 20, 当前 0」），必须先建藏经阁（250 灵力 / 4 回合）再等 10 回合，最早**第 15 回合**才有第一条可研究道法（`R4ClientTest` 端到端实测：14 回合后道点 20）。**不属缺陷、不改配置**（与 1.0 一致，1.0 亦有 `daoPoints = 0` 初值），但 R5 落地机缘/秘境后应复查该节奏是否达到设计预期 | PRD §5.1 L345、§4.9 L455；2.0 实测 `R4ClientTest` |
 
 ---
 
@@ -1583,6 +1588,8 @@
 | `disciples[]` | 己方全部弟子；敌方弟子仅在其所在格可见时下发 |
 | `spiritPeaks[]` | 己方灵峰实时；敌方灵峰按「可见实时 / 记忆冻结快照」下发，冻结态剔除 `fengZhuId` |
 | `resources{}` | **仅己方宗门**下发（`Enums.ResourceKind.ALL`） |
+| `unlockedDaoIds[]` | **仅己方宗门**下发（R4）：已推演道法 id，升序即解锁顺序 |
+| `daoOptions[]` | **仅己方宗门**下发（R4）：21 条道法的面板视图（见下），三态与 `blocker` 由服务端算好，客户端零规则 |
 
 `disciples[j]`（`Disciple.to_dict`）：`id, name, sectId, tileId, realm, position, rootGrade, spiritRoots[], unitClass, movePoints, maxMovePoints, attacksRemaining, turnsInSect, assignedPeakId, bloodLine, generation, directLine, heartDevil, injured, cultivationProgress, builderCharges`（R3 起追加 `builderCharges` 建造差事次数）
 
@@ -1591,6 +1598,11 @@
 `districts[j]`（`District.to_dict`）：`id, name, type, typeName, level, populationAssigned, buildings[], tileId`（`type` ∈ `Enums.DistrictType.ALL`，`buildings[]` 为建筑**类型字符串**数组）
 
 `improvements[id]`（`Improvement.to_dict`，顶层 `view.improvements{}`）：`id, type, tileId, sectId, broken, charges, networkLevel`（`type` ∈ `Enums.ImprovementType.ALL`）
+
+`daoOptions[j]`（R4，`StateView._dao_options`）：`id, name, desc, era, iconKey, prerequisiteDaoIds[], daoPointCost, spiritPowerCost, turns, effects[], factionOnly, requiresBloodLine, eraIndex, state, blocker`
+- `daoPointCost` / `spiritPowerCost` / `turns` 为**按本宗折扣与加速后的实际值**（血脉道法 `jiaZu.bloodDaoCostReduction`、宗门/长老/`RESEARCH_BONUS` 的研究加速已折算）；其中 `spiritPowerCost` 语义为**研究工力总额**（对齐 1.0 `BuildAction.researchDao` 的 `workCost`）。
+- `state` ∈ `UNLOCKED`（已推演）/ `RESEARCHING`（研究中）/ `AVAILABLE`（可研究）/ `BLOCKED`（不可研究，`blocker` 给中文原因）。
+- 未解锁任何道法时 `eraIndex` 用于前端按时代分列；`blocker` 文案由 `DaoRules.can_research` 唯一产生。
 
 ### 12.5 不下发的内部字段
 
@@ -1601,6 +1613,10 @@
 | `builderCharges` 之外的 `Improvement.charges` | `Improvement` | 预留字段（R3 恒 `0`）；`Improvement.to_dict` 仍照发，客户端忽略 |
 | `policyCarry` / `lastPolicySwitchTurn` / `lastEventTurn` | `Sect` | 结算中间态与冷却记账（R6 落地） |
 | `lastReproduceTurn` | `Disciple` | 繁衍冷却记账（R4 落地） |
+| `realmLevel` / `breakthroughPending` / `tribulating` | `Disciple` | 境界等级由 `realm` 派生、突破候选与渡劫中间态；`view.disciples[]` 的 `realm` 已足够表达（R4 落地） |
+| `researchQueue` | `Sect` | 研究队列（道法研究）；R4 `queryProjectQueue.researchQueue[]` 才下发 |
+| `boostFlags` / `recruitedTotal` / `enemiesDefeated` / `miJingExploredTotal` / `lastRecruitmentTurn` | `Sect` | 成就 boost 一次性标志、累计招募/击败/成功探索秘境数、收徒冷却记账（R4 落地；`miJingExploredTotal` 语义见 §11.1 #23） |
+| `discipleSeq` | `GameState` | 弟子 id 单调序号（R4 落地） |
 
 > 出处：1.0 `PROTOCOL.md` §5.1；2.0 `StateView.build` 未输出上述字段（R1 已实证）。
 
