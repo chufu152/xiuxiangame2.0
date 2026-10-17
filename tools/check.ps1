@@ -993,8 +993,8 @@ if ($godotExe) {
     Assert-Check ($r8ClientCombined -match 'R8_CLIENT_PASS: 相机铁律：全序列后 transform 的基不变') `
         '客户端 R8：全序列后相机基不变'
     # 资源缺失只 WARN 不崩（裁决二）
-    Assert-Check ($r8ClientCombined -match 'R8_CLIENT_PASS: 最小包 52 个 ID 均未触发 WARN') `
-        '客户端 R8：最小水墨资源包 52 个 ID 全部命中、零 WARN'
+    Assert-Check ($r8ClientCombined -match 'R8_CLIENT_PASS: 最小包 75 个 ID 均未触发 WARN') `
+        '客户端 R8：最小水墨资源包 75 个 ID 全部命中、零 WARN（仅 fonts 2 项待美术）'
     Assert-Check ($r8ClientCombined -match 'R8_CLIENT_PASS: 未覆盖 ID 仍回退占位并 WARN 一次') `
         '客户端 R8：未覆盖资源 ID 仍回退占位并 WARN 一次（不崩）'
     Assert-Check ($r8ClientCombined -match 'R8_CLIENT_RESULT=OK') '客户端 R8 无头验收全绿（R8_CLIENT_RESULT=OK）' `

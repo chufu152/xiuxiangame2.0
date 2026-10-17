@@ -10,7 +10,7 @@ extends Node
 ## 运行：
 ##   Godot_v4.4.1-stable_win64_console.exe --headless --path client res://tools/AssetGen.tscn
 ##
-## 覆盖范围（严格对齐 ROADMAP §3.2，**不越界**）：
+## 覆盖范围：
 ##   1. 3 基底地形顶面材质      terrain.base.{LING_FIELDS,SPIRIT_PLAIN,BARREN}
 ##   2. 3 海拔侧面 + 山体顶面   terrain.relief.{FLAT,HILL,MOUNTAIN}_SIDE / MOUNTAIN_TOP
 ##   3. 河流                    terrain.river
@@ -19,9 +19,14 @@ extends Node
 ##   6. 10 单位模型             unit.*
 ##   7. 10 建筑模型             building.*
 ##   8. 21 UI 图标              resource.*(13) / realm.*(5) / faction.*(3)
+##   9. 6 区域模型              district.*                      ← R9 W1 补齐
+##  10. 8 改良模型              improvement.*                    ← R9 W1 补齐
+##  11. 8 地貌/节点模型         terrain.feature.*(2) + node.*(6)  ← R9 W1 补齐
+##  12. 1 背景音                audio/bgm/main.wav               ← R9 W1 补齐
 ##
-## **不生成** districts / improvements / features：它们不在最小包清单内，留给 R8 的
-## 「缺失仍回退占位且 WARN 一次」验收路径（裁决二）。
+## 合计 75 个逻辑 ID（manifest 共 77）。**只有 `fonts` 分组的 2 个 ID 仍回退占位**：
+## 中文字体无法程序化生成，且客户端当前零处消费 `font.body`/`font.title`（grep 无命中），
+## 故保持 WARN 并在 manifest 标 `pending`，等真实美术/字体介入时覆盖同名文件即可。
 
 # ---------------------------------------------------------------------------
 # 尺寸与调色板
@@ -58,13 +63,17 @@ var _written: int = 0
 
 func _ready() -> void:
 	_root = Launcher.repo_root().path_join("assets").path_join("art").path_join("default")
-	for sub: String in ["terrain", "units", "buildings", "icons"]:
+	for sub: String in ["terrain", "units", "buildings", "icons", "districts", "features"]:
 		DirAccess.make_dir_recursive_absolute(_root.path_join(sub))
 
 	_gen_terrain()
 	_gen_icons()
 	_gen_units()
 	_gen_buildings()
+	_gen_districts()
+	_gen_improvements()
+	_gen_features()
+	_gen_audio()
 
 	print("[AssetGen] 共写出 %d 个文件 → %s" % [_written, _root])
 	print("ASSETGEN_OK")
@@ -987,3 +996,347 @@ func _gen_buildings() -> void:
 		_add_roof(di_du, 0.18, 0.16, Vector3(sign * 0.60, 0.82, 0.42), GOLD)
 	_add_box(di_du, Vector3(0.26, 0.30, 0.06), Vector3(0.0, 0.35, 0.29), CINNABAR)
 	_export_glb(di_du, "buildings", "wang_chao_di_du.glb")
+
+
+# ---------------------------------------------------------------------------
+# 9：区域模型（district.*）——**扁平件**
+# ---------------------------------------------------------------------------
+
+## 区域铺在地块顶面上，同一格里往往还立着灵峰楼阁。做成高建筑会互相穿模，
+## 故统一「薄台 + 1~3 件功能小件」，总高 ≤ 0.42，横向 ≤ 1.0。
+func _gen_districts() -> void:
+	# 1 首府区：方台 + 鼓楼 + 旗杆。
+	var shou_fu: Node3D = _new_root("SHOU_FU_QU")
+	_add_box(shou_fu, Vector3(0.88, 0.05, 0.88), Vector3(0.0, 0.025, 0.0), GOLD.darkened(0.35))
+	_add_box(shou_fu, Vector3(0.24, 0.24, 0.24), Vector3(-0.18, 0.17, -0.12), CINNABAR)
+	_add_roof(shou_fu, 0.22, 0.12, Vector3(-0.18, 0.35, -0.12), INK_SOFT)
+	_add_cylinder(shou_fu, 0.020, 0.42, Vector3(0.26, 0.21, 0.18), BRONZE, 6)
+	_add_box(shou_fu, Vector3(0.14, 0.11, 0.015), Vector3(0.34, 0.37, 0.18), CINNABAR)
+	_export_glb(shou_fu, "districts", "shou_fu_qu.glb")
+
+	# 2 修炼区：圆台 + 两座石墩 + 中央矮柱。
+	var xiu_lian: Node3D = _new_root("XIU_LIAN_QU")
+	_add_cylinder(xiu_lian, 0.44, 0.06, Vector3(0.0, 0.03, 0.0), JADE_LIGHT, 14)
+	_add_cylinder(xiu_lian, 0.30, 0.03, Vector3(0.0, 0.075, 0.0), BONE, 14)
+	for sx: int in range(2):
+		var sign: float = -1.0 if sx == 0 else 1.0
+		_add_box(xiu_lian, Vector3(0.10, 0.18, 0.10), Vector3(sign * 0.26, 0.15, 0.0), SLATE)
+	_add_cylinder(xiu_lian, 0.035, 0.26, Vector3(0.0, 0.22, 0.0), GOLD, 6)
+	_export_glb(xiu_lian, "districts", "xiu_lian_qu.glb")
+
+	# 3 丹器区：台 + 丹炉 + 木架。
+	var dan_qi: Node3D = _new_root("DAN_QI_QU")
+	_add_box(dan_qi, Vector3(0.86, 0.05, 0.86), Vector3(0.0, 0.025, 0.0), SLATE.lightened(0.10))
+	_add_cylinder(dan_qi, 0.15, 0.20, Vector3(-0.16, 0.15, 0.06), Color("6d5a44"), 10)
+	_add_cone(dan_qi, 0.16, 0.10, Vector3(-0.16, 0.30, 0.06), GOLD, 10)
+	for sx: int in range(2):
+		var sign: float = -1.0 if sx == 0 else 1.0
+		_add_box(dan_qi, Vector3(0.04, 0.24, 0.04), Vector3(0.22 + sign * 0.10, 0.14, -0.16), BRONZE)
+	_add_box(dan_qi, Vector3(0.28, 0.03, 0.05), Vector3(0.22, 0.26, -0.16), BRONZE)
+	_export_glb(dan_qi, "districts", "dan_qi_qu.glb")
+
+	# 4 藏经区：台 + 书架 + 小亭顶。
+	var cang_jing: Node3D = _new_root("CANG_JING_QU")
+	_add_box(cang_jing, Vector3(0.84, 0.05, 0.84), Vector3(0.0, 0.025, 0.0), BONE.darkened(0.10))
+	_add_box(cang_jing, Vector3(0.34, 0.22, 0.20), Vector3(0.0, 0.16, -0.06), Color("c9c0a6"))
+	for index: int in range(3):
+		_add_box(cang_jing, Vector3(0.28, 0.02, 0.16),
+			Vector3(0.0, 0.09 + float(index) * 0.06, -0.06), BRONZE)
+	_add_roof(cang_jing, 0.30, 0.12, Vector3(0.0, 0.34, -0.06), INK_SOFT)
+	_export_glb(cang_jing, "districts", "cang_jing_qu.glb")
+
+	# 5 法坛区：圆坛 + 四角幡柱 + 中心晶。
+	var fa_tan: Node3D = _new_root("FA_TAN_QU")
+	_add_cylinder(fa_tan, 0.42, 0.05, Vector3(0.0, 0.025, 0.0), PURPLE.darkened(0.20), 12)
+	_add_cylinder(fa_tan, 0.28, 0.04, Vector3(0.0, 0.07, 0.0), BONE, 12)
+	for index: int in range(4):
+		var angle: float = TAU * float(index) / 4.0 + PI * 0.25
+		var offset: Vector3 = Vector3(cos(angle) * 0.34, 0.0, sin(angle) * 0.34)
+		_add_cylinder(fa_tan, 0.016, 0.26, offset + Vector3(0.0, 0.16, 0.0), BRONZE, 5)
+		_add_box(fa_tan, Vector3(0.08, 0.10, 0.012), offset + Vector3(0.0, 0.26, 0.0), PURPLE)
+	_add_roof(fa_tan, 0.10, 0.20, Vector3(0.0, 0.18, 0.0), AZURE)
+	_export_glb(fa_tan, "districts", "fa_tan_qu.glb")
+
+	# 6 市集区：台 + 三顶棚 + 货箱。
+	var shi_ji: Node3D = _new_root("SHI_JI_QU")
+	_add_box(shi_ji, Vector3(0.86, 0.05, 0.86), Vector3(0.0, 0.025, 0.0), Color("b8a888"))
+	for index: int in range(3):
+		var x: float = -0.24 + float(index) * 0.24
+		_add_box(shi_ji, Vector3(0.16, 0.10, 0.14), Vector3(x, 0.10, 0.04), BRONZE.lightened(0.20))
+		_add_roof(shi_ji, 0.14, 0.07, Vector3(x, 0.18, 0.04), CINNABAR if index % 2 == 0 else JADE)
+	_add_box(shi_ji, Vector3(0.12, 0.10, 0.12), Vector3(0.26, 0.10, -0.24), BRONZE)
+	_export_glb(shi_ji, "districts", "shi_ji_qu.glb")
+
+
+# ---------------------------------------------------------------------------
+# 10：改良模型（improvement.*）——单格小件
+# ---------------------------------------------------------------------------
+
+func _gen_improvements() -> void:
+	# 1 灵田梯田：三级阶梯 + 水渠。
+	var ti_tian: Node3D = _new_root("LING_TIAN_TI_TIAN")
+	for index: int in range(3):
+		var width: float = 0.80 - float(index) * 0.16
+		var y: float = 0.04 + float(index) * 0.07
+		_add_box(ti_tian, Vector3(width, 0.08, 0.24),
+			Vector3(0.0, y, 0.22 - float(index) * 0.22), JADE_LIGHT.darkened(float(index) * 0.08))
+	_add_box(ti_tian, Vector3(0.06, 0.03, 0.62), Vector3(0.34, 0.02, -0.02), AZURE)
+	_export_glb(ti_tian, "features", "imp_ling_tian_ti_tian.glb")
+
+	# 2 灵矿：矿洞 + 轨道 + 矿车。
+	var ling_kuang: Node3D = _new_root("LING_KUANG")
+	_add_box(ling_kuang, Vector3(0.52, 0.36, 0.30), Vector3(-0.10, 0.18, -0.14), SLATE)
+	_add_box(ling_kuang, Vector3(0.22, 0.22, 0.04), Vector3(-0.10, 0.13, 0.02), INK)
+	for sx: int in range(2):
+		var sign: float = -1.0 if sx == 0 else 1.0
+		_add_box(ling_kuang, Vector3(0.02, 0.02, 0.40), Vector3(-0.10 + sign * 0.06, 0.02, 0.20), BRONZE)
+	_add_box(ling_kuang, Vector3(0.14, 0.10, 0.12), Vector3(-0.10, 0.09, 0.20), BRONZE.lightened(0.15))
+	_add_sphere(ling_kuang, 0.05, Vector3(-0.10, 0.16, 0.20), AZURE)
+	_export_glb(ling_kuang, "features", "imp_ling_kuang.glb")
+
+	# 3 采石场：石堆 + 楔 + 支架。
+	var cai_shi: Node3D = _new_root("CAI_SHI_CHANG")
+	for index: int in range(4):
+		var angle: float = TAU * float(index) / 4.0
+		_add_box(cai_shi, Vector3(0.18, 0.12 + 0.03 * float(index), 0.16),
+			Vector3(cos(angle) * 0.22, 0.07, sin(angle) * 0.22), SLATE.lightened(float(index) * 0.06),
+			angle, 0.0)
+	_add_box(cai_shi, Vector3(0.06, 0.26, 0.06), Vector3(0.0, 0.13, 0.0), BRONZE)
+	_add_box(cai_shi, Vector3(0.20, 0.04, 0.04), Vector3(0.0, 0.26, 0.0), INK_SOFT)
+	_export_glb(cai_shi, "features", "imp_cai_shi_chang.glb")
+
+	# 4 药园：苗床格 + 篱笆 + 三株灵植。
+	var yao_yuan: Node3D = _new_root("YAO_YUAN")
+	_add_box(yao_yuan, Vector3(0.82, 0.04, 0.82), Vector3(0.0, 0.02, 0.0), Color("9a8a63"))
+	for row: int in range(3):
+		for col: int in range(3):
+			var x: float = -0.22 + float(col) * 0.22
+			var z: float = -0.22 + float(row) * 0.22
+			_add_box(yao_yuan, Vector3(0.16, 0.03, 0.16), Vector3(x, 0.055, z),
+				JADE_LIGHT.darkened(0.06 * float((row + col) % 3)))
+	for index: int in range(3):
+		var x2: float = -0.22 + float(index) * 0.22
+		_add_sphere(yao_yuan, 0.055, Vector3(x2, 0.13, -0.22), JADE)
+	for side: int in range(2):
+		var sign: float = -1.0 if side == 0 else 1.0
+		_add_box(yao_yuan, Vector3(0.02, 0.10, 0.82), Vector3(sign * 0.41, 0.05, 0.0), BRONZE.lightened(0.25))
+	_export_glb(yao_yuan, "features", "imp_yao_yuan.glb")
+
+	# 5 聚灵阵：双环 + 中心晶柱。
+	var zhen: Node3D = _new_root("JU_LING_ZHEN")
+	_add_cylinder(zhen, 0.40, 0.04, Vector3(0.0, 0.02, 0.0), PURPLE.darkened(0.25), 16)
+	for index: int in range(2):
+		var radius: float = 0.26 + float(index) * 0.10
+		var segments: int = 16
+		for step: int in range(segments):
+			var angle: float = TAU * float(step) / float(segments)
+			_add_box(zhen, Vector3(0.05, 0.02, 0.03),
+				Vector3(cos(angle) * radius, 0.05, sin(angle) * radius), AZURE, -angle, 0.0)
+	_add_roof(zhen, 0.09, 0.22, Vector3(0.0, 0.16, 0.0), AZURE)
+	_add_roof(zhen, 0.09, -0.14, Vector3(0.0, 0.05, 0.0), AZURE)
+	_export_glb(zhen, "features", "imp_ju_ling_zhen.glb")
+
+	# 6 青石道路：沿 Z 铺的石板带（宽 0.42，占满一格）。
+	var dao_lu: Node3D = _new_root("QING_SHI_DAO_LU")
+	for index: int in range(5):
+		var z: float = -0.40 + float(index) * 0.20
+		_add_box(dao_lu, Vector3(0.40, 0.05, 0.17), Vector3(0.0, 0.025, z),
+			SLATE.lightened(0.10 if index % 2 == 0 else 0.02))
+	_export_glb(dao_lu, "features", "imp_qing_shi_dao_lu.glb")
+
+	# 7 洞府：山体 + 洞门 + 门楣。
+	var dong_fu: Node3D = _new_root("DONG_FU")
+	_add_box(dong_fu, Vector3(0.62, 0.40, 0.46), Vector3(0.0, 0.20, -0.10), SLATE)
+	_add_box(dong_fu, Vector3(0.24, 0.26, 0.04), Vector3(0.0, 0.13, 0.12), INK)
+	_add_box(dong_fu, Vector3(0.34, 0.05, 0.06), Vector3(0.0, 0.29, 0.13), BRONZE)
+	_add_roof(dong_fu, 0.36, 0.14, Vector3(0.0, 0.46, -0.10), INK_SOFT)
+	_add_sphere(dong_fu, 0.03, Vector3(0.0, 0.20, 0.15), GOLD)
+	_export_glb(dong_fu, "features", "imp_dong_fu.glb")
+
+	# 8 灵泉修缮：泉眼 + 石栏 + 水面。
+	var xiu_shan: Node3D = _new_root("LING_QUAN_XIU_SHAN")
+	_add_cylinder(xiu_shan, 0.30, 0.10, Vector3(0.0, 0.05, 0.0), SLATE, 12)
+	_add_cylinder(xiu_shan, 0.22, 0.02, Vector3(0.0, 0.11, 0.0), AZURE, 12)
+	for index: int in range(4):
+		var angle: float = TAU * float(index) / 4.0 + PI * 0.25
+		_add_box(xiu_shan, Vector3(0.10, 0.14, 0.04),
+			Vector3(cos(angle) * 0.28, 0.17, sin(angle) * 0.28), BONE, -angle, 0.0)
+	_add_box(xiu_shan, Vector3(0.06, 0.30, 0.06), Vector3(0.34, 0.15, -0.20), BRONZE)
+	_export_glb(xiu_shan, "features", "imp_ling_quan_xiu_shan.glb")
+
+
+# ---------------------------------------------------------------------------
+# 11：地貌与资源节点（terrain.feature.* / node.*）
+# ---------------------------------------------------------------------------
+
+func _gen_features() -> void:
+	# 1 灵林：四棵伞状灵树 + 低矮灌木。
+	var forest: Node3D = _new_root("SPIRIT_FOREST")
+	for index: int in range(4):
+		var angle: float = TAU * float(index) / 4.0 + 0.4
+		var x: float = cos(angle) * 0.26
+		var z: float = sin(angle) * 0.26
+		var height: float = 0.30 + 0.06 * float(index % 2)
+		_add_cylinder(forest, 0.028, height, Vector3(x, height * 0.5, z), BRONZE.darkened(0.15), 6)
+		_add_roof(forest, 0.20, 0.16, Vector3(x, height + 0.05, z), JADE)
+		_add_roof(forest, 0.14, 0.10, Vector3(x, height + 0.16, z), JADE_LIGHT)
+	_add_sphere(forest, 0.09, Vector3(0.0, 0.09, 0.0), JADE_LIGHT.darkened(0.10))
+	_export_glb(forest, "features", "feature_spirit_forest.glb")
+
+	# 2 雾泽：浅水片 + 芦苇丛 + 雾气小球。
+	var mire: Node3D = _new_root("MIRE")
+	_add_cylinder(mire, 0.46, 0.02, Vector3(0.0, 0.01, 0.0), AZURE.lightened(0.10), 14)
+	for index: int in range(6):
+		var angle: float = TAU * float(index) / 6.0
+		var x: float = cos(angle) * 0.28
+		var z: float = sin(angle) * 0.28
+		_add_cylinder(mire, 0.012, 0.22, Vector3(x, 0.11, z), INK_SOFT, 4)
+	for index: int in range(3):
+		_add_sphere(mire, 0.06 + 0.02 * float(index),
+			Vector3(-0.12 + float(index) * 0.14, 0.14 + float(index) * 0.04, 0.10), BONE.lightened(0.30))
+	_export_glb(mire, "features", "feature_mire.glb")
+
+	# 3 灵田节点：田块 + 稻穗 + 水渠。
+	var ling_tian: Node3D = _new_root("LING_TIAN")
+	_add_box(ling_tian, Vector3(0.76, 0.05, 0.76), Vector3(0.0, 0.025, 0.0), Color("9a8a63"))
+	for row: int in range(3):
+		for col: int in range(3):
+			var x: float = -0.24 + float(col) * 0.24
+			var z: float = -0.24 + float(row) * 0.24
+			_add_box(ling_tian, Vector3(0.18, 0.04, 0.18), Vector3(x, 0.07, z), JADE_LIGHT)
+			_add_cylinder(ling_tian, 0.012, 0.10, Vector3(x, 0.14, z), GOLD.darkened(0.10), 4)
+	_export_glb(ling_tian, "features", "node_ling_tian.glb")
+
+	# 4 灵脉节点：地裂 + 露头晶簇。
+	var ling_mai: Node3D = _new_root("LING_MAI")
+	_add_box(ling_mai, Vector3(0.84, 0.04, 0.84), Vector3(0.0, 0.02, 0.0), SLATE.lightened(0.14))
+	for index: int in range(5):
+		var angle: float = TAU * float(index) / 5.0
+		var x: float = cos(angle) * 0.18
+		var z: float = sin(angle) * 0.18
+		_add_roof(ling_mai, 0.07 + 0.01 * float(index % 2), 0.20 + 0.05 * float(index % 3),
+			Vector3(x, 0.12, z), AZURE, angle)
+	_add_box(ling_mai, Vector3(0.70, 0.02, 0.06), Vector3(0.0, 0.045, 0.0), INK, 0.5, 0.0)
+	_export_glb(ling_mai, "features", "node_ling_mai.glb")
+
+	# 5 机缘节点：石碑 + 光球 + 台座。
+	var ji_yuan: Node3D = _new_root("JI_YUAN")
+	_add_cylinder(ji_yuan, 0.22, 0.06, Vector3(0.0, 0.03, 0.0), BONE, 10)
+	_add_box(ji_yuan, Vector3(0.20, 0.44, 0.08), Vector3(0.0, 0.28, 0.0), SLATE.lightened(0.12))
+	_add_box(ji_yuan, Vector3(0.13, 0.26, 0.02), Vector3(0.0, 0.30, 0.05), GOLD.darkened(0.20))
+	_add_sphere(ji_yuan, 0.06, Vector3(0.0, 0.58, 0.0), GOLD)
+	_export_glb(ji_yuan, "features", "node_ji_yuan.glb")
+
+	# 6 秘境节点：石门 + 门内幽光。
+	var mi_jing: Node3D = _new_root("MI_JING")
+	_add_box(mi_jing, Vector3(0.56, 0.08, 0.30), Vector3(0.0, 0.04, 0.0), SLATE)
+	for side: int in range(2):
+		var sign: float = -1.0 if side == 0 else 1.0
+		_add_box(mi_jing, Vector3(0.09, 0.52, 0.14), Vector3(sign * 0.20, 0.30, 0.0), SLATE.lightened(0.10))
+	_add_box(mi_jing, Vector3(0.46, 0.10, 0.16), Vector3(0.0, 0.60, 0.0), INK_SOFT)
+	_add_box(mi_jing, Vector3(0.30, 0.40, 0.02), Vector3(0.0, 0.30, 0.02), INK)
+	_add_roof(mi_jing, 0.28, 0.12, Vector3(0.0, 0.68, 0.0), PURPLE)
+	_add_sphere(mi_jing, 0.05, Vector3(0.0, 0.30, 0.04), AZURE.lightened(0.20))
+	_export_glb(mi_jing, "features", "node_mi_jing.glb")
+
+	# 7 灵泉节点：泉池 + 石沿 + 水面。
+	var ling_quan: Node3D = _new_root("LING_QUAN")
+	_add_cylinder(ling_quan, 0.34, 0.09, Vector3(0.0, 0.045, 0.0), SLATE, 14)
+	_add_cylinder(ling_quan, 0.25, 0.02, Vector3(0.0, 0.10, 0.0), AZURE, 14)
+	for index: int in range(6):
+		var angle: float = TAU * float(index) / 6.0
+		_add_box(ling_quan, Vector3(0.08, 0.10, 0.05),
+			Vector3(cos(angle) * 0.31, 0.14, sin(angle) * 0.31), BONE.lightened(0.06), -angle, 0.0)
+	_add_roof(ling_quan, 0.06, 0.16, Vector3(0.0, 0.20, 0.0), AZURE.lightened(0.20))
+	_export_glb(ling_quan, "features", "node_ling_quan.glb")
+
+	# 8 灵峰节点：小山峰 + 峰顶平台（正式灵峰楼阁由 SectView 另建）。
+	var ling_feng: Node3D = _new_root("LING_FENG")
+	_add_roof(ling_feng, 0.44, 0.46, Vector3(0.0, 0.23, 0.0), SLATE.lightened(0.16), 0.6)
+	_add_cylinder(ling_feng, 0.20, 0.05, Vector3(0.0, 0.48, 0.0), BONE, 10)
+	_add_roof(ling_feng, 0.24, 0.16, Vector3(0.0, 0.58, 0.0), JADE.darkened(0.10))
+	for index: int in range(3):
+		var angle: float = TAU * float(index) / 3.0 + 0.5
+		_add_roof(ling_feng, 0.16, 0.22,
+			Vector3(cos(angle) * 0.34, 0.11, sin(angle) * 0.34), SLATE, angle)
+	_export_glb(ling_feng, "features", "node_ling_feng.glb")
+
+
+# ---------------------------------------------------------------------------
+# 12：背景音（audio/bgm/main.wav）
+# ---------------------------------------------------------------------------
+
+## 为什么自己合成而不塞一段现成曲子：仓库要「可复现、可审阅、无外部依赖」，
+## 且 1 个 8 秒循环 ≈ 250 KB，比一首完整 BGM 小两个数量级。
+##
+## 循环无缝的做法：所有频率与 LFO 周期都取 `1/时长` 的整数倍（8 秒 → 基频 0.125 Hz），
+## 于是波形在 8 秒处正好回到起点，不需要交叉淡化。
+## 用五声音阶（D3/A3/D4/F4/A4）+ 每 2 秒一记钟声，避免三度音带来的西洋味。
+const AUDIO_RATE: int = 16000
+const AUDIO_SECONDS: int = 8
+
+
+func _gen_audio() -> void:
+	var dir: String = Launcher.repo_root().path_join("assets").path_join("audio").path_join("bgm")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var count: int = AUDIO_RATE * AUDIO_SECONDS
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(count)
+	# [频率, 振幅, LFO 频率]：三者的周期都能整除 8 秒。
+	var partials: Array = [
+		[146.875, 0.30, 0.125],
+		[220.000, 0.20, 0.250],
+		[293.750, 0.14, 0.375],
+		[440.000, 0.09, 0.500],
+	]
+	for index: int in range(count):
+		var t: float = float(index) / float(AUDIO_RATE)
+		var value: float = 0.0
+		for partial: Array in partials:
+			var lfo: float = 0.55 + 0.45 * sin(TAU * float(partial[2]) * t)
+			value += float(partial[1]) * lfo * sin(TAU * float(partial[0]) * t)
+		var bell: float = fmod(t, 2.0)
+		value += 0.20 * exp(-bell * 2.2) * sin(TAU * 587.5 * bell)
+		samples[index] = value
+	# 一阶低通：把正弦叠成「远钟 + 风过松林」的钝感，避免电子味。
+	var previous: float = 0.0
+	for index: int in range(count):
+		previous = lerpf(previous, samples[index], 0.35)
+		samples[index] = previous
+	var peak: float = 0.0001
+	for value: float in samples:
+		peak = maxf(peak, absf(value))
+	var gain: float = 0.30 / peak
+
+	var data: PackedByteArray = PackedByteArray()
+	data.resize(44 + count * 2)
+	_put_ascii(data, 0, "RIFF")
+	data.encode_u32(4, 36 + count * 2)
+	_put_ascii(data, 8, "WAVE")
+	_put_ascii(data, 12, "fmt ")
+	data.encode_u32(16, 16)
+	data.encode_u16(20, 1)
+	data.encode_u16(22, 1)
+	data.encode_u32(24, AUDIO_RATE)
+	data.encode_u32(28, AUDIO_RATE * 2)
+	data.encode_u16(32, 2)
+	data.encode_u16(34, 16)
+	_put_ascii(data, 36, "data")
+	data.encode_u32(40, count * 2)
+	for index: int in range(count):
+		var sample: int = int(clampf(samples[index] * gain, -1.0, 1.0) * 32767.0)
+		data.encode_s16(44 + index * 2, sample)
+	var path: String = dir.path_join("main.wav")
+	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		push_error("[AssetGen] 写出失败 %s" % path)
+		return
+	file.store_buffer(data)
+	file.close()
+	_written += 1
+
+
+func _put_ascii(buffer: PackedByteArray, offset: int, text: String) -> void:
+	var bytes: PackedByteArray = text.to_ascii_buffer()
+	for index: int in range(bytes.size()):
+		buffer.encode_u8(offset + index, bytes[index])

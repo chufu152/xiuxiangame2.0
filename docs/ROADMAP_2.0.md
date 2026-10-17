@@ -60,17 +60,17 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 | 客户端·表现 | `world/{HexMap,Fog,CameraRig,UnitView,SectView}.gd`、`scenes/{Main,MainMenu,World}`、`art/AssetLibrary.gd` | ✅ 起伏六棱柱 + 连绵山体 + 河流贴边、三态迷雾静态材质、正交 45° 锁定相机、占位回退；**R2 新增**：移动高亮层、选中标记、顶部 TopBar、点选→高亮→移动交互；**R3 新增**：`CityPanel`（CanvasLayer，人口/粮食/安定/住房/工作格/区域/产出明细 + 建造/区域选址/劳力指派/改良按钮）、`SectView` 灵峰/建筑/区域占位几何、TopBar 资源栏追加 粮/气运/道点/材料；**R4 新增**：`DaoPanel`（左侧竖排，按 `eraIndex` 分 5 列 + 三态标记 + `blocker` tooltip + 点击研究）、`QueuePanel`（左下，`projects[]`/`researchQueue[]` 两列并排不混池 + 回合数输入/加速/取消）、侧栏弟子详情追加修炼进度/心魔/伤势/入门回合/灵根品阶，三个面板互斥且均不触碰相机；**R5 新增**：`CombatPanel`（右下，悬停攻击预览：攻守战力/胜率/相克/反击/距离/notes + 不可攻击时显 `blockedReason` + `CombatResult` 结算反馈）、`UnitPanel`（左下，与城市面板互斥：战功/战阶/晋升点/出手 + 撤退/传送/驻守/撤离按钮 + 十兵种转职候选置灰与 blocker tooltip + 晋升候选）、**攻击高亮层**（`HexMap.show_attack_range`，与移动高亮层**完全独立并存**，清一层不影响另一层）、`UnitView` 十兵种占位剪影（prism/box/sphere/cylinder/cone 各按兵种取值，正式模型缺失时仍可区分）、Shift+点选多选 → `batchMove`；**R6 新增**：`ExplorePanel`（节点冷却/奖励预览/派弟子/秘境多选）、`PolicyPanel`（当前政体 + 效果合计 + 3 政体按钮 + 8 卡按钮三态 + 槽位占用）、`AutomationPanel`（4 开关 + 逐峰自动项目 + 立即探索/集结/回防 + 本地设置），三面板左侧竖排**互斥**且均不触碰相机；TopBar 追加 政令 / 自动 入口；**节点点击优先级提到弟子点击之前**（秘境要求全员已站在节点格，否则面板永远打不开）；**R7 新增**：`VictoryPanel`（三路线 `stage`/`ratio`/`summary`/`score` + 逐 goal 9 键行 + 择定按钮）、`SavesPanel`（槽 0–4 存入/读取 + `listSaves` 刷新）、`GameOverPanel`（`winType`/`winnerSectId`/本宗达成路线/覆灭判定）、`ChoicePanel`（居中 `layer=5` 待抉择弹窗，按 `options[].index` 发 `resolveChoice`）、侧栏**事件栏**（回包 `events[]` 保留 12 条，AI 行动占位展示）、弟子详情追加「任命峰主/长老/宗主」「渡劫飞升」四入口；TopBar 追加 胜负 / 存档 / 结局 入口；`MainMenu` 追加「读取存档」（`listSaves` → `loadGame`，与 `newGame` 共用 `game_started` 路径）；四面板与 R3–R6 面板**全局互斥**且均不触碰相机；**R8 新增**：`world/Decorations.gd`（昼夜 180 秒循环 / 六边形网格开关 / 宗门色边框 / 灵气粒子 / 飞鸟 / 三态迷雾泼墨转场，五层子节点互不干扰）、`ui/ActionBar.gd`（底栏 + **70 条命令入口登记表**，四类 button/panel/gesture/auto）、`ui/Minimap.gd`（三态配色 + 视口框 + 点击跳转**只发信号不碰相机**）、`ui/SettingsPanel.gd`（6 项本地偏好，`setSetting` 仅作确认）、`ui/GuideOverlay.gd`（6 步引导，不阻塞输入）、`ui/Toast.gd`（轻提示，只显 `✗` 状态与 `events[]`）；TopBar 资源文本改 **13 项图标化 `ResourceChips`**（`topbar_resource_label` 保留为 `visible=false` 文本镜像，不破坏 R2 既有断言），7 个面板按钮下沉到底栏；补 8 条此前无 UI 入口的命令（`foundSpiritPeak`/`appointBuilder`/`openCave`/`fortifyPeak`/`repairImprovement`/`queryVictoryChoice`/`nextTurn`/`finishTurn`）；快捷键 `空格`/`End`/`G`/`B`/`M`/`F1`/`Esc`；`world/CameraRig.gd` 新增 `pan_to()`（**只平移**，显式不改 `rotation`/`size`）、`view_center()`、`view_size()` |
 | 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command`；**R5 新增**：12 条 `request_*` 包装 + 5 个信号（`attackPreview`/`attackable`/`teleportOptions`/`discipleDetail`/`r5Result`）+ `_is_r5_command`；**R6 新增**：16 条 `request_*` 包装 + 5 个信号（`ji_yuan_info_received`/`mi_jing_info_received`/`policy_options_received`/`automation_state_received`/`r6_result_received`）+ `_is_r6_command`；**点选弟子改为三段串行链**（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），因 `_request` 是单请求语义、并发会被静默丢弃；**R7 新增**：14 条 `request_*` 包装 + 6 个信号（`victory_progress_received`/`victory_choice_received`/`saves_received`/`await_input`/`events_received`/`r7_result_received`）+ `_is_r7_command`；`NetClient.server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）；`loadGame` 与 `newGame` 同样触发 `game_started`；**R8 新增**：`request_next_turn()`（`nextTurn` 此前服务端已实现、客户端无入口，R8「70 条全入口」才暴露） |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
-| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R7 起 69 条 + `ping` 全部标「已实现」**（`implemented_commands()` 共 70 项；**无「待实现」**）；`TODO(需核对)` 降至 **7 处**（R7 回填 §11.2 #1 `AppointmentResult` 与 #3 `goals` 9 键，§3 `tribulate`/`appoint*` 的 result 展开）；校验脚本 **38/38** 全绿（新增「已实现 = 70」全量断言与 `awaitInput` 转正断言）、69 分组点数不变 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **24 阶段**（`[0/24]`–`[23/24]`），含 R0–R8 全量断言 + 协议契约校验（**175/175** 全绿） |
+| 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R7 起 69 条 + `ping` 全部标「已实现」**（`implemented_commands()` 共 70 项；**无「待实现」**）；`TODO(需核对)` 降至 **7 处**（R7 回填 §11.2 #1 `AppointmentResult` 与 #3 `goals` 9 键，§3 `tribulate`/`appoint*` 的 result 展开；**R9 W0 后为 3 处，见 §4.11**）；校验脚本 **38/38** 全绿（新增「已实现 = 70」全量断言与 `awaitInput` 转正断言）、69 分组点数不变 |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **24 阶段**（`[0/24]`–`[23/24]`），含 R0–R8 全量断言 + 协议契约校验（**179/179** 全绿） |
 
 ### 1.3 遗留缺口（进入 R5 前需知悉，不阻塞 R5）
 
-1. **美术资源：R8 前置已交付 52 个实体文件，其余仍为 0**（`assets/art/default/**` 下现有 32 个 `.png` + 20 个 `.glb`，覆盖 `terrain`/`units`/`buildings`/`resources`/`realms`/`factions` 六组；`districts`/`improvements`/`features`/`audio`/`fonts` 五组共 25 个 ID 仍缺，见 §3.2.1）。缺的部分**是计划内状态**，不是缺陷：
-   - `AssetLibrary` 对 manifest 里缺失的逻辑 ID **全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**；R8 的 `R8ClientTest` 已双向断言「最小包 52 个 ID 零 WARN」+「未覆盖 ID 仍 WARN 一次」。
+1. **美术资源：R9 W1 已补全默认皮肤（75 个 ID 全覆盖，仅 `fonts` 2 项按裁决保留回退）**（`assets/art/default/**` 下 75 个实体文件：`terrain`/`units`/`buildings`/`resources`/`realms`/`factions`/`districts`/`improvements`/`features`/`audio` 十组；R8 前置交付 52 个，R9 W1 追加 `districts` 6 + `improvements` 8 + `features` 8 + `audio` 1 共 23 个，验收口径 `ASSETVERIFY_OK covered=75 warned=0`，见 §4.12）。**唯一仍缺的是 `font.body` / `font.title`**，属用户裁决「继续走回退占位」的**计划内状态**，不是缺陷：
+   - `AssetLibrary` 对 manifest 里缺失的逻辑 ID **全部回退占位**（模型=水墨灰阶几何体 + 文字标签、贴图=纯色块、材质=`StandardMaterial3D`、字体=回退字体），**不崩**；R8 的 `R8ClientTest` 已双向断言「最小包 75 个 ID 零 WARN」+「未覆盖 ID 仍 WARN 一次」（`FALLBACK_GROUPS = ["fonts"]`）。
    - 回退行为有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」；R8 起由 `R8ClientTest._assert_asset_fallback` 接续双向覆盖。
    - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
-   - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 7 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2，`check_protocol.ps1` 实测统计；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → R4 未增 → R3/R4 收尾补做 +1 为 12 处 → R6 回填 3 处降为 9 处 → **R7 回填 2 处降为 7 处**）：`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的移动路径接线点、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径；**R4 后新增**：三流派特性中未能落地的键（§11.2 #11，`guoJia.expansionCostReduction`/`diDuGrowthBonus` 缺可计算口径）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）；③ `TrainingResult`/`ExploreResult`/`PolicyResult`/`AppointmentResult`/`NodeInfo`/`goals` 九键 均已在 R5–R7 回填。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层；**R3/R4 收尾另登记** §11.1 #24 三流派特性落地口径（6 项已实现）。**不阻塞 R9**，随对应里程碑逐条补齐。
+   - 真资源排期见 §三「最小水墨资源包」前置约束；默认皮肤已在 R9 W1 补齐（§4.12），第二套皮肤包见 W2。
+2. **协议契约的 `TODO(需核对)` 已于 R9 W0 全部结案（0 处实质待办）**：`PROTOCOL_2.0.md` §11.2 更名为「结案记录」，四处实质 TODO 逐条给出结论——① `querySpiritPeakBlocker` **不是命令**（1.0 全仓 grep 零命中），语义由 `foundSpiritPeak` 的 `success=false + message` 承载；② 敌方可见弟子的 `assignedPeakId` **已剥离**（`StateView` 对非玩家宗门 erase，与敌方灵峰剥离 `fengZhuId` 同口径）；③ 灵泉衰减 `minFactor` 定为 `lingQuanMinOutput(3) ÷ workYieldByNode.LING_QUAN.spiritPower(6) = 0.5`（1.0 口径核实见 §4.11）；④ 三流派 46 个叶子键**全部审计完毕**，仅剩 4 个 `deadKey`（`expansionCostReduction`/`diDuGrowthBonus`/`rareMaterialPenalty`/`bloodLinePenalty`，1.0 亦无消费点）。全文 `TODO(需核对)` 标记从 7 处降至 3 处，且这 3 处都是**对标记本身的说明**（定义、工具说明、小节标题），不是待办。
 3. **R5–R9 提示词已预生成**（草案）；`R5_*.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
@@ -133,7 +133,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - **排期**：该资源包的具体制作在 **R7 完成后、R8 启动前单独立项**（含美术风格与工作量评估），**不属于任何现有里程碑**，也不在 R1.5 范围内。
 - **验收方式**：替换 `assets/art/default/` 下实体文件后，`activePack=default` 下 `AssetLibrary` 不再对上述 ID 触发 WARN；R8 打磨项基于真资产进行。
 
-#### 3.2.1 交付记录（✅ 已完成，`8f96a6e`）
+#### 3.2.1 交付记录（✅ 已完成，`8f96a6e`；R9 W1 扩至 75 个，见 §4.12）
 
 - **交付内容**：`assets/art/default/` 下 **52 个实体文件**，覆盖上述八类清单全部 ID：
   - 地形材质 11 张（3 基底顶面 + 3 海拔侧面 + `mountain_peak` + `river` + `danger` + 2 张迷雾）；
@@ -141,8 +141,8 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
   - UI 图标 21 张（`resource.*` 13 + `realm.*` 5 + `faction.*` 3，64×64 透明底、3×3 超采样）。
 - **生成方式**：`client/tools/AssetGen.gd`（`res://tools/AssetGen.tscn`）**程序化生成**——固定 seed 的哈希值噪声 + 低模图元拼装，**零外部依赖、确定性可复现**。真实美术介入时同名文件覆盖即可，`manifest.json` 与代码均无需改动。
 - **验收工具**：`client/tools/AssetVerify.gd` 用客户端 `AssetLibrary` 逐 ID 取资源，输出 **`ASSETVERIFY_OK covered=52 warned=0`**；`client/tools/AssetPreview.gd` 用 CPU 等距光栅化把模型/图标/材质拼成联络表（`outputs/r8_asset_*.png`，不入库）供人工核验。
-- **仍未覆盖**（计划内，`AssetLibrary` 继续回退占位并 WARN 一次，裁决二）：`districts` 6、`improvements` 8、`features`/`node` 8、`audio` 1、`fonts` 2 —— 共 25 个 ID。
-- **回归**：`tools/check.ps1` 现 **175/175 `CHECK_RESULT=OK`**（24 阶段，R0–R8 断言无回归）；无残留 godot 进程、无 `.java`。
+- **仍未覆盖**（计划内，`AssetLibrary` 继续回退占位并 WARN 一次，裁决二）：`districts` 6、`improvements` 8、`features`/`node` 8、`audio` 1、`fonts` 2 —— 共 25 个 ID。**R9 W1 已补掉前四项共 23 个，仅余 `fonts` 2 个**（用户裁决保留回退占位，`manifest.json` 已标 `"pending": "art"`）。
+- **回归**：`tools/check.ps1` 当时 **175/175 `CHECK_RESULT=OK`**（24 阶段，R0–R8 断言无回归）；R8 追加两轮界面打磨后升至 **179/179**（见 §4.9/§4.10）；无残留 godot 进程、无 `.java`。
 
 ---
 
@@ -446,7 +446,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 - `R8_CLIENT_RESULT=OK checks=59 failures=0`（端到端：hello 70 条 → 装饰层按真 view 生成 1131 条网格线 + 1 圈边框 + 352 个缩略点 → 小地图只平移 → 泼墨/存读档/结束回合/getState 全序列相机不变 → `setSetting` 不进 view → 资源栏 13 项有值）
 - `ASSETVERIFY_OK covered=52 warned=0`（前置资源包）
 - 回归全绿：服务端 `R1 79458` / `R2 220` / `R3 297` / `R4 174` / `R5 453` / `R6 317` / `R7 211`（`R7_IMPLEMENTED=70`）；客户端 `R1 58` / `R2 36` / `R3 43` / `R4 69` / `R5 95` / `R6 59` / `R7 77`
-- `tools/check.ps1` 扩为 **24 阶段 175/175**（新增 `[21/24]` 客户端 R8 单元 + 端到端，原仓库扫描/协议契约顺延为 `[22/24]`/`[23/24]`），`check_protocol.ps1` 仍 **38/38**、`TODO(需核对)` 仍 **7 处**（L5/L1517/L1554/L1562/L1565/L1566/L1568）、69 分组点数不变
+- `tools/check.ps1` 扩为 **24 阶段 175/175**（新增 `[21/24]` 客户端 R8 单元 + 端到端，原仓库扫描/协议契约顺延为 `[22/24]`/`[23/24]`），`check_protocol.ps1` 仍 **38/38**、`TODO(需核对)` 当时 **7 处**、69 分组点数不变（R8 追加后断言数升至 179/179，`TODO` 已于 R9 W0 全部结案，见 §4.11）
 
 **偏差与未做项（诚实登记）**
 - **昼夜是客户端本地计时，不与服务端回合同步**：R8 裁决五禁止改数值，回合数也不下发时间戳，故 `DAY_CYCLE_SECONDS=180` 是一个纯观感常量。副作用：读档/刷新 view **不会**重置昼夜相位（这是有意的——否则每次操作画面都会跳一下）。若后续要「昼夜跟着回合走」，需要服务端在 view 里补一个时间字段，属**协议变更**，不在 R8 范围。
@@ -566,6 +566,79 @@ R8 交付后追加了一轮「按水墨长卷参考图贴近」的表现层改�
 - **道统树画布不撑满容器**：画布最小宽度由「最宽一层的列数」算出（约 640px），比容器窄时会靠左，右侧留白。这是 `ScrollContainer` 的默认行为，不影响可读性，故未强改。
 - **战斗「战力」显示「—」**：`preview.attackerPower` 需要先选目标，未选时服务端不给值，界面如实显示破折号而不是 0。
 - **建筑群截图是「原型图册」不是「对局截图」**：开局只有 1~2 座建筑，光靠地图截图看不全十种形制，故单独做 `BuildingShot`。它不入 CI，只用于肉眼比对参考图。
+
+### 4.11 R9 W0：收尾清账（协议 TODO 全部结案 + 文档漂移修正）
+
+R9 开工先做纯清账，**只改 1 处服务端字段裁剪 + 3 份文档**，不动玩法数值、不动配置。
+
+**唯一代码改动：`server/scripts/net/StateView.gd`**
+
+| 项 | 处理 |
+|---|---|
+| 问题 | 敌方弟子站在可见格上时，`view.sects[].disciples[].assignedPeakId` 会泄露「他归属哪座峰」，哪怕那座峰的地块玩家从未探索 |
+| 依据 | 灵峰快照早已按迷雾剥离 `fengZhuId`（`if not sect.player: remembered.erase("fengZhuId")`），弟子侧无对称处理；且**客户端零处消费 `assignedPeakId`**（仅服务端 `AutomationRules`/`DiscipleRules`/`BloodlineRules` 等规则使用） |
+| 修法 | 非玩家宗门的弟子改为 `to_dict()` 后 `erase("assignedPeakId")`；玩家自己的弟子原样下发 |
+| 风险 | 无表现差异（客户端不读该字段）；R1 权威快照是同进程双跑互比，不依赖固定基线 |
+
+**四处协议 TODO 的结案依据（都查了 1.0 源码，不臆造）**
+
+| # | 结论 | 证据 |
+|---|---|---|
+| 5 `querySpiritPeakBlocker` | **不是命令**，是 PRD 行文里的语义简称 | 1.0 `src/main/java` 全仓 grep 零命中；PRD §6.7 未登记；2.0 按 R3 裁决四由 `foundSpiritPeak` 的 `success=false + message` 承载 |
+| 8 敌方弟子 `assignedPeakId` | **已剥离**（见上表） | 1.0 对应字段为 `Disciple.currentPeakId`，只在 `queryDiscipleDetail`（查自己弟子）里下发 |
+| 9 灵泉衰减 `minFactor` | **= 3 ÷ 6 = 0.5** | 1.0 `EconomyCalculator.settleLingQuanDecay()`：`decayRate` 是产出乘数因子（初值 1.0），无修缮 `max(minFactor, r−0.02)`、有修缮 `min(1.0, r+0.05)`，`minFactor = lingQuanMinOutput / lingQuanBaseOutput`。2.0 产出基准改由 `city.workYieldByNode.LING_QUAN.spiritPower(6)` 给出，故分母取它才让「下限 3 点」自洽；1.0 的 `lingQuanBaseOutput=15` 属遗留键 |
+| 11 三流派死键 | ① 类**全部已落地**；② 类 4 键**1.0 也是死键** | ① `territoryPowerWeight`→`VictoryRules`、`exploreSuccessBonus`→`ExploreRules`、`zuCiReproduceCostReduction`→`BloodlineRules`、`appointment.*`→`AppointmentRules`、`flavors.*`→`ConfigValidator`/`CityRules`/`DaoRules`/`UnitRules`、`tendency`→`AIController`；② `expansionCostReduction`/`diDuGrowthBonus`/`rareMaterialPenalty`/`bloodLinePenalty` 在 1.0 `GameConfig` 里只有字段与 getter/setter，**全仓无任何规则消费点** |
+
+**仍然开着、但已定性为「规则补丁」而非「待核对」的两项**（不属 R9 范围，登记备查）
+- **灵泉衰减/修缮恢复未实现**：公式已定（见上表 #9），但 2.0 目前根本不衰减。实现属规则改动，需单独立项。
+- **`pillageChanceOnMove`（0.35）未读**：掠夺只在战斗路径接线（`CombatResolver` 胜后 `apply_pillage(..., 1.0, "battle")`），移动路径未接线。同为规则改动。
+
+**文档漂移修正**
+- `ROADMAP` §1.2 工具行、§3.2.1 回归行：`175/175` → `179/179`（现状陈述）
+- `ROADMAP` §4.8、`README` R8 里程碑行：保留当时的 `175/175`，加注「R8 追加两轮后为 179/179」（历史记录不篡改）
+- `PROTOCOL_2.0.md` §11.2：小节名由「待办」改为「结案记录」，四处实质 TODO 换为结论
+
+**验收**：`grep -c "TODO(需核对)" docs/PROTOCOL_2.0.md` = **3**（全是对标记本身的说明）；`check_protocol.ps1` 仍 **38/38**。
+
+### 4.12 R9 W1：补全默认皮肤（52 → 75，仅剩字体按裁决回退）
+
+目标：把 §3.2.1 遗留的 25 个缺失 ID 补到「只剩字体」。**服务端零改动，玩法数值零改动**，全部是 `AssetGen` 程序化产物 + 资源加载链路的两处真 bug 修复。
+
+**一、`client/tools/AssetGen.gd`（989 → 1342 行）覆盖 52 → 75**
+
+| 新增函数 | 产出 | 形制要点（全部单格小件：总高 ≤0.42 / 横向 ≤1.0） |
+|---|---|---|
+| `_gen_districts()` | 6 个 `districts/*.glb` | 首府区（台 + 鼓楼 + 旗杆）、修炼区（圆台 + 石墩 + 矮柱）、丹器区（炉 + 木架）、藏经区（书架 + 亭顶）、法坛区（圆坛 + 四角幡柱 + 晶）、市集区（三顶棚 + 货箱） |
+| `_gen_improvements()` | 8 个 `features/imp_*.glb` | 灵田梯田 / 灵矿（矿洞 + 轨道 + 矿车）/ 采石场 / 药园（3×3 苗床 + 篱笆）/ 聚灵阵（双环 16 段 + 晶柱）/ 青石道路（5 石板）/ 洞府 / 灵泉修缮 |
+| `_gen_features()` | 8 个 `features/{feature,node}_*.glb` | 灵林（4 伞状树）/ 雾泽（浅水 + 芦苇 + 雾球）/ 灵田 / 灵脉（晶簇）/ 机缘（石碑 + 光球）/ 秘境（石门 + 幽光）/ 灵泉 / 灵峰（山峰 + 峰顶平台） |
+| `_gen_audio()` | 1 个 `audio/bgm/main.wav` | 16000 Hz × 8 秒单声道，五声音阶 D3/A3/D4/A4 + 每 2 秒一记 587.5 Hz 钟声 + 一阶低通；**所有频率与 LFO 周期整除 8 秒**，故首尾无缝可循环；44 字节 WAV 头手写（`_put_ascii`） |
+
+**二、资源加载链路的两处真 bug（此前一直被 WARN 掩盖）**
+
+`asset_root = Launcher.repo_root()/assets` 是**绝对文件系统路径**，而 `ResourceLoader.load()` 只认 `res://`——所以「文件明明在，却永远返回 null」。
+
+| 位置 | 修法 |
+|---|---|
+| `AssetLibrary._load_external()` 的 `"audio"` 分支 | 按扩展名分派 `AudioStreamWAV.load_from_file()` / `AudioStreamOggVorbis.load_from_file()` / `AudioStreamMP3.load_from_file()` |
+| 同函数的 `"font"` 分支 | `FontFile.load_dynamic_font(path)`（返回 `Error`，`OK` 才采用） |
+| 同函数的 `"material"/"particle"` 分支 | 先 `ResourceLoader.exists()` 再 `load()`，避免对绝对路径空转 |
+| `loop` 字段 | 由**库**兑现而不是交给调用方：`AudioStream` 且 `entry.loop` 为真时设 `loop_mode = LOOP_FORWARD`（兼容老字段 `loop`） |
+
+**三、manifest 与断言同步**
+
+- `assets/manifest.json`：`bgm.main` 路径 `audio/bgm/main.ogg` → `audio/bgm/main.wav`；`font.body` / `font.title` 各加 `"pending": "art"`（**标注待补，不是失效**）。
+- `client/tools/AssetVerify.gd`：`MINIMAL_GROUPS` 加 `districts`/`improvements`/`features`/`audio`，`EXPECTED_MINIMAL` 52 → **75**；模型几何校验扩展到 `district.`/`improvement.`/`node.`/`terrain.feature.` 前缀（42 个模型逐个量高度/宽度/底面锚点）。
+- `client/tests/R8ClientTest.gd`：`EXPECTED_MINIMAL` → 75，新增 `FALLBACK_GROUPS = ["fonts"]`（白名单化的「允许 WARN」分组），回退分组类型推断由 `match` 改显式 `if/elif`（`font`/`model`/`texture`）。
+- `tools/check.ps1`：断言文案 `最小包 52 个 ID` → `75 个 ID`。
+
+**验收**
+```
+[AssetVerify] 最小包 ID 命中 75 / 75，WARN 总数 2
+[AssetVerify] 未覆盖分组仍回退占位 2 个（fonts）
+[AssetVerify] 模型几何校验 42 个（单位 ≤1.4 高、建筑 ≤1.75 宽、底面锚 y≈0）
+ASSETVERIFY_OK covered=75 warned=0
+```
+`R8_CLIENT_RESULT=OK checks=44 failures=0`（含「最小包 75 个 ID 均未触发 WARN」「未覆盖 ID 仍回退占位并 WARN 一次（2 个）」）；`tools/check.ps1` **179/179 `CHECK_RESULT=OK`**，`check_protocol.ps1` 仍 **38/38**。剩余 2 条 WARN 恰为 `font.body` / `font.title`，符合「继续走回退占位」裁决。
 
 ---
 

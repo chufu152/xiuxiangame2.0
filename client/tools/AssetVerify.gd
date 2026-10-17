@@ -2,29 +2,34 @@ extends Node
 ## 「最小水墨资源包」验收器（ROADMAP §3.2 验收方式）。
 ##
 ## 直接用客户端的 `AssetLibrary` 按 `manifest.json` 的逻辑 ID 逐个取资源，
-## 断言 8 类最小包资产**全部命中实体文件、零 WARN**；同时打印**仍然回退占位**的
-## 分组（districts / improvements / features / audio / fonts）——那是裁决二要求的
-## 「未覆盖 ID 仍回退且不崩」。
+## 断言最小包资产**全部命中实体文件、零 WARN**；同时打印**仍然回退占位**的分组
+## （R9 之后只剩 `fonts`）——那是裁决二要求的「未覆盖 ID 仍回退且不崩」。
 ##
 ## 运行：
 ##   Godot_v4.4.1-stable_win64_console.exe --headless --path client res://tools/AssetVerify.tscn
 ##
 ## 输出契约：
-##   `ASSETVERIFY_OK covered=52 warned=0`  全绿
+##   `ASSETVERIFY_OK covered=75 warned=0`  全绿
 ##   `ASSETVERIFY_FAIL ...`                有 ID 未命中
 ##
 ## 注意：集合按 **manifest 分组名**选取，不按 ID 前缀——`terrain.feature.*` 虽然以
-## `terrain.` 开头，但归属 `features` 分组（地貌模型），不在最小包清单内。
+## `terrain.` 开头，但归属 `features` 分组（地貌模型），R9 W1 起已纳入最小包。
 
 ## 最小水墨资源包覆盖的 manifest 分组（= ROADMAP §3.2 八类清单）。
 const MINIMAL_GROUPS: Array[String] = [
-	"terrain",    # 基底顶面 / 海拔侧面 / 山体顶面 / 河流 / 险地 / 三态迷雾
-	"units",      # 10 兵种
-	"buildings",  # 10 建筑
-	"resources",  # 13 资源图标
-	"realms",     # 5 境界图标
-	"factions",   # 3 势力图标
+	"terrain",       # 基底顶面 / 海拔侧面 / 山体顶面 / 河流 / 险地 / 三态迷雾（11）
+	"units",         # 10 兵种
+	"buildings",     # 10 建筑
+	"resources",     # 13 资源图标
+	"realms",        # 5 境界图标
+	"factions",      # 3 势力图标
+	"districts",     # 6 区域（R9 W1）
+	"improvements",  # 8 改良（R9 W1）
+	"features",      # 8 地貌/节点（R9 W1）
+	"audio",         # 1 背景音（R9 W1）
 ]
+## 最小包应有 ID 数（manifest 共 77，减去 `fonts` 的 2 个待美术项）。
+const EXPECTED_MINIMAL: int = 75
 
 var _library: AssetLibrary = null
 var _failures: Array[String] = []
@@ -92,7 +97,7 @@ func _ready() -> void:
 
 	_check_model_bounds(minimal)
 
-	if _failures.is_empty() and covered == minimal.size():
+	if _failures.is_empty() and covered == minimal.size() and minimal.size() == EXPECTED_MINIMAL:
 		print("ASSETVERIFY_OK covered=%d warned=0" % covered)
 		get_tree().quit(0)
 		return
@@ -137,7 +142,9 @@ func _ids_of(groups: Dictionary, group_name: String) -> Array[String]:
 func _check_model_bounds(ids: Array[String]) -> void:
 	var checked: int = 0
 	for logical_id: String in ids:
-		if not logical_id.begins_with("unit.") and not logical_id.begins_with("building."):
+		if not logical_id.begins_with("unit.") and not logical_id.begins_with("building.") \
+				and not logical_id.begins_with("district.") and not logical_id.begins_with("improvement.") \
+				and not logical_id.begins_with("node.") and not logical_id.begins_with("terrain.feature."):
 			continue
 		var resource: Resource = _library.resource_for(logical_id, "model")
 		if not resource is PackedScene:

@@ -52,6 +52,13 @@ func resource_for(logical_id: String, expected_type: String = "texture") -> Reso
 	var path: String = asset_root.path_join(relative).simplify_path()
 	if not relative.is_empty() and path.begins_with(asset_root.simplify_path() + "/") and FileAccess.file_exists(path):
 		resource = _load_external(path, str(entry.get("type", expected_type)))
+	if resource is AudioStream and bool(entry.get("loop", false)):
+		# manifest 的 `loop` 字段由库兑现：`AudioStreamWAV` 用 `loop_mode` 枚举，
+		# `AudioStreamOggVorbis`/`MP3` 用布尔 `loop`，两者键名不同，故按存在性分派。
+		if "loop_mode" in resource:
+			resource.set("loop_mode", AudioStreamWAV.LOOP_FORWARD)
+		elif "loop" in resource:
+			resource.set("loop", true)
 	if not _matches(resource, expected_type):
 		_warn_once(logical_id, "缺失或不可用资源，使用占位：" + relative)
 		resource = _fallback(expected_type)
@@ -77,9 +84,26 @@ func _load_external(path: String, kind: String) -> Resource:
 						scene.free()
 						if error == OK:
 							return packed
-		"material", "particle", "font", "audio":
-			# 只加载对应的资源后缀；文本或错误类型不能进入 ResourceLoader。
-			if path.get_extension().to_lower() in ["tres", "res", "gdshader", "ttf", "otf", "ogg", "wav"]:
+		"audio":
+			# 必须走 `load_from_file`：`asset_root` 是**绝对文件系统路径**（`Launcher.repo_root()/assets`），
+			# 而 `ResourceLoader` 只认 `res://`，所以以前用 `ResourceLoader.load(path)` 永远返回 null，
+			# 音频/字体这两类资源「文件明明在，却一直 WARN」。`load_from_*` 接受绝对路径。
+			var extension: String = path.get_extension().to_lower()
+			if extension == "wav":
+				return AudioStreamWAV.load_from_file(path)
+			if extension == "ogg":
+				return AudioStreamOggVorbis.load_from_file(path)
+			if extension == "mp3":
+				return AudioStreamMP3.load_from_file(path)
+		"font":
+			# 同上：字体也走 `FontFile.load_dynamic_font()`，不能用 ResourceLoader。
+			if path.get_extension().to_lower() in ["ttf", "otf"]:
+				var font: FontFile = FontFile.new()
+				if font.load_dynamic_font(path) == OK:
+					return font
+		"material", "particle":
+			# 材质/粒子仍只支持 `res://` 内的 .tres/.res（当前 manifest 未使用）。
+			if path.get_extension().to_lower() in ["tres", "res", "gdshader"]:
 				if ResourceLoader.exists(path):
 					return ResourceLoader.load(path)
 	return null

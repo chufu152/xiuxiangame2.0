@@ -55,7 +55,16 @@ static func build(state: GameState, config: Dictionary) -> Dictionary:
 		var disciples: Array[Dictionary] = []
 		var peaks: Array[Dictionary] = []
 		for disciple: Disciple in sect.disciples:
-			if sect.player or player.visibleTiles.has(disciple.tileId): disciples.append(disciple.to_dict())
+			if sect.player:
+				disciples.append(disciple.to_dict())
+			elif player.visibleTiles.has(disciple.tileId):
+				# 敌方可见弟子与敌方灵峰同口径（见下方 `remembered.erase("fengZhuId")`）：
+				# 弟子站在可见格上时，`assignedPeakId` 会泄露「他归属哪座峰」——哪怕那座峰
+				# 的地块玩家从未探索过。故对非玩家宗门一律剥离该字段。
+				# 客户端零处消费 `assignedPeakId`（只服务端规则用），剥离不产生任何表现差异。
+				var masked: Dictionary = disciple.to_dict()
+				masked.erase("assignedPeakId")
+				disciples.append(masked)
 		for remembered_id: String in player.peakSnapshots.keys():
 			var old: Dictionary = player.peakSnapshots[remembered_id]
 			# 己方主峰永远是实时的，不进快照；旧快照必须清掉，否则拆峰后会残留幽灵峰。

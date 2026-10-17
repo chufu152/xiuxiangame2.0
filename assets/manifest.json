@@ -97,10 +97,10 @@
     { "id": "faction.GUO_JIA", "type": "texture", "path": "art/default/icons/faction_guo_jia.png" }
   ],
   "audio": [
-    { "id": "bgm.main", "type": "audio", "path": "audio/bgm/main.ogg", "loop": true, "volume": 0.6 }
+    { "id": "bgm.main", "type": "audio", "path": "audio/bgm/main.wav", "loop": true, "volume": 0.6 }
   ],
   "fonts": [
-    { "id": "font.body",  "type": "font", "path": "fonts/body.ttf" },
-    { "id": "font.title", "type": "font", "path": "fonts/title.ttf" }
+    { "id": "font.body",  "type": "font", "path": "fonts/body.ttf",  "pending": "art" },
+    { "id": "font.title", "type": "font", "path": "fonts/title.ttf", "pending": "art" }
   ]
 }

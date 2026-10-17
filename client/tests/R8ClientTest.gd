@@ -10,10 +10,14 @@ extends Node
 ## 纯视觉项（配色/连绵观感/泼墨观感/粒子观感）不在此断言，见汇报里的人工核验清单。
 
 const TEST_PORT: int = 19581
-## 最小水墨资源包覆盖的 manifest 分组（= ROADMAP §3.2 八类）。
-const MINIMAL_GROUPS: Array[String] = ["terrain", "units", "buildings", "resources", "realms", "factions"]
+## 最小水墨资源包覆盖的 manifest 分组（R9 W1 起把 districts/improvements/features/audio 也补进来了）。
+const MINIMAL_GROUPS: Array[String] = ["terrain", "units", "buildings", "resources", "realms", "factions",
+	"districts", "improvements", "features", "audio"]
 ## 明确「不在最小包内」的分组——它们必须继续回退占位并 WARN 一次（裁决二）。
-const FALLBACK_GROUPS: Array[String] = ["districts", "improvements", "features", "audio", "fonts"]
+## R9 之后只剩 `fonts`：中文字体无法程序化生成，且客户端零处消费，故按计划待美术介入。
+const FALLBACK_GROUPS: Array[String] = ["fonts"]
+## 最小包应有的 ID 数（manifest 共 77，减去 fonts 的 2 个待美术项）。
+const EXPECTED_MINIMAL: int = 75
 
 var checks: int = 0
 var failures: int = 0
@@ -207,7 +211,7 @@ func _assert_camera_stable() -> void:
 		"相机铁律：全序列后 transform 的基不变（无旋转，实际 %s）" % str(camera.global_transform.basis))
 
 
-## 资源缺失只 WARN 不崩（裁决二）：最小包 52 个 ID 不再 WARN；未覆盖分组仍 WARN 一次。
+## 资源缺失只 WARN 不崩（裁决二）：最小包 75 个 ID 不再 WARN；未覆盖分组（只剩 fonts）仍 WARN 一次。
 func _assert_asset_fallback(session: Node) -> void:
 	var library: Node = session.get("assets")
 	if library == null:
@@ -237,7 +241,8 @@ func _assert_asset_fallback(session: Node) -> void:
 				minimal_ids.append(logical_id)
 			elif FALLBACK_GROUPS.has(str(group)):
 				fallback_ids.append(logical_id)
-	check(minimal_ids.size() == 52, "最小包 ID 共 52 个（实际 %d）" % minimal_ids.size())
+	check(minimal_ids.size() == EXPECTED_MINIMAL,
+		"最小包 ID 共 %d 个（实际 %d）" % [EXPECTED_MINIMAL, minimal_ids.size()])
 	check(not fallback_ids.is_empty(), "存在未覆盖分组 ID（用于验证回退路径）")
 
 	var warned_ids: Dictionary = library.get("warned")
@@ -246,14 +251,18 @@ func _assert_asset_fallback(session: Node) -> void:
 		if warned_ids.has(logical_id):
 			wrongly_warned.append(logical_id)
 	check(wrongly_warned.is_empty(),
-		"最小包 52 个 ID 均未触发 WARN（实际告警：%s）" % ", ".join(wrongly_warned))
+		"最小包 %d 个 ID 均未触发 WARN（实际告警：%s）" % [EXPECTED_MINIMAL, ", ".join(wrongly_warned)])
 
 	var fallback_ok: int = 0
 	for logical_id: String in fallback_ids:
 		var before: int = int(library.get("warning_count"))
-		library.call("resource_for", logical_id, "model" if logical_id.begins_with("improvement.")
-			or logical_id.begins_with("district.") or logical_id.begins_with("node.")
-			or logical_id.begins_with("terrain.feature.") else "texture")
+		var expected_type: String = "texture"
+		if logical_id.begins_with("font."):
+			expected_type = "font"
+		elif logical_id.begins_with("improvement.") or logical_id.begins_with("district.") \
+				or logical_id.begins_with("node.") or logical_id.begins_with("terrain.feature."):
+			expected_type = "model"
+		library.call("resource_for", logical_id, expected_type)
 		if int(library.get("warning_count")) > before or warned_ids.has(logical_id):
 			fallback_ok += 1
 	check(fallback_ok > 0, "未覆盖 ID 仍回退占位并 WARN 一次（%d 个）" % fallback_ok)
