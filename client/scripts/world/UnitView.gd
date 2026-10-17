@@ -36,6 +36,13 @@ const SKIN: Color = Color("e8d5b8")
 ## 影子色。
 const SHADOW: Color = Color(0.18, 0.22, 0.20, 0.26)
 
+## 小人整体放大倍率。
+##
+## 历史坑：程序化小人只有 0.56 世界单位高，而一格直径是 2 单位——按 R1 的取景（一格 22px）
+## 小人只有 11px，玩家「根本看不到单位在哪，连操作都没法指示」。放大到 2 倍后，
+## 小人约占格高的七成，与 Civ VI 的单位体量相当；**只放大表现层，不动任何权威数据**。
+const MODEL_SCALE: float = 1.55
+
 
 func render_view(view: Dictionary, map: HexMap, assets: AssetLibrary, fog: Fog, selected_id: String = "") -> void:
 	selected_disciple_id = selected_id
@@ -62,6 +69,9 @@ func render_view(view: Dictionary, map: HexMap, assets: AssetLibrary, fog: Fog, 
 			var offset: int = int(offsets.get(tile_id, 0))
 			offsets[tile_id] = offset + 1
 			model.position = map.top_position(tile_id) + Vector3(-0.34 + offset * 0.30, 0, -0.30)
+			# 放大只作用在表现层（根节点 scale），根节点 `position.y` 仍是格顶面高度，
+			# 故 R1 的「position.y == 1.7」与「每个弟子一个顶层子节点」两条约束都不受影响。
+			model.scale = Vector3.ONE * MODEL_SCALE
 			if disciple_id == selected_disciple_id:
 				_attach_marker(model)
 			add_child(model)
@@ -77,8 +87,10 @@ func _build_figure(parent: Node3D, unit_class: String, sect_color: Color) -> voi
 	var spec: Array = PLACEHOLDER_SHAPES.get(unit_class, PLACEHOLDER_SHAPES[Enums.UnitClass.PU_TONG])
 	var size: Vector3 = spec[1]
 	# 身高/体宽按兵种微调：重甲更矮壮、剑修更瘦高。
-	var height: float = 0.56 + size.y * 0.20
-	var width: float = 0.10 + size.x * 0.13
+	# 比例按「人形」重调过：原先躯干方柱 0.45 宽、头只有 0.14，放大后像方块机器人；
+	# 现在躯干收窄到 0.30、头放大一档，剪影读得出「站着一个人」。
+	var height: float = 0.74 + size.y * 0.22
+	var width: float = 0.085 + size.x * 0.10
 
 	# ① 影子：贴地扁圆，让单位「站」在格面上而不是飘着。
 	var shadow_mesh: CylinderMesh = CylinderMesh.new()
@@ -99,7 +111,21 @@ func _build_figure(parent: Node3D, unit_class: String, sect_color: Color) -> voi
 	robe.bottom_radius = width * 1.18
 	robe.height = height * 0.46
 	robe.radial_segments = 8
-	var robe_color: Color = sect_color.lerp(Color("f2ece0"), 0.18)
+	# 袍摆直接用宗门色（**不再 lerp 向宣纸白**）：R10 之前它被冲淡到近白，
+	# 一格上站着三四个单位时全是白棋子，玩家分不出敌我。
+	var robe_color: Color = sect_color
+	# ①b 宗门色底座：Civ VI 式的单位底盘。缩到最小缩放时小人轮廓会糊，
+	# 但底盘是一块饱和色圆盘，永远能一眼定位「我的单位在哪」。
+	# 注意：本节点整体会被 `MODEL_SCALE` 放大，故这里的半径都是「放大前」的值。
+	# 0.20 × 2.0 = 0.40 世界单位半径（格半径是 1.0），约当一枚棋子底盘。
+	var base_mesh: CylinderMesh = CylinderMesh.new()
+	base_mesh.top_radius = 0.19
+	base_mesh.bottom_radius = 0.21
+	base_mesh.height = 0.014
+	base_mesh.radial_segments = 18
+	var base_material: StandardMaterial3D = HexMap.solid(robe_color.darkened(0.06))
+	base_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	HexMap.add_mesh(parent, "Base", base_mesh, Vector3(0, 0.035, 0), base_material)
 	HexMap.add_mesh(parent, "Robe", robe, Vector3(0, height * 0.23, 0), HexMap.solid(robe_color))
 
 	# ③ 躯干：形状来自十兵种剪影表（缩放后作为上半身）。
@@ -107,21 +133,22 @@ func _build_figure(parent: Node3D, unit_class: String, sect_color: Color) -> voi
 	torso.name = "Torso"
 	parent.add_child(torso)
 	_apply_class_silhouette(torso, unit_class)
-	torso.scale = Vector3.ONE * 0.46
+	torso.scale = Vector3.ONE * 0.40
 	torso.position = Vector3(0, height * 0.62, 0)
 	torso.material_override = HexMap.solid(robe_color.darkened(0.12))
 	torso.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	# ④ 头 + 发冠（小方块），工笔人物的「一点」。
+	# 头半径压到 0.085×身高：再大就成了「方柱顶一颗大球」，读不出人形。
 	var head_mesh: SphereMesh = SphereMesh.new()
-	head_mesh.radius = height * 0.105
-	head_mesh.height = height * 0.21
+	head_mesh.radius = height * 0.085
+	head_mesh.height = height * 0.17
 	head_mesh.radial_segments = 10
 	head_mesh.rings = 6
-	HexMap.add_mesh(parent, "Head", head_mesh, Vector3(0, height * 0.90, 0), HexMap.solid(SKIN))
+	HexMap.add_mesh(parent, "Head", head_mesh, Vector3(0, height * 0.88, 0), HexMap.solid(SKIN))
 	var crown: BoxMesh = BoxMesh.new()
-	crown.size = Vector3(height * 0.16, height * 0.055, height * 0.16)
-	HexMap.add_mesh(parent, "Crown", crown, Vector3(0, height * 1.00, 0), HexMap.solid(robe_color.darkened(0.32)))
+	crown.size = Vector3(height * 0.13, height * 0.045, height * 0.13)
+	HexMap.add_mesh(parent, "Crown", crown, Vector3(0, height * 0.97, 0), HexMap.solid(robe_color.darkened(0.32)))
 
 
 ## 把占位网格换成该兵种的剪影（仅占位资源生效；正式模型原样保留）。
@@ -203,10 +230,12 @@ func marker_count() -> int:
 
 
 func _attach_marker(model: Node3D) -> void:
+	# 半径同样是「放大前」的值：0.30 × 2.0 = 0.60 世界单位（格半径 1.0），
+	# 选中环刚好套住单位又不会溢出到相邻格。
 	var ring: CylinderMesh = CylinderMesh.new()
-	ring.top_radius = 0.42
-	ring.bottom_radius = 0.42
-	ring.height = 0.05
+	ring.top_radius = 0.30
+	ring.bottom_radius = 0.30
+	ring.height = 0.02
 	ring.radial_segments = 6
 	var marker: MeshInstance3D = HexMap.add_mesh(model, "SelectionMarker", ring, Vector3(0, 0.02, 0), HexMap.solid(Color("d8a33c")))
 	marker.rotation.y = PI / 6.0

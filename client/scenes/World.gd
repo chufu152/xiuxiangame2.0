@@ -12,6 +12,12 @@ extends Node3D
 
 const SIDEBAR_WIDTH: float = 320.0
 const TOPBAR_HEIGHT: float = 46.0
+## 首帧取景的正交视野高度（世界单位，1 单位 = 1 个六边形半径）。
+## `PLAY_VIEW_SPAN` 是「能看清单位」的上限：约等于屏幕纵向 15 格（1080p 下一格 ≈ 120px）。
+## 历史坑：上限原先取「全图 span」，26×18 图开局就取景 41 单位，一格 22px、小人 11px 高，
+## 玩家既看不见单位也点不准。Civ VI 的默认缩放同样是十几格，故这里不再「装下整张图」。
+const PLAY_VIEW_SPAN: float = 13.0
+const MIN_VIEW_SPAN: float = 9.0
 ## R3 城市面板（左下角，覆盖在地图之上，不改相机）。
 const CITY_PANEL_WIDTH: float = 400.0
 const CITY_PANEL_MAX_HEIGHT: float = 360.0
@@ -322,8 +328,12 @@ func _view_bounds(view: Dictionary) -> Dictionary:
 ## 理由：若按全图取景，开局已探索只有十几格，画面会被大片未探索留白淹没；
 ## 按已探索取景则能看清地形、建筑与单位（参考图的构图即如此）。
 ## 另做两处构图补偿：
-##   ① 系数 0.84——参考图里地图约占画面八成，按 1.15 取景会留太多空白；
-##   ② 中心沿**屏幕右方**平移半个侧栏宽——侧栏压住右侧，不补偿则地图偏右。
+##   ① **上限夹到 `PLAY_VIEW_SPAN`**——这是 R10 的关键修正。原先上限是「全图 span」，
+##      而开局 fog 全可见时 explored_span ≈ 全图（26×18 图 ≈ 49 单位），一格只有 22px，
+##      小人 11px 高：玩家「根本看不到单位在哪，连操作都没法指示」。Civ VI 的默认缩放
+##      是纵向十几格，故这里不再「装下整张图」。
+##   ② 中心优先落在**玩家自己的单位/灵峰**上（而非已探索包围盒中心），开局镜头对准自家。
+##   ③ 中心沿屏幕右方平移半个侧栏宽——侧栏压住右侧，不补偿则地图偏右。
 ## 注意：`frame_once` 只生效一次（`CameraRig.framed`），故此后任何刷新都不再改取景。
 func _framing_bounds(view: Dictionary) -> Dictionary:
 	var full: Dictionary = _view_bounds(view)
@@ -338,6 +348,7 @@ func _framing_bounds(view: Dictionary) -> Dictionary:
 			continue
 		var tile: Dictionary = tiles[tile_id]
 		var point: Vector3 = Hex.to_world(int(tile.get("q", 0)), int(tile.get("r", 0)))
+
 		min_x = minf(min_x, point.x)
 		max_x = maxf(max_x, point.x)
 		min_z = minf(min_z, point.z)
@@ -347,14 +358,37 @@ func _framing_bounds(view: Dictionary) -> Dictionary:
 		return full
 	var center: Vector3 = Vector3((min_x + max_x) / 2.0, 0.0, (min_z + max_z) / 2.0)
 	var explored_span: float = maxf(max_x - min_x, max_z - min_z) + 4.0
-	var span: float = clampf(explored_span * 0.84, 11.0, maxf(float(full["span"]), 11.0))
-	# 相机 yaw 45° → 屏幕右方 = 世界 (0.707, 0, -0.707)。把相机朝右推，地图即在屏幕上左移。
+	var span: float = clampf(explored_span, MIN_VIEW_SPAN, PLAY_VIEW_SPAN)
+	# 镜头优先对准玩家自己的第一个弟子（没有弟子则对准自家灵峰）。
+	var focus: Vector3 = _player_focus_point(view)
+	if focus != Vector3.INF:
+		center = focus
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var world_per_px: float = span / maxf(viewport_size.y, 1.0)
 	var shift: float = SIDEBAR_WIDTH * 0.5 * world_per_px
-	center.x += shift * 0.7071
-	center.z -= shift * 0.7071
+	center += CameraRig.screen_right() * shift
 	return {"center": center, "span": span}
+
+
+## 玩家镜头锚点：第一个弟子所在格 → 否则第一个灵峰 → 否则 `Vector3.INF`（调用方回退到包围盒中心）。
+## **只读 view**，不做任何位置推导。
+func _player_focus_point(view: Dictionary) -> Vector3:
+	var tiles: Dictionary = view.get("tiles", {})
+	for sect: Dictionary in view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for disciple: Dictionary in sect.get("disciples", []):
+			var tile_id: String = str(disciple.get("tileId", ""))
+			if tiles.has(tile_id):
+				var tile: Dictionary = tiles[tile_id]
+				return Hex.to_world(int(tile.get("q", 0)), int(tile.get("r", 0)))
+		for peak: Dictionary in sect.get("spiritPeaks", []):
+			var peak_tile: String = str(peak.get("tileId", ""))
+			if tiles.has(peak_tile):
+				var peak_data: Dictionary = tiles[peak_tile]
+				return Hex.to_world(int(peak_data.get("q", 0)), int(peak_data.get("r", 0)))
+		break
+	return Vector3.INF
 
 
 # ---------------------------------------------------------------------------
@@ -1924,20 +1958,28 @@ func _build_unit_panel() -> void:
 	UiTheme.style_plain(close)
 	header.add_child(close)
 
+	# 属性文本稍后放进滚动区（见下），此处只创建节点，不挂到固定区。
 	unit_info_label = UiTheme.body_label("", 12, UiTheme.INK_SOFT)
-	column.add_child(unit_info_label)
 
-	column.add_child(UiTheme.hairline())
-
+	# 属性文本与按钮列表**一起**放进滚动区：属性是 5~6 行长文本，若留在卡片固定高度之外，
+	# 会把 `PanelContainer` 的最小高度撑大、卡片向上顶到地块卡上（玩家看到的就是两卡叠在一起）。
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 54)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(scroll)
+	var scroll_body: VBoxContainer = VBoxContainer.new()
+	scroll_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_body.add_theme_constant_override("separation", 4)
+	scroll.add_child(scroll_body)
+	unit_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_body.add_child(unit_info_label)
+	scroll_body.add_child(UiTheme.hairline())
 	unit_list = VBoxContainer.new()
 	unit_list.add_theme_constant_override("separation", 3)
 	unit_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(unit_list)
+	scroll_body.add_child(unit_list)
 
 	unit_status_label = UiTheme.body_label("", 11, UiTheme.CINNABAR)
 	column.add_child(unit_status_label)
@@ -2000,7 +2042,18 @@ func _populate_unit_actions() -> void:
 	found_peak.text = "在选中地块开辟灵峰（%s）" % (_selected if not _selected.is_empty() else "未选地块")
 	found_peak.tooltip_text = "foundSpiritPeak：需己方弟子位于该地块；费用/间距/地形由服务端判定"
 	found_peak.disabled = _selected.is_empty()
-	found_peak.pressed.connect(func() -> void: Session.request_found_spirit_peak(selected_disciple_id, _selected))
+	# **R10 修复：开峰的目标格必须是弟子脚下的格子。**
+	# `select_disciple()` 会把 `_selected` 清空（选中弟子≠选中地块），而服务端
+	# `CityRules.can_found_peak` 的判据是「弟子需身处目标地块方可开辟灵峰」——
+	# 原先这里传 `_selected`，点完弟子再点「开峰」发出去的是空串，必然被拒（玩家看到的
+	# 就是「无法开拓灵峰」）。改为按 discipleId 反查其 tileId，与规则口径一致。
+	found_peak.tooltip_text = "在弟子当前所在格开辟灵峰（需金丹以上、该格无归属、灵力足够）"
+	found_peak.pressed.connect(func() -> void:
+		var tile_id: String = _disciple_tile_id(selected_disciple_id)
+		if tile_id.is_empty():
+			_set_selection("未找到该弟子所在格，无法开辟灵峰")
+			return
+		Session.request_found_spirit_peak(selected_disciple_id, tile_id))
 	unit_list.add_child(found_peak)
 	# 撤退 / 驻守 / 传送
 	unit_list.add_child(_city_section_label("机动"))

@@ -52,7 +52,12 @@ func _ready() -> void:
 	var rig: Node3D = session.get("camera_rig") as Node3D
 	var camera: Camera3D = rig.get("camera") as Camera3D
 	check(camera.projection == Camera3D.PROJECTION_ORTHOGONAL, "相机为正交投影")
-	check(camera.rotation_degrees.is_equal_approx(Vector3(-45.0, 45.0, 0.0)), "Godot 相机锁 yaw45 pitch-45 俯看")
+	# 取景朝向以 `CameraRig` 常量为唯一权威：R10 起改为「偏航 0 + 俯角 50°」的 Civ VI 同款
+	# （网格行沿屏幕水平方向），原先的 yaw45 会把六边形网格斜成菱形。
+	check(camera.rotation_degrees.is_equal_approx(
+		Vector3(CameraRig.PITCH_DEGREES, CameraRig.YAW_DEGREES, 0.0)),
+		"相机锁 Civ VI 朝向（yaw %.0f / pitch %.0f）" % [CameraRig.YAW_DEGREES, CameraRig.PITCH_DEGREES])
+	check(is_zero_approx(CameraRig.YAW_DEGREES), "网格正对镜头（偏航 0），不斜成菱形")
 	var cursor: Vector2 = Vector2(580.0, 340.0)
 	var anchor: Vector3 = rig.call("ground_point", cursor)
 	rig.call("zoom_at", cursor, 0.8)

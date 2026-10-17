@@ -57,6 +57,10 @@ func _ready() -> void:
 	# 让远景/装饰/泼墨转场与 HUD 布局稳定下来再截。
 	for _frame: int in range(WARMUP_FRAMES):
 		await get_tree().process_frame
+	var shot_camera: Camera3D = (session.get("camera_rig") as Node).get("camera") as Camera3D
+	if shot_camera != null:
+		print("WORLDSHOT_CAMERA size=%.2f pos=%s rot=%s" % [
+			shot_camera.size, str(shot_camera.global_position), str(shot_camera.rotation_degrees)])
 	await RenderingServer.frame_post_draw
 
 	DirAccess.make_dir_recursive_absolute("res://outputs")
@@ -79,6 +83,12 @@ func _ready() -> void:
 	await _play_one_turn(world, session)
 	# 选中己方首个弟子：让战斗界面/单位卡有真实数据（战力/射程/移动力）。
 	await _select_first_disciple(world, session)
+	# 选中态实拍：确认「单位看得见 + 可达格高亮看得见」（玩家报的「看不到单位/无法移动」）。
+	await RenderingServer.frame_post_draw
+	var selected_image: Image = get_viewport().get_texture().get_image()
+	if selected_image != null:
+		var selected_path: String = ProjectSettings.globalize_path("res://outputs/ui_preview_selected.png")
+		print("WORLDSHOT_SAVED: %s code=%d" % [selected_path, selected_image.save_png(selected_path)])
 
 	# 卷轴界面逐个实拍（每个界面先开、等布局稳定、再关）。
 	await _capture_screen(world, session, "ui_preview_turn_summary.png", "open_turn_summary", "close_turn_summary", true)
@@ -103,6 +113,11 @@ func _play_one_turn(world: Node3D, session: Node) -> void:
 		await get_tree().process_frame
 	print("WORLDSHOT_TURN: %d → %d，结算卷轴可见=%s" % [
 		turn_before, _turn_of(session), str(world.call("turn_summary_visible"))])
+	# 结算卷轴是模态层，会盖住地图：后续「选中态」与各面板实拍前必须先收起，
+	# 否则拍到的是卷轴而不是世界（也顺带验证了「返回 · 继续经营」这条新出口）。
+	world.call("close_turn_summary")
+	for _frame: int in range(4):
+		await get_tree().process_frame
 
 
 func _turn_of(session: Node) -> int:
@@ -125,8 +140,34 @@ func _select_first_disciple(world: Node3D, session: Node) -> void:
 		world.call("select_disciple", disciple_id)
 		for _frame: int in range(30):
 			await get_tree().process_frame
-		print("WORLDSHOT_SELECT: %s（选中弟子 %s）" % [
-			str((disciples[0] as Dictionary).get("name", "")), disciple_id])
+		print("WORLDSHOT_SELECT: %s（选中弟子 %s）颜色=%s" % [
+			str((disciples[0] as Dictionary).get("name", "")), disciple_id, str(sect.get("color", "<无>"))])
+		# 诊断：选中后「详情是否到齐 / 可达格数 / 开峰按钮是否可用」——
+		# 玩家报的「无法移动 / 无法开拓灵峰」都落在这三个量上。
+		var panel: Node = world.get("unit_panel")
+		print("WORLDSHOT_UNIT: panel_visible=%s detail_found=%s reachable=%d move_mode=%s" % [
+			str(panel != null and panel.visible),
+			str(bool((world.get("disciple_detail") as Dictionary).get("found", false))),
+			int((world.get("reachable_ids") as Array).size()),
+			str(bool(world.get("move_mode")))])
+		# 近景特写：把相机推到该弟子所在格，确认单位体量、宗门配色、选中环是否真的看得见。
+		var rig: Node = get_node("/root/Session").get("camera_rig")
+		var shot_cam: Camera3D = rig.get("camera") as Camera3D
+		if shot_cam != null:
+			var tile_id: String = str((disciples[0] as Dictionary).get("tileId", ""))
+			var tile: Dictionary = (session.get("current_view") as Dictionary).get("tiles", {}).get(tile_id, {})
+			if not tile.is_empty():
+				rig.call("pan_to", Hex.to_world(int(tile.get("q", 0)), int(tile.get("r", 0))))
+			var keep_size: float = shot_cam.size
+			shot_cam.size = 6.0
+			for _frame: int in range(6):
+				await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			var zoom_image: Image = get_viewport().get_texture().get_image()
+			if zoom_image != null:
+				var zoom_path: String = ProjectSettings.globalize_path("res://outputs/ui_preview_zoom.png")
+				print("WORLDSHOT_SAVED: %s code=%d" % [zoom_path, zoom_image.save_png(zoom_path)])
+			shot_cam.size = keep_size
 		return
 
 
