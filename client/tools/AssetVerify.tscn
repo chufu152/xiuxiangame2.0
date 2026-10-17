@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="Runner"]
+script/source = "extends Node
+func _ready() -> void:
+	var verify_script: GDScript = load(\"res://tools/AssetVerify.gd\")
+	if verify_script == null or not verify_script.can_instantiate():
+		printerr(\"ASSETVERIFY_FAIL 验收脚本未能编译\")
+		get_tree().quit(1)
+		return
+	var verify_node: Node = Node.new()
+	verify_node.set_script(verify_script)
+	add_child(verify_node)
+"
+
+[node name="AssetVerify" type="Node"]
+script = SubResource("Runner")

@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="Runner"]
+script/source = "extends Node
+func _ready() -> void:
+	var gen_script: GDScript = load(\"res://tools/AssetGen.gd\")
+	if gen_script == null or not gen_script.can_instantiate():
+		printerr(\"ASSETGEN_FAIL 生成器脚本未能编译\")
+		get_tree().quit(1)
+		return
+	var gen_node: Node = Node.new()
+	gen_node.set_script(gen_script)
+	add_child(gen_node)
+"
+
+[node name="AssetGen" type="Node"]
+script = SubResource("Runner")

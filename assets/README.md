@@ -65,6 +65,37 @@ assets/
 3. **缺失资源不崩溃**：模型回退水墨灰阶几何体 + 文字标签，贴图回退色块，打印 `WARN`。
 4. 支持开发期 F5 热重载 manifest。
 
+## 最小水墨资源包（R8 前置交付）
+
+`assets/art/default/` 下的实体文件由**程序化生成器**产出，覆盖 ROADMAP §3.2 的八类清单（共 52 个文件）：
+
+| 类别 | 逻辑 ID | 数量 | 文件 |
+|---|---|---|---|
+| 基底顶面 | `terrain.base.{LING_FIELDS,SPIRIT_PLAIN,BARREN}` | 3 | `terrain/top_*.png` |
+| 海拔侧面 + 山体顶面 | `terrain.relief.{FLAT,HILL,MOUNTAIN}_SIDE`、`MOUNTAIN_TOP` | 4 | `terrain/side_*.png`、`terrain/mountain_peak.png` |
+| 河流 / 险地 | `terrain.river`、`terrain.danger` | 2 | `terrain/river.png`、`terrain/danger.png` |
+| 三态迷雾 | `terrain.fog.{RICE_PAPER,INK_MAP}` | 2 | `terrain/fog_*.png`（第三态=实景，走正常材质） |
+| 兵种 | `unit.*` | 10 | `units/*.glb` |
+| 建筑 | `building.*` | 10 | `buildings/*.glb` |
+| 图标 | `resource.*`、`realm.*`、`faction.*` | 21 | `icons/*.png` |
+
+**未覆盖**（`AssetLibrary` 仍回退占位并 WARN 一次，属计划内）：`districts`（6）、`improvements`（8）、`features`/`node`（8）、`audio`（1）、`fonts`（2）。
+
+### 再生成与核验
+
+```powershell
+$godot = "C:\Users\Administrator\godot\Godot_v4.4.1-stable_win64_console.exe"
+& $godot --headless --path client res://tools/AssetGen.tscn      # 重新生成 52 个文件（ASSETGEN_OK）
+& $godot --headless --path client res://tools/AssetVerify.tscn   # 断言最小包零 WARN（ASSETVERIFY_OK）
+& $godot --headless --path client res://tools/AssetPreview.tscn  # 输出 outputs/r8_asset_*.png 供人工核验
+```
+
+- `AssetGen`：**确定性**（固定 seed 的哈希值噪声，不读全局随机），零外部依赖，只写 `assets/art/default/`。
+- `AssetVerify`：用客户端 `AssetLibrary` 逐 ID 取资源，最小包必须 `covered=52 warned=0`；同时校验 20 个模型的几何（非退化、底面锚 `y≈0`、单位 ≤1.4 高、建筑 ≤1.75 宽）。
+- `AssetPreview`：CPU 等距光栅化，把 20 个模型 / 21 个图标 / 11 张材质拼成联络表，写到 `outputs/`（不入库）。
+
+> 真实美术介入时，**直接用同名文件覆盖即可**——`manifest.json` 与代码都不用改。生成器是「可复现的最小基线」，不是最终美术方案。
+
 ## 美术规范（默认皮肤包）
 
 - 风格：简化手绘水墨、青绿山水 + 留白云雾；主色青、白、浅金；建筑斗拱飞檐、依山半嵌；功能色读图（丹房红、药田绿、地形底色）。
