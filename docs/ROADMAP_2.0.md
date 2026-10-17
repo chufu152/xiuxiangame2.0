@@ -12,11 +12,11 @@
 ### 1.1 总体位置
 
 ```
-R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5 ✅   ┃ R6 ✅   ┃ R7 ✅ ← 当前位置 ┃ R8 · R9
-骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 道统与修炼 ┃ 兵种与战斗 ┃ 探索/政令/自动化 ┃ 任命/渡劫/AI/胜负/存档 ┃ 未开始
+R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5 ✅   ┃ R6 ✅   ┃ R7 ✅   ┃ R8 🔶 ← 当前位置 ┃ R9
+骨架完成 ┃ 地图开局 ┃ R2 前置修复 ┃ 回合/移动/视野 ┃ 经济与城市 ┃ 道统与修炼 ┃ 兵种与战斗 ┃ 探索/政令/自动化 ┃ 任命/渡劫/AI/胜负/存档 ┃ 表现与UI打磨（前置资源包已交付 `8f96a6e`） ┃ 未开始
 ```
 
-**当前位置：R7「任命/渡劫飞升/反应式 AI/胜负评分/存档读档/胜利择一」已完成 → 下一个里程碑 R8「表现与 UI 打磨」。**
+**当前位置：R8「表现与 UI 打磨」进行中**——§3.2 的硬门禁「最小水墨资源包」已交付并验收（`ASSETVERIFY_OK covered=52 warned=0`，提交 `8f96a6e`），正式打磨项已开工。
 
 > R7 之后 **69 条命令 + `ping` 全部落地**（`implemented_commands()` 共 70 项，PROTOCOL §1 已无「待实现」），
 > 故 R8 的任务是「给每一条已实现命令补 UI 入口 + 打磨表现」，不再新增命令。
@@ -132,6 +132,17 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
   8. **主要 UI 图标**（`resource.*` 13 项 + `realm.*` 5 项 + `faction.*` 3 项）
 - **排期**：该资源包的具体制作在 **R7 完成后、R8 启动前单独立项**（含美术风格与工作量评估），**不属于任何现有里程碑**，也不在 R1.5 范围内。
 - **验收方式**：替换 `assets/art/default/` 下实体文件后，`activePack=default` 下 `AssetLibrary` 不再对上述 ID 触发 WARN；R8 打磨项基于真资产进行。
+
+#### 3.2.1 交付记录（✅ 已完成，`8f96a6e`）
+
+- **交付内容**：`assets/art/default/` 下 **52 个实体文件**，覆盖上述八类清单全部 ID：
+  - 地形材质 11 张（3 基底顶面 + 3 海拔侧面 + `mountain_peak` + `river` + `danger` + 2 张迷雾）；
+  - 兵种模型 10 个、建筑模型 10 个（`.glb`，原点锚在底面中心，单位 ≤1.4 高 / 建筑 ≤1.75 宽，均落在半径 1.0 的六边形格内）；
+  - UI 图标 21 张（`resource.*` 13 + `realm.*` 5 + `faction.*` 3，64×64 透明底、3×3 超采样）。
+- **生成方式**：`client/tools/AssetGen.gd`（`res://tools/AssetGen.tscn`）**程序化生成**——固定 seed 的哈希值噪声 + 低模图元拼装，**零外部依赖、确定性可复现**。真实美术介入时同名文件覆盖即可，`manifest.json` 与代码均无需改动。
+- **验收工具**：`client/tools/AssetVerify.gd` 用客户端 `AssetLibrary` 逐 ID 取资源，输出 **`ASSETVERIFY_OK covered=52 warned=0`**；`client/tools/AssetPreview.gd` 用 CPU 等距光栅化把模型/图标/材质拼成联络表（`outputs/r8_asset_*.png`，不入库）供人工核验。
+- **仍未覆盖**（计划内，`AssetLibrary` 继续回退占位并 WARN 一次，裁决二）：`districts` 6、`improvements` 8、`features`/`node` 8、`audio` 1、`fonts` 2 —— 共 25 个 ID。
+- **回归**：`tools/check.ps1` 仍 **147/147 `CHECK_RESULT=OK`**（23 阶段，R0–R7 断言无回归）；无残留 godot 进程、无 `.java`。
 
 ---
 
