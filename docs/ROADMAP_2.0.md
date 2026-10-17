@@ -41,6 +41,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
   - R3/R4 补充（三流派特性）`1c82f68 feat(faction): implement three-faction traits (build speed, sub-peak cost, bloodline cultivation)`（见 §4.5）
   - R3/R4 补充收尾 `44ba556 docs(faction): record delivered commit hash for three-faction traits`
   - R5 `442f701 feat(r5): ten unit classes, combat preview and resolution, zoc, teleport, garrison, reclass promote`（见 §4.4）
+  - R6 `a0c72c8 feat(r6): exploration ji yuan mi jing, policy government cards, automation toggles`（见 §4.6）
 
 ### 1.2 已交付并验证的资产
 
@@ -273,7 +274,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 
 **Step 4 · 客户端表现**：`Session` 16 条 `request_*` 包装 + 5 个信号 + `_is_r6_command`；`World` 三个左侧竖排面板（探索 / 政令 / 自动化）互斥显示，TopBar 追加「政令」「自动」入口。**客户端零规则**：成功率、槽位、`blocker`、自动化摘要全部由服务端算好。**相机不重置**：`R6ClientTest` 逐项断言 transform/size 不变。
 
-**Step 5 · 验收**：`R6_PASS checks=288`（11 个测试组，含 8 步命令脚本的确定性双跑逐字节比对）、`R6_CLIENT_RESULT=OK checks=59`；`R1 79458`/`R2 220`/`R3 297`/`R4 174`/`R5 453`/`R1_CLIENT 58`/`R2_CLIENT 36`/`R3_CLIENT 43`/`R4_CLIENT 69`/`R5_CLIENT 95` 无回归；`tools/check.ps1` 扩为 **21 阶段 130/130**（新增 `[17/21]` 服务端 R6、`[18/21]` 客户端 R6，原仓库扫描/协议契约顺延为 `[19/21]`/`[20/21]`），`check_protocol.ps1` **35/35**、69 分组点数不变。
+**Step 5 · 验收**：`R6_PASS checks=288`（11 个测试组，含 8 步命令脚本的确定性双跑逐字节比对）、`R6_CLIENT_RESULT=OK checks=59`；`R1 79458`/`R2 220`/`R3 297`/`R4 174`/`R5 453`/`R1_CLIENT 58`/`R2_CLIENT 36`/`R3_CLIENT 43`/`R4_CLIENT 69`/`R5_CLIENT 95` 无回归；`tools/check.ps1` 扩为 **21 阶段 130/130**（新增 `[17/21]` 服务端 R6、`[18/21]` 客户端 R6，原仓库扫描/协议契约顺延为 `[19/21]`/`[20/21]`），`check_protocol.ps1` **35/35**、69 分组点数不变。已提交 `a0c72c8` 并推送。
 
 **R5 遗留回填情况**（R6 提示词要求的两项 + 一项自查）
 - ✅ `Sect.miJingExploredTotal` 由 `exploreMiJing` 递增 → 成就 `boost_first_mijing` **已可达**（§11.1 #23 语义按 1.0 口径落地）；
