@@ -14,6 +14,14 @@ extends CanvasLayer
 ##   - 事件：回包信封里的 `events[]`（纯字符串），由 `Session.events_received` 累积。
 ##
 ## 不触碰相机（相机铁律），不改任何玩法状态。
+##
+## **关闭路径**：卷轴是带全屏遮罩（`MOUSE_FILTER_STOP`）的模态层，弹出期间世界不可点。
+## 因此它必须自带出口，否则玩家除了「下一回合」什么都点不到——这正是 R10 玩家反馈的
+## 「点完下个回合之后界面只能点下个回合」。三个出口：点遮罩、点「返回 · 继续经营」、Esc
+## （Esc 走 `World._close_all_panels()`，那里也登记了本卷轴）。
+
+## 玩家主动关闭卷轴（点遮罩 / 点返回按钮）。`World` 连接后收起。
+signal close_requested
 
 ## 结算卷轴尺寸。高度取 470 而不是更高：结算内容通常只有 4~6 行资源 + 2~3 张事件卡，
 ## 卷轴再高下半幅就会空着，看着像渲染没画完。
@@ -30,6 +38,8 @@ var event_column: VBoxContainer = null
 var timeline_column: VBoxContainer = null
 var net_label: Label = null
 var next_button: Button = null
+## 次要出口：只收起卷轴，不推进回合。
+var close_button: Button = null
 var title_label: Label = null
 
 var _assets: AssetLibrary = null
@@ -46,6 +56,8 @@ func setup(assets: AssetLibrary) -> void:
 	_dim.color = Color(0.06, 0.09, 0.08, 0.22)
 	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	# 点卷轴以外的暗底即关闭（模态层的通用习惯，也给不想找按钮的玩家留一条路）。
+	_dim.gui_input.connect(_on_dim_input)
 	add_child(_dim)
 
 	root = ScrollFrame.new()
@@ -114,7 +126,38 @@ func setup(assets: AssetLibrary) -> void:
 	next_button.pressed.connect(_on_next_pressed)
 	footer.add_child(next_button)
 
+	# 次要出口：**不推进回合**，只收起卷轴回到山河图。
+	# 主操作仍是「下一回合」（对齐参考图的青玉药丸），但玩家必须有办法留在当前回合继续经营。
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(14, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	footer.add_child(spacer)
+	close_button = Button.new()
+	close_button.name = "CloseButton"
+	close_button.text = "返回 · 继续经营"
+	close_button.tooltip_text = "收起结算卷轴，留在本回合继续操作（Esc 同效）"
+	close_button.custom_minimum_size = Vector2(164, 40)
+	UiTheme.style_plain(close_button)
+	close_button.pressed.connect(_on_dismiss)
+	footer.add_child(close_button)
+
 	visible = false
+
+
+## 点暗底：左键按下即关闭。
+func _on_dim_input(event: InputEvent) -> void:
+	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if mouse == null or not mouse.pressed or mouse.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_on_dismiss()
+
+
+## 收起卷轴并通知 `World`。重复调用安全（已隐藏时直接返回）。
+func _on_dismiss() -> void:
+	if not visible:
+		return
+	visible = false
+	close_requested.emit()
 
 
 ## 建一栏：标题带 + 可滚动内容区，返回内容容器。

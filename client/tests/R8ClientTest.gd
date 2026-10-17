@@ -148,6 +148,29 @@ func _ready() -> void:
 	check(project_text.contains('run/main_scene="res://scenes/MainMenu.tscn"'),
 		"主场景仍是 MainMenu.tscn（拨号点与入口脚本一致）")
 
+	# ⑬ 回合结算卷轴必须自带出口（R10）：它是 `MOUSE_FILTER_STOP` 的全屏遮罩模态层，
+	# 弹出期间世界不可点。此前它唯一的按钮是「下一回合」，`close_turn_summary()` 全仓只有
+	# 截图工具在调，Esc 的 `_close_all_panels()` 也没登记它——玩家点完一回合就被永久困住。
+	world.call("open_turn_summary")
+	await get_tree().process_frame
+	check(bool(world.call("turn_summary_visible")), "结算卷轴可打开")
+	var summary: Node = world.get("turn_summary") as Node
+	check(summary != null and summary.get("close_button") != null, "结算卷轴有「返回 · 继续经营」按钮")
+	var dim: ColorRect = summary.get_node_or_null("Dim") as ColorRect
+	check(dim != null, "结算卷轴有全屏遮罩节点 Dim")
+	if dim != null:
+		var click: InputEventMouseButton = InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = true
+		dim.gui_input.emit(click)
+		await get_tree().process_frame
+	check(not bool(world.call("turn_summary_visible")), "点遮罩可关闭结算卷轴")
+	world.call("open_turn_summary")
+	await get_tree().process_frame
+	world.call("_close_all_panels")
+	await get_tree().process_frame
+	check(not bool(world.call("turn_summary_visible")), "Esc（_close_all_panels）可关闭结算卷轴")
+
 	world.queue_free()
 	world = null
 	await get_tree().process_frame

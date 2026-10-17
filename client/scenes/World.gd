@@ -4455,6 +4455,8 @@ func _close_all_panels() -> void:
 	close_saves_panel()
 	close_gameover_panel()
 	close_choice_panel()
+	# 回合结算卷轴是带全屏遮罩的模态层，必须能被 Esc 收起。
+	close_turn_summary()
 	if settings_panel != null:
 		settings_panel.close_panel()
 	if guide_overlay != null and guide_overlay.open:
@@ -4641,6 +4643,9 @@ var _summary_auto_turn: int = -1
 func _build_turn_summary() -> void:
 	turn_summary = TurnSummary.new()
 	turn_summary.setup(Session.assets)
+	# 卷轴自带三个出口（点遮罩 / 返回按钮 / Esc）。前两个走本信号，第三个走
+	# `_close_all_panels()`——两处都必须接上，否则模态遮罩会把玩家困在卷轴上。
+	turn_summary.close_requested.connect(close_turn_summary)
 	add_child(turn_summary)
 
 
