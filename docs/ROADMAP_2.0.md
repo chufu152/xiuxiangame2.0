@@ -45,7 +45,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
   - R3/R4 补充收尾 `44ba556 docs(faction): record delivered commit hash for three-faction traits`
   - R5 `442f701 feat(r5): ten unit classes, combat preview and resolution, zoc, teleport, garrison, reclass promote`（见 §4.4）
   - R6 `a0c72c8 feat(r6): exploration ji yuan mi jing, policy government cards, automation toggles`（见 §4.6）
-  - R7 `feat(r7): appointment bloodline, tribulation ascension, reactive ai, victory score, save load, victory choice`（见 §4.7）
+  - R7 `756e545 feat(r7): appointment bloodline, tribulation ascension, reactive ai, victory score, save load, victory choice`（见 §4.7）
 
 ### 1.2 已交付并验证的资产
 
@@ -362,7 +362,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 **Step 5 · 客户端表现**
 `Session` 14 条 `request_*` 包装 + 5 个信号（`victory_progress_received` / `victory_choice_received` / `saves_received` / `await_input` / `r7_result_received`）+ `events_received`（回包 `events[]` 进侧栏事件栏）+ `_is_r7_command`；`NetClient` 的 `server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）。`World` 新增四块 UI：**胜利进度面板**（三路线 `stage`/`ratio`/`summary`/`score` + 逐 goal 9 键行 + 择定按钮）、**存档面板**（槽 0–4，存入/读取/listSaves 刷新）、**结局屏**（`winType`/`winnerSectId`/本宗达成路线/覆灭判定 + 待择按钮）、**待抉择弹窗**（居中 `layer=5`，按 `options[].index` 发 `resolveChoice`）、**事件栏**（侧栏，保留 12 条）；弟子详情面板追加「任命峰主/长老/宗主」「渡劫飞升」四个入口。`MainMenu` 追加「读取存档」（`listSaves` → `loadGame`，与 `newGame` 共用 `game_started` 路径）。
 
-**Step 6 · 验收**：`R7_PASS checks=211`（12 个测试组，含 `outputs/r7_authority_a|b.json` 双跑 SHA256 相同）、`R7_IMPLEMENTED=70`、`R7_CLIENT_RESULT=OK checks=77`；回归 `R1 79458` / `R2 220` / `R3 297` / `R4 174` / `R5 453` / `R6 317`、客户端 `R1 58` / `R2 36` / `R3 43` / `R4 69` / `R5 95` / `R6 59` 全绿；`tools/check.ps1` 扩为 **23 阶段**（新增 `[19/23]` 服务端 R7、`[20/23]` 客户端 R7，原仓库扫描/协议契约顺延为 `[21/23]`/`[22/23]`），`check_protocol.ps1` **38/38**（新增「已实现 = 70」全量断言）、69 分组点数不变。
+**Step 6 · 验收**：`R7_PASS checks=211`（12 个测试组，含 `outputs/r7_authority_a|b.json` 双跑 SHA256 相同）、`R7_IMPLEMENTED=70`、`R7_CLIENT_RESULT=OK checks=77`；回归 `R1 79458` / `R2 220` / `R3 297` / `R4 174` / `R5 453` / `R6 317`、客户端 `R1 58` / `R2 36` / `R3 43` / `R4 69` / `R5 95` / `R6 59` 全绿；`tools/check.ps1` 扩为 **23 阶段**（新增 `[19/23]` 服务端 R7、`[20/23]` 客户端 R7，原仓库扫描/协议契约顺延为 `[21/23]`/`[22/23]`），`check_protocol.ps1` **38/38**（新增「已实现 = 70」全量断言）、69 分组点数不变。已提交 `756e545` 并推送。
 
 **九条裁决的落地对照**
 
