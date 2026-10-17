@@ -460,6 +460,30 @@ func _test_cultivation_breakthrough() -> void:
 	_check(not bool(blocked["advanced"]), "灵力不足时修炼不推进")
 	_grant(sect)
 
+	# 三流派特性（PRD §1.1）：家族流血脉弟子 ×1.4，本宗有祖祠再 ×1.25；非血脉弟子不受影响
+	sect.resources["prestige"] = 0
+	var jia: CommandDispatcher = _new_game_faction("400016", Enums.FactionType.JIA_ZU)
+	var jia_sect: Sect = jia.state.sects[0]
+	var jia_state: GameState = jia.state
+	jia_sect.resources["prestige"] = 0
+	var blood: Disciple = jia_sect.disciples[1]
+	var plain: Disciple = jia_sect.disciples[2]
+	blood.bloodLine = true
+	plain.bloodLine = false
+	var jia_base: float = float(cultivation["baseSpeed"]) * (1.0 + float(cultivation["rootGradeBonusPerGrade"]) * float(blood.rootGrade))
+	var blood_speed: float = DiscipleRules.cultivation_speed(jia_state, _config, blood)
+	_check(is_equal_approx(blood_speed, jia_base * (1.0 + float(_config["faction"]["jiaZu"]["bloodLineSpeedBonus"]))), "家族流血脉弟子修炼 +%d%%" % int(round(float(_config["faction"]["jiaZu"]["bloodLineSpeedBonus"]) * 100.0)))
+	_check(is_equal_approx(FactionRules.cultivation_multiplier(_config, jia_sect, plain), 1.0), "家族流非血脉弟子无血脉修炼加成")
+	var zu_ci_peak: SpiritPeak = _capital(jia_sect)
+	zu_ci_peak.buildings["building_zu_ci_test"] = {"id": "building_zu_ci_test", "type": "ZU_CI", "name": "祖祠", "level": 1, "districtId": ""}
+	var with_zu_ci: float = DiscipleRules.cultivation_speed(jia_state, _config, blood)
+	_check(is_equal_approx(with_zu_ci, jia_base * (1.0 + float(_config["faction"]["jiaZu"]["bloodLineSpeedBonus"])) * (1.0 + float(_config["faction"]["jiaZu"]["zuCiCultivationBonus"]))), "家族流祖祠对血脉弟子再 +%d%%" % int(round(float(_config["faction"]["jiaZu"]["zuCiCultivationBonus"]) * 100.0)))
+	_check(FactionRules.sect_building_count(jia_sect, "ZU_CI") == 1, "sect_building_count 跨灵峰统计祖祠")
+	# 血脉弟子在**宗门流**下不享受家族加成（特性按流派归属，不按弟子属性）
+	disciple.bloodLine = true
+	_check(is_equal_approx(FactionRules.cultivation_multiplier(_config, sect, disciple), 1.0), "宗门流的血脉弟子无家族血脉加成")
+	disciple.bloodLine = false
+
 	# 修为满 → breakthroughPending
 	var cap: float = float(cultivation["progressCapPerRealm"][disciple.realm])
 	disciple.cultivationProgress = cap - 1.0

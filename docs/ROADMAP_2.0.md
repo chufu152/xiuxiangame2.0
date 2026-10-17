@@ -57,7 +57,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅ ← 当�
    - 该行为已有测试覆盖：`client/tests/R1ClientTest.gd` L84–96 断言「模型缺失回退灰阶几何与文字」「同一缺失 logicalID 只 WARN 一次」「缺失贴图回退纯色块」「缺失材质安全回退」「无效文本字体安全回退」「F5 热重读 manifest 并使缓存失效」，并由 `check.ps1` `[9/14]` 断言 `同一缺失 logicalID 只 WARN 一次`。
    - R3 的灵峰/建筑/区域同样只走 `SectView` 占位几何（`DISTRICT_COLORS` 色块 + `Label3D` 文字 + 堆叠方块），未引入真资产。
    - 真资源排期见 §三「最小水墨资源包」前置约束。
-2. **协议契约仍有 11 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → **R4 未增不减仍 11 处**）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层。**不阻塞 R5**，随对应里程碑逐条补齐。
+2. **协议契约仍有 12 处 `TODO(需核对)`**（`PROTOCOL_2.0.md` §11.2；R2 时 8 处 → R3 增 3 处 → R3 收尾消 1 增 1 仍 11 处 → R4 未增 → **R3/R4 收尾补做 +1 为 12 处**）：`TrainingResult`/`AppointmentResult`/`ExploreResult`/`PolicyResult`/`NodeInfo` 等实体形状 1.0 未展开；`querySpiritPeakBlocker` 未在 69 条清单内；R3 遗留：`ImprovementRules.apply_pillage()` 的接线点（R2 移动 / R5 攻击）、敌方可见弟子的 `assignedPeakId` 未剥离、灵泉衰减/修缮恢复的生效口径（归 R6 灾劫）；**R4 后新增**：三流派特性中未能落地的键（§11.2 #11，`guoJia.expansionCostReduction`/`diDuGrowthBonus` 缺可计算口径）。**已消项**：① 原「`city` 配置缺丘陵石+1 / 河流 foodBonus」已在 R3 收尾回填（`map.relief[].yield` + `map.river.foodBonus`，见 §4.1.1）；② R3 的「道法门控改良不可建」已在 R4 回填（`ImprovementRules._has_unlocked_dao` 改查 `unlockedDaoIds`）。**R4 另登记两项已核实结论**（非 `TODO`）：§11.1 #23 成就「初探秘境」语义修正、§11.2 #10 前期道点断层；**R3/R4 收尾另登记** §11.1 #24 三流派特性落地口径（6 项已实现）。**不阻塞 R5**，随对应里程碑逐条补齐。
 3. **R5–R9 提示词已预生成**（草案）；`R5_*.md` 起进入前须按当时最新代码/config 重新核对文件锚点与数值。
 
 ### 1.4 前置条件核验（全部就绪 ✅）
@@ -203,6 +203,28 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅ ← 当�
 **Step 4 · 验收与提交**
 - 扩展 `tools/check.ps1`：机缘/秘境成功率与冷却、战斗结算与掠夺、`boost_first_mijing`/`boost_first_win` 触发、确定性。
 - 全绿后：`git add -A && git commit -m "feat(r5): ..." && git push origin HEAD:main`。
+
+### 4.5 R3/R4 补充完善：三流派特性（交付后补做）
+
+**怎么发现的**：R4 交付后对 `daoTree`/`disciple`/`building`/`economy`/`appointment`/`warfare`/`faction`/`city` 八个配置块重跑死键审计，发现 **`faction` 块此前从未被审计过**（R3 收尾只覆盖了 `city`/`economy`/`road`/`improvement`/`spiritPeak`/`building`/`qiYun`）。审计结果：`faction` 46 个叶子键中只有 3 个被读过（`researchSpeedBonus`/`qiYunBonus`/`bloodDaoCostReduction`），而 PRD §1.1 明确写着的「营造 +30%、副峰花费 −20%、血脉修炼 +40%、祖祠修炼 +25%、建峰花费 +50%」全部未实现。
+
+**关键判断**：回查 1.0 源码，这些键在 `GameConfig.java` 里**只有 getter/setter，业务代码零引用** —— 即 1.0 也从未实现流派特性。因此这不是「1.0 回填」，而是**按 PRD §1.1 首次实现**。落地前先排除了两类陷阱：
+
+- **不叠乘开峰造价**：`spiritPeak.foundCost` 表已内建流派差异（宗门 500 / 家族 800 / 国家 350，其中 800=500×1.6、350=500×0.7），故 `jiaZu.foundCostPenalty`(0.6)、`guoJia.foundCostReduction`(0.3) 是**冗余键**，再乘一次会双重计费。
+- **不臆造口径**：`guoJia.expansionCostReduction`（「扩张 −20%」未定义扩张指建区还是气运吞并）、`guoJia.diDuGrowthBonus`（「帝都人口增长 +50%」但 `building` 侧无住房/增长配置键）暂不实现，登记 §11.2 #11。
+
+**交付**：新增 `server/scripts/rules/FactionRules.gd` 作为流派特性**唯一出口**（`build_turns` / `building_cost` / `cultivation_multiplier` / `sect_building_count`），接入 5 处：
+1. `CityAction.construct_building`（造价 + 工期）
+2. `CityAction.open_cave` / `fortify_peak` / `found_district`（工期）
+3. `CityRules.can_build`（灵力够不够按**折后**造价判定，否则 blocker 与实际扣款不一致）
+4. `CityAction.query_build_options`（`cost` 折后价、`baseCost` 配置原值、`turns` 折后工期）
+5. `DiscipleRules.cultivation_speed`（家族血脉 ×1.4，有祖祠再 ×1.25）
+
+`ConfigValidator` 增 9 个 `faction.*` 键的类型校验。
+
+**验收**：`R3_PASS 279 → 297`（新增 `_test_faction_traits` 18 项：三流派造价/工期纯函数断言、家族与宗门端到端扣款、`queryBuildOptions` 双价字段）；`R4_PASS 169 → 174`（家族血脉/祖祠/非血脉/宗门流血脉弟子共 5 项）；`R1 79458`/`R2 220`/`R3_CLIENT 43`/`R4_CLIENT 69` 无回归。
+
+**顺带修正的既有测试口径**：`R3Test._test_buildings` 与 `_test_districts` 原先直接拿 `building.costs`/`building.turns` 当期望值，流派特性落地后必然失败。已改为**在测试内用 config + PRD 口径独立复算**（不调用 `FactionRules`），避免「用被测函数当自己的 oracle」。
 
 ---
 

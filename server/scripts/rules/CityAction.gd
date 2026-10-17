@@ -124,8 +124,9 @@ static func construct_building(state: GameState, config: Dictionary, peak_id: St
 	if not bool(check["allowed"]):
 		return fail_result(str(check["blocker"]))
 	var building: Dictionary = config["building"]
-	var cost: int = int(building["costs"][building_type])
-	var turns: int = int(building["turns"][building_type])
+	# 三流派特性（PRD §1.1）：宗门流副峰省钱 + 营造加速；家族流营造更贵。唯一出口 `FactionRules`。
+	var cost: int = FactionRules.building_cost(config, sect, building_type, int(building["costs"][building_type]))
+	var turns: int = FactionRules.build_turns(config, sect, int(building["turns"][building_type]))
 	var material_cost: Dictionary = building["materialCosts"].get(building_type, {})
 	var materials: Dictionary = sect.resources.get("materials", {})
 	_set_power(sect, _power(sect) - cost)
@@ -161,7 +162,7 @@ static func open_cave(state: GameState, config: Dictionary, peak_id: String, dis
 		return fail_result("弟子需身处该灵峰方可分配洞府")
 	var building: Dictionary = config["building"]
 	var cost: int = int(building["caveCost"])
-	var turns: int = int(building["caveTurns"])
+	var turns: int = FactionRules.build_turns(config, sect, int(building["caveTurns"]))
 	if _power(sect) < cost:
 		return fail_result("灵力不足(%d/%d)" % [_power(sect), cost])
 	_set_power(sect, _power(sect) - cost)
@@ -182,7 +183,7 @@ static func fortify_peak(state: GameState, config: Dictionary, peak_id: String) 
 		return fail_result("灵峰所属宗门不存在")
 	var building: Dictionary = config["building"]
 	var cost: int = int(building["fortifyCost"])
-	var turns: int = int(building["fortifyTurns"])
+	var turns: int = FactionRules.build_turns(config, sect, int(building["fortifyTurns"]))
 	if _power(sect) < cost:
 		return fail_result("灵力不足(%d/%d)" % [_power(sect), cost])
 	_set_power(sect, _power(sect) - cost)
@@ -211,7 +212,7 @@ static func found_district(state: GameState, config: Dictionary, sect_id: String
 			return fail_result("该地块的区域正在兴建中")
 	var district_config: Dictionary = config["city"]["district"]
 	var cost: int = int(district_config["costs"][district_type_id])
-	var turns: int = int(district_config["turns"][district_type_id])
+	var turns: int = FactionRules.build_turns(config, sect, int(district_config["turns"][district_type_id]))
 	if _power(sect) < cost:
 		return fail_result("灵力不足(%d/%d)" % [_power(sect), cost])
 	_set_power(sect, _power(sect) - cost)
@@ -449,7 +450,9 @@ static func query_build_options(state: GameState, config: Dictionary, sect_id: S
 	var options: Array[Dictionary] = []
 	for building_type: String in Enums.Building.ALL:
 		var check: Dictionary = CityRules.can_build(state, config, _peak_of_sect(sect, building_type), building_type)
-		var cost: int = int(building["costs"].get(building_type, 0))
+		var base_cost: int = int(building["costs"].get(building_type, 0))
+		# `cost` 为按流派折扣/惩罚后的**实际**造价，`baseCost` 保留配置原值供 UI 对比。
+		var cost: int = FactionRules.building_cost(config, sect, building_type, base_cost)
 		var material_cost: Dictionary = building["materialCosts"].get(building_type, {})
 		var affordable: bool = power >= cost
 		for material: Variant in material_cost.keys():
@@ -462,8 +465,8 @@ static func query_build_options(state: GameState, config: Dictionary, sect_id: S
 			"factionOnly": str(building["factionOnly"].get(building_type, "")),
 			"allowed": bool(check["allowed"]),
 			"cost": cost,
-			"baseCost": cost,
-			"turns": int(building["turns"].get(building_type, 0)),
+			"baseCost": base_cost,
+			"turns": FactionRules.build_turns(config, sect, int(building["turns"].get(building_type, 0))),
 			"materialCost": material_cost.duplicate(true),
 			"affordable": affordable,
 		})

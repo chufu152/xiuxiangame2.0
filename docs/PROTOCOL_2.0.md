@@ -838,6 +838,8 @@
 | `sectId` | string | 是 | — | 宗门 id | 1.0 `PROTOCOL.md` §11.3 |
 
 - **result**：`{sectId, sectName, options:[{type, displayName, core, factionOnly, allowed, cost, baseCost, turns, materialCost{}, affordable}…]}`。
+  - `cost` / `turns` 为**按流派特性调整后的实际值**（宗门流副峰 −20%、营造 −30%；家族流建筑 +50%），
+    `baseCost` 保留 `building.costs` 配置原值供 UI 对比。`affordable` 亦按 `cost` 判定（见 §11.1 #24）。
 - **view**：否（只读）。
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
@@ -1513,6 +1515,7 @@
 | 21 | `researchDao` 的费用与工期语义 | 1.0 `BuildAction.researchDao`：**入队即扣道点**，`dao.spiritPowerCost` 实为**工力总额**，逐回合按 `ceil(总额/回合)` 从 `workPower` 扣，不足则项目暂停 | 2.0 完全沿用 1.0 口径。故 `BuildResult.spiritPowerCost` 对研究命令返回的是**工力总额**（不是灵力）；`queryProjectQueue.researchQueue[].spiritPowerCost` 同义。工期倍率 = `(1−宗门研究加速)×(1−长老数×zhangLaoResearchSpeedBonus)×(1−RESEARCH_BONUS)`，下限 `0.3`，与 1.0 同式 | 1.0 `BuildAction.researchDao/advanceProject`；2.0 代码 `DaoRules.research_turns`、`ProjectRules.advance_research` |
 | 22 | `holdRecruitment` 落成人数公式 | 1.0 `completeRecruitment`：`recruitmentBaseCount + peak.level × recruitmentPerLevel`（1 级峰 = 3 人） | 2.0 按 R4 提示词取 **`recruitmentBaseCount + recruitmentPerLevel × (峰级 − 1)`**（1 级峰 = 2 人）。与 1.0 相差 1 人/次，属里程碑规格明示的差异，登记备查 | R4 提示词自动验收 #5；1.0 `BuildAction.completeRecruitment` |
 | 23 | 道统成就「初探秘境」的判定语义 | 1.0 以「已探索地块中存在秘境节点」计数（`sect.exploredTiles` 含秘境节点所在格即算达成） | 该口径在 2.0 会**开局即成立**：出生点视野内常含秘境节点，导致第 1 回合白送 30 道点、且成就永久失效（R4 客户端端到端实测暴露，见 `R4_CLIENT_FAIL: 开局无任何 AVAILABLE 道法`）。故 2.0 改为**成功探索秘境次数** `Sect.miJingExploredTotal`（内部记账，不下发 view）：`exploreMiJing` 成功才递增，R5 落地该命令时回填；R4 期间恒为 `0`，成就不可触发。`ownLingMai`/`recruited`/`enemyDefeated` 三个成就的计数口径不受影响 | PRD §4.9「道统成就 boost（一次性道点奖励）」；2.0 代码 `DaoRules._boost_progress` |
+| 24 | 三流派特性的落地口径 | 1.0 `GameConfig` 声明了 `faction.zongMen.*` / `jiaZu.*` / `guoJia.*` 全套字段，但**业务代码零引用**（`grep` 全仓仅命中 `GameConfig.java` 的 getter/setter）——即 1.0 从未实现流派特性 | 2.0 按 PRD §1.1 原文落地其中**口径明确**的 6 项，统一由 `FactionRules` 出口：① `zongMen.buildSpeedBonus` 营造工期 ×(1−0.3) 下限 1（「营造 +30%」）；② `zongMen.subPeakCostReduction` 4 种 `*_FEN_FENG` 造价 ×0.8（「副峰花费 −20%」）；③ `zongMen.uniqueBuildingDefenseBonus` 护山剑阵落成防御 +25（「落成防御 +25」）；④ `jiaZu.peakBuildCostPenalty` 建筑造价 ×1.5（「建峰花费 +50%」）；⑤ `jiaZu.bloodLineSpeedBonus` 血脉弟子修炼 ×1.4（「血脉修炼 +40%」）；⑥ `jiaZu.zuCiCultivationBonus` 本宗有祖祠时血脉弟子再 ×1.25（「祖祠修炼 +25%」）。**`zongMen.buildSpeedBonus` 与 `jiaZu.peakBuildCostPenalty` 互斥**（一宗一流派，用 if/elif 不累乘）；**开峰造价不叠乘**——`spiritPeak.foundCost` 表已内建流派差异（宗门 500 / 家族 800 / 国家 350），故 `jiaZu.foundCostPenalty`、`guoJia.foundCostReduction` 属**冗余键**，若再乘一次会双重计费 | PRD §1.1、§4.3 L348；2.0 代码 `FactionRules`、`CityAction`、`CityRules.can_build`、`DiscipleRules.cultivation_speed` |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
@@ -1528,6 +1531,7 @@
 | 8 | 敌方可见弟子的 `assignedPeakId` 是否应剥离 | `Disciple.to_dict` 恒含 `assignedPeakId`；灵峰快照已按迷雾剔除 `fengZhuId`（§12.4），弟子侧**无对称处理** | `TODO(需核对)`：核对 1.0 敌方弟子字段裁剪口径；若不泄露，敌方可见弟子的 `assignedPeakId` 应清空（R3 沿用 R1/R2 现状，未改） |
 | 9 | 灵泉衰减/修缮恢复的生效口径 | 配置含 `economy.lingQuanDecayRate` 0.02 / `lingQuanMinOutput` 3 / `improvement.lingQuanRestorePerTurn` 0.05，PRD §4.4 记「灵泉修缮：灵泉每回合恢复 5%」；但 2.0 配置**无 `lingQuanBaseOutput`**（1.0 有，值 15），而 2.0 节点产出改由 `city.workYieldByNode.LING_QUAN`（`spiritPower:6`）给出，衰减下限 `minFactor` 的分母无权威取值 | `TODO(需核对)`：1.0 `EconomyCalculator.settleLingQuanDecay()` 以 `lingQuanMinOutput / lingQuanBaseOutput` 求下限、以 `node.decayRate` 乘算产出；2.0 改用 `workYieldByNode` 后分母应取哪个键未定。**R3 未实现衰减与恢复**（灵泉枯竭属 PRD §5.1「灾劫」，归 R6 判定），待 R6 落地时一并回填，避免臆造系数 |
 | 10 | 前期「道点不可得」的跨里程碑断层 | PRD §5.1 L345 初始资源为 灵力400/灵石300/工力120/声望0，**无道点**；PRD §4.9 L455 道点来源为藏经阁（+2/回合）、灵脉/机缘/秘境节点、道统成就 boost。而 `sendToJiYuan`（机缘，成功 +20 道点）与 `exploreMiJing`（秘境，富裕 +40 道点）属 **R5**，节点占领亦无对应命令 | 结果为 R4 实测：开局 21 条道法**全部 `BLOCKED`**（`tu_na` blocker =「道点不足: 需要 20, 当前 0」），必须先建藏经阁（250 灵力 / 4 回合）再等 10 回合，最早**第 15 回合**才有第一条可研究道法（`R4ClientTest` 端到端实测：14 回合后道点 20）。**不属缺陷、不改配置**（与 1.0 一致，1.0 亦有 `daoPoints = 0` 初值），但 R5 落地机缘/秘境后应复查该节奏是否达到设计预期 | PRD §5.1 L345、§4.9 L455；2.0 实测 `R4ClientTest` |
+| 11 | 三流派特性中**未能落地**的键 | `faction` 块共 46 个叶子键，R3/R4 已落地 6 项（§11.1 #24）。剩余未读键分三类：**① 属后续里程碑**：`guoJia.territoryPowerWeight`（R7 胜负）、`zongMen.exploreSuccessBonus`（R5/R6 探索）、`jiaZu.zuCiReproduceCostReduction` + `bloodline.*` 全套（R7 繁衍）、`guoJia.rareMaterialPenalty`（R5/R6 资源）、`appointment.*` 7 键（R7 任命）、`bloodLinePenalty`（语义未明，PRD §1.1 宗门流条目未提）。**② PRD 未给可计算口径**：`guoJia.expansionCostReduction`（「扩张 −20%」未定义扩张指建区还是气运吞并）、`guoJia.diDuGrowthBonus`（「帝都人口增长 +50%」缺 `building` 侧住房/增长配置，且 `building.housingBonus` 键不存在）。**③ 展示用文案**：`flavors.*.tendency/uniqueAbilityName/...`（R8 UI 打磨才需要） | `TODO(需核对)`：②类需回 PRD/1.0 补齐口径后再实现；①类随对应里程碑落地。**禁止**按字面猜「扩张」「增长 +50%」的具体公式——与 R3 灵泉衰减同一处理原则（不臆造系数） | PRD §1.1、§4.3；2.0 死键审计（`FactionRules` 注释列明已落地项） |
 
 ---
 

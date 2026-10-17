@@ -44,6 +44,8 @@ static func cultivation_speed(state: GameState, config: Dictionary, disciple: Di
 		bonus += prestige_cultivation_bonus(config, sect)
 		bonus += DaoRules.cultivation_bonus(state, config, sect)
 	var speed: float = float(cultivation["baseSpeed"]) * (1.0 + bonus)
+	# 三流派特性（PRD §1.1）：家族流血脉弟子 ×1.4，本宗有祖祠再 ×1.25。
+	speed *= FactionRules.cultivation_multiplier(config, sect, disciple)
 	if disciple.heartDevil >= int(cultivation["heartDevilPenaltyThreshold"]):
 		speed *= 1.0 - float(cultivation["heartDevilPenalty"])
 	return maxf(0.0, speed)

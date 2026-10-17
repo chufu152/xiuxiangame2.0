@@ -308,7 +308,7 @@ static func can_build(state: GameState, config: Dictionary, peak: SpiritPeak, bu
 		var have: int = int(materials.get(material, 0))
 		if have < need:
 			return {"allowed": false, "blocker": "战略资源不足: 建造%s需 %sx%d, 当前 %d" % [display_name, _material_label(config, str(material)), need, have]}
-	var cost: int = int(building["costs"][building_type])
+	var cost: int = FactionRules.building_cost(config, sect, building_type, int(building["costs"][building_type]))
 	var power: int = int(sect.resources.get("spiritPower", 0))
 	if power < cost:
 		return {"allowed": false, "blocker": "灵力不足(%d/%d)" % [power, cost]}

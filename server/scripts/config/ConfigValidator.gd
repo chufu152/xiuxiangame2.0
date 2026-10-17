@@ -94,6 +94,11 @@ static func validate(config: Dictionary) -> Array[String]:
 		_number(config, "vision.discipleVisionByRealm." + realm, errors, true)
 		_number(config, "map.setup.realmMoveBonus." + realm, errors, true)
 	for faction: String in Enums.FactionType.ALL: _require(config, "faction.flavors." + faction, TYPE_DICTIONARY, errors)
+	# 三流派特性数值（`FactionRules` 读取；PRD §1.1）。已落地 6 项做类型校验，
+	# 其余键属 R5/R6/R7 或 PRD 未给口径（见 PROTOCOL §11.2 #11），此处不臆造校验。
+	for key: String in ["faction.zongMen.buildSpeedBonus", "faction.zongMen.subPeakCostReduction", "faction.zongMen.researchSpeedBonus", "faction.zongMen.qiYunBonus", "faction.jiaZu.peakBuildCostPenalty", "faction.jiaZu.bloodLineSpeedBonus", "faction.jiaZu.zuCiCultivationBonus", "faction.jiaZu.bloodDaoCostReduction"]:
+		_number(config, key, errors)
+	_number(config, "faction.zongMen.uniqueBuildingDefenseBonus", errors, true)
 	for difficulty: String in Enums.Difficulty.ALL:
 		_require(config, "difficulty.levels." + difficulty + ".name", TYPE_STRING, errors)
 		for field: String in ["aiActionPoints", "aiStartStonesBonus", "aiStartWorkPowerBonus", "aiAggressionMultiplier", "aiExpansionMultiplier", "playerStartStonesBonus"]: _number(config, "difficulty.levels." + difficulty + "." + field, errors)

@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_registration()
 	_test_found_peak()
 	_test_buildings()
+	_test_faction_traits()
 	_test_districts()
 	_test_workers()
 	_test_improvements()
@@ -138,13 +139,19 @@ func _test_found_peak() -> void:
 func _test_buildings() -> void:
 	var building: Dictionary = _config["building"]
 	var faction_rejected: Array[String] = ["ZU_CI", "WANG_CHAO_DI_DU"]  # 玩家为 ZONG_MEN
+	# 玩家为 ZONG_MEN：营造工期 ×(1−buildSpeedBonus)、副峰造价 ×(1−subPeakCostReduction)。
+	# 期望值在此**独立复算**（只用 config + PRD §1.1 口径），不调用 `FactionRules`，避免自证。
+	var speed: float = float(_config["faction"]["zongMen"]["buildSpeedBonus"])
+	var sub_peak_cut: float = float(_config["faction"]["zongMen"]["subPeakCostReduction"])
+	var sub_peaks: Array[String] = ["XIU_LIAN_FEN_FENG", "DAN_TANG_FEN_FENG", "QI_TANG_FEN_FENG", "JIANG_DAO_FEN_FENG"]
 	for building_type: String in Enums.Building.ALL:
 		var dispatcher: CommandDispatcher = _new_game("123456")
 		var state: GameState = dispatcher.state
 		var sect: Sect = state.sects[0]
 		var peak: SpiritPeak = _capital(sect)
-		var cost: int = int(building["costs"][building_type])
-		var turns: int = int(building["turns"][building_type])
+		var base_cost: int = int(building["costs"][building_type])
+		var cost: int = int(round(float(base_cost) * (1.0 - sub_peak_cut))) if sub_peaks.has(building_type) else base_cost
+		var turns: int = maxi(1, int(round(float(int(building["turns"][building_type])) * (1.0 - speed))))
 		var material_cost: Dictionary = building["materialCosts"].get(building_type, {})
 		# 精确配平：灵力恰好够、材料恰好够
 		sect.resources["spiritPower"] = cost
@@ -203,6 +210,62 @@ func _test_buildings() -> void:
 
 
 # ---------------------------------------------------------------------------
+# 2.5 三流派特性（PRD §1.1；`FactionRules` 唯一出口）
+# ---------------------------------------------------------------------------
+
+func _test_faction_traits() -> void:
+	var zong: CommandDispatcher = _new_game_faction("410001", Enums.FactionType.ZONG_MEN)
+	var jia: CommandDispatcher = _new_game_faction("410002", Enums.FactionType.JIA_ZU)
+	var guo: CommandDispatcher = _new_game_faction("410003", Enums.FactionType.GUO_JIA)
+	var zong_sect: Sect = zong.state.sects[0]
+	var jia_sect: Sect = jia.state.sects[0]
+	var guo_sect: Sect = guo.state.sects[0]
+	var base_shan: int = int(_config["building"]["costs"]["SHAN_MEN"])
+	var base_fen: int = int(_config["building"]["costs"]["XIU_LIAN_FEN_FENG"])
+	var base_shan_turns: int = int(_config["building"]["turns"]["SHAN_MEN"])
+	var expect_zong_turns: int = maxi(1, int(round(float(base_shan_turns) * (1.0 - float(_config["faction"]["zongMen"]["buildSpeedBonus"])))))
+
+	# 造价：宗门副峰 −20%（核心建筑不打折）；家族全体 +50%；国家无改动
+	_check(FactionRules.building_cost(_config, zong_sect, "XIU_LIAN_FEN_FENG", base_fen) == int(round(float(base_fen) * 0.8)), "宗门流副峰造价 −20%")
+	_check(FactionRules.building_cost(_config, zong_sect, "SHAN_MEN", base_shan) == base_shan, "宗门流核心建筑造价不变")
+	_check(FactionRules.building_cost(_config, jia_sect, "SHAN_MEN", base_shan) == int(round(float(base_shan) * 1.5)), "家族流建筑造价 +50%")
+	_check(FactionRules.building_cost(_config, jia_sect, "XIU_LIAN_FEN_FENG", base_fen) == int(round(float(base_fen) * 1.5)), "家族流副峰造价 +50%（不享宗门折扣）")
+	_check(FactionRules.building_cost(_config, guo_sect, "SHAN_MEN", base_shan) == base_shan, "国家流建筑造价不变")
+
+	# 工期：宗门流 ×0.7 且下限 1；家族/国家不变
+	_check(FactionRules.build_turns(_config, zong_sect, base_shan_turns) == expect_zong_turns, "宗门流营造工期 −30%")
+	_check(FactionRules.build_turns(_config, jia_sect, base_shan_turns) == base_shan_turns, "家族流营造工期不变")
+	_check(FactionRules.build_turns(_config, guo_sect, base_shan_turns) == base_shan_turns, "国家流营造工期不变")
+	_check(FactionRules.build_turns(_config, zong_sect, 1) == 1, "营造工期下限 1 回合")
+
+	# 端到端：家族流建山门按 +50% 扣灵力、工期不变
+	var jia_peak: SpiritPeak = _capital(jia_sect)
+	_boost(jia_sect, 20000)
+	_result(jia, "constructBuilding", {"peakId": jia_peak.id, "buildingType": "SHAN_MEN"})
+	var jia_project: Project = _last_project(jia_peak)
+	_check(jia_project != null and jia_project.spiritPowerCost == int(round(float(base_shan) * 1.5)), "家族流建山门按 +50% 扣灵力")
+	_check(jia_project != null and jia_project.turnsRequired == base_shan_turns, "家族流建山门工期不变")
+	_check(int(jia_sect.resources.get("spiritPower", 0)) == 20000 - int(round(float(base_shan) * 1.5)), "家族流建造实际扣款与 `FactionRules` 一致")
+
+	# 端到端：宗门流建山门工期缩短、造价不变
+	var zong_peak: SpiritPeak = _capital(zong_sect)
+	_boost(zong_sect, 20000)
+	_result(zong, "constructBuilding", {"peakId": zong_peak.id, "buildingType": "SHAN_MEN"})
+	var zong_project: Project = _last_project(zong_peak)
+	_check(zong_project != null and zong_project.turnsRequired == expect_zong_turns, "宗门流建山门工期缩短")
+	_check(zong_project != null and zong_project.spiritPowerCost == base_shan, "宗门流建山门不打折")
+	_check(int(zong_sect.resources.get("spiritPower", 0)) == 20000 - base_shan, "宗门流建造实际扣款与 `FactionRules` 一致")
+
+	# queryBuildOptions 同时给出实际造价与配置造价
+	var options: Dictionary = _result(zong, "queryBuildOptions", {"sectId": zong_sect.id})
+	for option: Dictionary in options.get("options", []):
+		if str(option.get("type", "")) == "XIU_LIAN_FEN_FENG":
+			_check(int(option["cost"]) == int(round(float(base_fen) * 0.8)), "queryBuildOptions.cost 为宗门流副峰折后价")
+			_check(int(option["baseCost"]) == base_fen, "queryBuildOptions.baseCost 保留配置原值")
+			_check(int(option["turns"]) == FactionRules.build_turns(_config, zong_sect, int(_config["building"]["turns"]["XIU_LIAN_FEN_FENG"])), "queryBuildOptions.turns 为流派调整后工期")
+
+
+# ---------------------------------------------------------------------------
 # 3. 区域（foundDistrict / queryDistrictSites）
 # ---------------------------------------------------------------------------
 
@@ -233,9 +296,10 @@ func _test_districts() -> void:
 		_check(_same_yield(site["yield"], reference["yield"]), "site %s yield 与独立复算一致" % tile.id)
 		_check(_same_strings(site["adjacencyReasons"], reference["reasons"]), "site %s adjacencyReasons 与独立复算一致" % tile.id)
 
-	# ② foundDistrict 成功（入队，turnsRequired == district.turns）
+	# ② foundDistrict 成功（入队，turnsRequired == 宗门流营造加速后的 district.turns）
 	var target: String = str((result["sites"] as Array)[0]["tileId"])
-	var expected_turns: int = int(_config["city"]["district"]["turns"][district_type])
+	var district_speed: float = float(_config["faction"]["zongMen"]["buildSpeedBonus"])
+	var expected_turns: int = maxi(1, int(round(float(int(_config["city"]["district"]["turns"][district_type])) * (1.0 - district_speed))))
 	var expected_cost: int = int(_config["city"]["district"]["costs"][district_type])
 	var power_before: int = int(sect.resources["spiritPower"])
 	var found: Dictionary = _result(dispatcher, "foundDistrict", {"sectId": sect.id, "peakId": peak.id, "districtTypeId": district_type, "tileId": target})
@@ -792,9 +856,20 @@ func _snapshot(view: Dictionary) -> Dictionary:
 # ---------------------------------------------------------------------------
 
 func _new_game(seed: String) -> CommandDispatcher:
+	return _new_game_faction(seed, Enums.FactionType.ZONG_MEN)
+
+
+func _new_game_faction(seed: String, faction: String) -> CommandDispatcher:
 	var dispatcher: CommandDispatcher = CommandDispatcher.new(_config)
-	_request(dispatcher, "newGame", {"sectName": "验收宗", "playerFaction": "ZONG_MEN", "mapWidth": 24, "mapHeight": 18, "randomSeed": seed, "difficultyId": "normal"})
+	_request(dispatcher, "newGame", {"sectName": "验收宗", "playerFaction": faction, "mapWidth": 24, "mapHeight": 18, "randomSeed": seed, "difficultyId": "normal"})
 	return dispatcher
+
+
+## 灵峰项目队列的最后一条（刚入队的项目）。
+func _last_project(peak: SpiritPeak) -> Project:
+	if peak == null or peak.projectQueue.is_empty():
+		return null
+	return peak.projectQueue[peak.projectQueue.size() - 1]
 
 
 func _request(dispatcher: CommandDispatcher, command: String, params: Dictionary = {}) -> Dictionary:
