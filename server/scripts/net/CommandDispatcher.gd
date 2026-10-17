@@ -66,6 +66,23 @@ func _init(config: Dictionary = {}) -> void:
 	_handlers[Commands.RECLASS] = Callable(self, "_handle_reclass")
 	_handlers[Commands.PROMOTE] = Callable(self, "_handle_promote")
 	_handlers[Commands.QUERY_DISCIPLE_DETAIL] = Callable(self, "_handle_query_disciple_detail")
+	# R6：探索（机缘/秘境）+ 政令（政体/政令卡）+ 自动化/设置 + 集结/回防
+	_handlers[Commands.RALLY] = Callable(self, "_handle_rally")
+	_handlers[Commands.RETURN_TO_DEFENSE] = Callable(self, "_handle_return_to_defense")
+	_handlers[Commands.QUERY_JI_YUAN_INFO] = Callable(self, "_handle_query_ji_yuan_info")
+	_handlers[Commands.SEND_TO_JI_YUAN] = Callable(self, "_handle_send_to_ji_yuan")
+	_handlers[Commands.QUERY_MI_JING_INFO] = Callable(self, "_handle_query_mi_jing_info")
+	_handlers[Commands.EXPLORE_MI_JING] = Callable(self, "_handle_explore_mi_jing")
+	_handlers[Commands.SWITCH_GOVERNMENT] = Callable(self, "_handle_switch_government")
+	_handlers[Commands.ENACT_POLICY] = Callable(self, "_handle_enact_policy")
+	_handlers[Commands.REVOKE_POLICY] = Callable(self, "_handle_revoke_policy")
+	_handlers[Commands.QUERY_POLICY_OPTIONS] = Callable(self, "_handle_query_policy_options")
+	_handlers[Commands.SET_AUTOMATION_TOGGLE] = Callable(self, "_handle_set_automation_toggle")
+	_handlers[Commands.SET_PEAK_AUTO_PROJECT] = Callable(self, "_handle_set_peak_auto_project")
+	_handlers[Commands.SET_ALL_AUTO_PROJECT] = Callable(self, "_handle_set_all_auto_project")
+	_handlers[Commands.EXPLORE_NOW] = Callable(self, "_handle_explore_now")
+	_handlers[Commands.QUERY_AUTOMATION_STATE] = Callable(self, "_handle_query_automation_state")
+	_handlers[Commands.SET_SETTING] = Callable(self, "_handle_set_setting")
 
 
 ## 处理一条原始文本帧，返回响应信封。
@@ -674,3 +691,208 @@ func _require_string_array(params: Dictionary, key: String) -> Dictionary:
 			return {"ok": false, "message": "%s 的每一项都必须是非空字符串" % key}
 		values.append(String(entry))
 	return {"ok": true, "value": values}
+
+
+## 校验布尔参数；返回 {ok, value, message}。
+func _require_bool(params: Dictionary, key: String) -> Dictionary:
+	var raw: Variant = params.get(key)
+	if typeof(raw) != TYPE_BOOL:
+		return {"ok": false, "message": "%s 必须是布尔值" % key}
+	return {"ok": true, "value": bool(raw)}
+
+
+## 从 `policy` 配置取某类 id 清单（`governments` / `cards`），供 `_require_enum` 做 BAD_PARAMS 把关。
+func _policy_ids(section: String) -> Array:
+	var list: Array = _config["policy"].get(section, [])
+	var ids: Array = []
+	for entry: Variant in list:
+		ids.append(str((entry as Dictionary).get("id", "")))
+	return ids
+
+
+# ---------------------------------------------------------------------------
+# 处理器（R6：探索 + 政令 + 自动化/设置 + 集结/回防）
+# ---------------------------------------------------------------------------
+# 只读（`queryJiYuanInfo`/`queryMiJingInfo`/`queryPolicyOptions`/`queryAutomationState`）→ view=null；
+# 写命令 → 实时 view + 本命令期间新增日志；`setSetting` → view=null 且不改 `GameState`。
+# 业务失败（冷却中/灵石不足/人数超限/槽位满/时代未到/道法未解锁…）一律
+# `ok:true + result.success:false + message`；只有参数缺失/类型错/枚举非法才 `BAD_PARAMS`。
+
+## `rally`：`tileId` 可省（省则集结到己方主峰地块）。
+func _handle_rally(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var tile_id: String = ""
+	if params.has("tileId"):
+		var tile_check: Dictionary = _require_nonempty(params, "tileId")
+		if not bool(tile_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(tile_check["message"]))
+		tile_id = str(tile_check["value"])
+	else:
+		tile_id = _player_capital_tile_id()
+		if tile_id.is_empty(): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "未指定 tileId 且本宗没有可用的集结地")
+	if not state.tiles.has(tile_id): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "目标地块不存在：" + tile_id)
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.rally(state, _config, str(sect_check["value"]), tile_id)
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_return_to_defense(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.return_to_defense(state, _config, str(sect_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_ji_yuan_info(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var node_check: Dictionary = _require_nonempty(params, "nodeId")
+	if not bool(node_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(node_check["message"]))
+	if not state.nodes.has(str(node_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "节点不存在：" + str(node_check["value"]))
+	return Dto.ok_response(request_id, [], null, ExploreAction.query_ji_yuan_info(state, _config, str(node_check["value"])))
+
+
+func _handle_send_to_ji_yuan(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var disciple_check: Dictionary = _require_own_disciple(request_id, params)
+	if not bool(disciple_check["ok"]): return disciple_check["response"]
+	var node_check: Dictionary = _require_nonempty(params, "nodeId")
+	if not bool(node_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(node_check["message"]))
+	if not state.nodes.has(str(node_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "节点不存在：" + str(node_check["value"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = ExploreAction.send_to_ji_yuan(state, _config, str(disciple_check["value"]), str(node_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_mi_jing_info(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var node_check: Dictionary = _require_nonempty(params, "nodeId")
+	if not bool(node_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(node_check["message"]))
+	if not state.nodes.has(str(node_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "节点不存在：" + str(node_check["value"]))
+	return Dto.ok_response(request_id, [], null, ExploreAction.query_mi_jing_info(state, _config, str(node_check["value"])))
+
+
+## 秘境多人探索：`discipleIds` 只校验形状（同宗/在格/灵石由规则回 `success:false`，与 `batchMove` 同口径）。
+func _handle_explore_mi_jing(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var list_check: Dictionary = _require_string_array(params, "discipleIds")
+	if not bool(list_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(list_check["message"]))
+	var node_check: Dictionary = _require_nonempty(params, "nodeId")
+	if not bool(node_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(node_check["message"]))
+	if not state.nodes.has(str(node_check["value"])): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "节点不存在：" + str(node_check["value"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = ExploreAction.explore_mi_jing(state, _config, list_check["value"], str(node_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## 切换政体：`governmentId` 必须在 `policy.governments[].id` 内（非法 → BAD_PARAMS）。
+func _handle_switch_government(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var gov_check: Dictionary = _require_enum(params, "governmentId", _policy_ids("governments"))
+	if not bool(gov_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(gov_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = PolicyAction.switch_government(state, _config, str(sect_check["value"]), str(gov_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+## 颁行政令：参数名 `cardId`（PROTOCOL §11.1 #5），必须在 `policy.cards[].id` 内。
+func _handle_enact_policy(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var card_check: Dictionary = _require_enum(params, "cardId", _policy_ids("cards"))
+	if not bool(card_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(card_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = PolicyAction.enact_policy(state, _config, str(sect_check["value"]), str(card_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_revoke_policy(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var card_check: Dictionary = _require_enum(params, "cardId", _policy_ids("cards"))
+	if not bool(card_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(card_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = PolicyAction.revoke_policy(state, _config, str(sect_check["value"]), str(card_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_policy_options(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null, PolicyAction.query_policy_options(state, _config, str(sect_check["value"])))
+
+
+## 自动化开关：`key` 必须是 `improve`/`repair`/`road`/`explore`（非法 → BAD_PARAMS，PROTOCOL §7 明列）。
+func _handle_set_automation_toggle(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var key_check: Dictionary = _require_enum(params, "key", AutomationRules.TOGGLE_KEYS)
+	if not bool(key_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(key_check["message"]))
+	var on_check: Dictionary = _require_bool(params, "on")
+	if not bool(on_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(on_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.set_automation_toggle(state, _config, str(sect_check["value"]), str(key_check["value"]), bool(on_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_set_peak_auto_project(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var peak_check: Dictionary = _require_player_peak(request_id, params)
+	if not bool(peak_check["ok"]): return peak_check["response"]
+	var on_check: Dictionary = _require_bool(params, "on")
+	if not bool(on_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(on_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.set_peak_auto_project(state, _config, str(peak_check["value"]), bool(on_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_set_all_auto_project(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var on_check: Dictionary = _require_bool(params, "on")
+	if not bool(on_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(on_check["message"]))
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.set_all_auto_project(state, _config, str(sect_check["value"]), bool(on_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_explore_now(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	var before: int = state.eventLog.size()
+	var result: Dictionary = AutomationAction.explore_now(state, _config, str(sect_check["value"]))
+	return Dto.ok_response(request_id, state.eventLog.slice(before), StateView.build(state, _config), result)
+
+
+func _handle_query_automation_state(request_id: String, params: Dictionary) -> Dictionary:
+	if state == null: return Dto.error_response(request_id, Msg.ERR_NO_GAME, "尚未开局")
+	var sect_check: Dictionary = _require_player_sect(request_id, params)
+	if not bool(sect_check["ok"]): return sect_check["response"]
+	return Dto.ok_response(request_id, [], null, AutomationAction.query_automation_state(state, _config, str(sect_check["value"])))
+
+
+## `setSetting`：**不改 `GameState`、不回 view**（PROTOCOL §7）；`value` 允许任意类型但必须存在。
+func _handle_set_setting(request_id: String, params: Dictionary) -> Dictionary:
+	var key_check: Dictionary = _require_nonempty(params, "key")
+	if not bool(key_check["ok"]): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, str(key_check["message"]))
+	if not params.has("value"): return Dto.error_response(request_id, Msg.ERR_BAD_PARAMS, "value 必须存在")
+	var result: Dictionary = AutomationAction.set_setting(str(key_check["value"]), params["value"])
+	return Dto.ok_response(request_id, [], null, result)
+
+
+## 己方主峰地块 id（`rally` 省略 `tileId` 时的集结地）。
+func _player_capital_tile_id() -> String:
+	var peak_id: String = _player_capital_peak_id()
+	if peak_id.is_empty(): return ""
+	var peak: SpiritPeak = CityAction.find_peak(state, peak_id)
+	return "" if peak == null else peak.tileId

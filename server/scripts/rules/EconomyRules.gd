@@ -263,7 +263,8 @@ static func apply_settlement(state: GameState, config: Dictionary) -> Array[Stri
 		var deficit: bool = int(sect.resources.get("spiritPower", 0)) + int(totals["spiritPower"]) < int(upkeep["spiritPower"])
 		settle_city(state, config, sect, deficit)
 		_apply_economy(state, config, sect, totals, per_peak, upkeep, deficit)
-	# TODO(R4): 道统成就 boost 结算；TODO(R4): 心魔结算；TODO(R6): 政令结算
+	# 道统成就 boost / 心魔结算（R4）与政令结算（R6）在 `TurnProcessor._run_settlement` 里按序调用，
+	# 因为政令的安定叠加必须落在本函数重算安定之后。
 	return state.eventLog.slice(before)
 
 

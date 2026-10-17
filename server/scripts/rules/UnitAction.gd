@@ -211,6 +211,10 @@ static func query_disciple_detail(state: GameState, config: Dictionary, disciple
 			if peak.tileId == disciple.tileId: current_peak = peak
 	if not disciple.garrisonNodeId.is_empty() and state.nodes.has(disciple.garrisonNodeId):
 		garrison_node = state.nodes[disciple.garrisonNodeId]
+	# R6：探索任务节点（机缘/秘境），与驻守互斥。
+	var mission_node: GameNode = null
+	if not disciple.missionNodeId.is_empty() and state.nodes.has(disciple.missionNodeId):
+		mission_node = state.nodes[disciple.missionNodeId]
 	var promotions: Array[String] = disciple.promotions.duplicate()
 	var promotion_names: Array[String] = []
 	for promotion_id: String in promotions:
@@ -261,8 +265,8 @@ static func query_disciple_detail(state: GameState, config: Dictionary, disciple
 		"currentPeakName": "" if current_peak == null else current_peak.name,
 		"garrisonNodeId": disciple.garrisonNodeId,
 		"garrisonNodeName": "" if garrison_node == null else garrison_node.id,
-		"missionNodeId": "",
-		"missionNodeName": "",
+		"missionNodeId": disciple.missionNodeId,
+		"missionNodeName": "" if mission_node == null else mission_node.name,
 		"injured": disciple.injured,
 		"tribulating": disciple.tribulating,
 		"capturedFromSectId": disciple.capturedFromSectId,

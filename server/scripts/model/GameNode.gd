@@ -2,6 +2,9 @@ class_name GameNode
 extends RefCounted
 
 var id: String = ""
+## R6 新增：节点显示名（`Enums.NodeType.NAMES` + 序号，开局生成时写入）。
+## 唯一消费方是 `queryJiYuanInfo`/`queryMiJingInfo` 的 `NodeInfo.name`，**不进 view**。
+var name: String = ""
 var type: String = Enums.NodeType.LING_TIAN
 var tileId: String = ""
 var ownerSectId: String = ""

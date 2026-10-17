@@ -32,6 +32,16 @@ class NodeType:
 	const ALL: Array[String] = [LING_TIAN, LING_MAI, JI_YUAN, MI_JING, LING_QUAN, LING_FENG]
 	const SPAWN: Array[String] = [LING_TIAN, LING_MAI, JI_YUAN, MI_JING, LING_QUAN]
 	const CHANCE_KEYS: Array[String] = ["lingTian", "lingMai", "jiYuan", "miJing", "lingQuan"]
+	## R6 新增：节点显示名（`GameNode.name` 的取名来源，1.0 `NodeType.getDisplayName()` 同义）。
+	## 仅供文案与 `NodeInfo.name` 使用，不参与任何规则判定。
+	const NAMES: Dictionary = {
+		LING_TIAN: "灵田",
+		LING_MAI: "灵脉",
+		JI_YUAN: "机缘",
+		MI_JING: "秘境",
+		LING_QUAN: "灵泉",
+		LING_FENG: "灵峰",
+	}
 
 class FactionType:
 	const ZONG_MEN: String = "ZONG_MEN"

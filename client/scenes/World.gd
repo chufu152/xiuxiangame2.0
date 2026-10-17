@@ -158,6 +158,9 @@ func _ready() -> void:
 	_build_queue_panel()
 	_build_combat_panel()
 	_build_unit_panel()
+	_build_explore_panel()
+	_build_policy_panel()
+	_build_automation_panel()
 	Session.camera_rig.set_active(true)
 	Session.view_changed.connect(_on_view_changed)
 	Session.move_range_received.connect(_on_move_range_received)
@@ -175,6 +178,11 @@ func _ready() -> void:
 	Session.teleport_options_received.connect(_on_teleport_options_received)
 	Session.disciple_detail_received.connect(_on_disciple_detail_received)
 	Session.r5_result_received.connect(_on_r5_result_received)
+	Session.ji_yuan_info_received.connect(_on_ji_yuan_info_received)
+	Session.mi_jing_info_received.connect(_on_mi_jing_info_received)
+	Session.policy_options_received.connect(_on_policy_options_received)
+	Session.automation_state_received.connect(_on_automation_state_received)
+	Session.r6_result_received.connect(_on_r6_result_received)
 	if not Session.current_view.is_empty():
 		_render(Session.current_view)
 	else:
@@ -186,6 +194,9 @@ func _ready() -> void:
 		_render_queue_panel()
 		_render_combat_panel()
 		_render_unit_panel()
+		_render_explore_panel()
+		_render_policy_panel()
+		_render_automation_panel()
 
 
 func _process(_delta: float) -> void:
@@ -226,6 +237,9 @@ func _render(view: Dictionary) -> void:
 	_render_queue_panel()
 	_render_combat_panel()
 	_render_unit_panel()
+	_render_explore_panel()
+	_render_policy_panel()
+	_render_automation_panel()
 
 
 ## 按缓存数据重绘两层高亮（移动 / 攻击），二者独立并存。
@@ -334,8 +348,9 @@ static func _list_of(data: Dictionary, key: String) -> String:
 ## 左键点击优先级：① 撤退模式下点候选格 → retreat；② 攻击模式下点可攻击格 → attack；
 ## ③ 多选（≥2）且点可达格 → batchMove；④ 移动模式下点可达格 → moveDisciple；
 ## ⑤ 城市选址/指派模式下点候选格 → foundDistrict/assignWorker；
-## ⑥ 点己方弟子所在格 → 选中并 queryMoveRange（按住 Shift 追加多选）；⑦ 点己方灵峰所在格 → 打开城市面板；
-## ⑧ 否则回到 R1 的地块选择。
+## ⑥ 点机缘/秘境节点所在格 → 打开探索面板（按住 Shift 跳过，改为选中格上弟子）；
+## ⑦ 点己方弟子所在格 → 选中并 queryMoveRange（按住 Shift 追加多选）；⑧ 点己方灵峰所在格 → 打开城市面板；
+## ⑨ 否则回到 R1 的地块选择。
 ##
 ## 攻击与移动不冲突：服务端 `MoveRules.step_cost` 对敌方占据格返回 `IMPASSABLE`，
 ## 故敌方格永不出现在可达集里，先判攻击不会抢占移动。
@@ -358,6 +373,17 @@ func on_tile_clicked(tile_id: String) -> void:
 	if city_mode == "worker" and city_candidate_ids.has(tile_id):
 		Session.request_assign_worker(selected_peak_id, tile_id)
 		return
+	# R6：机缘/秘境节点 → 探索面板（优先于「选中格上弟子」：秘境要求弟子站在节点格上，
+	# 若先选弟子就再也点不开探索面板。需要选格上弟子时按住 Shift 点选）。
+	var node_id: String = _node_id_at(tile_id)
+	if not node_id.is_empty() and not Input.is_key_pressed(KEY_SHIFT):
+		var node_type: String = node_type_of(node_id)
+		if node_type == Enums.NodeType.JI_YUAN or node_type == Enums.NodeType.MI_JING:
+			_exit_city_mode()
+			_exit_unit_mode()
+			_clear_move_state()
+			open_explore_panel(node_id)
+			return
 	var disciple: Dictionary = _player_disciple_at(tile_id)
 	if not disciple.is_empty():
 		select_disciple(str(disciple.get("id", "")), Input.is_key_pressed(KEY_SHIFT))
@@ -597,6 +623,18 @@ func _build_topbar() -> void:
 	queue_button.tooltip_text = "打开项目/研究队列（projects[] 与 researchQueue[] 两列不混）；相机角度与缩放保持不变"
 	queue_button.pressed.connect(func() -> void: open_queue_panel())
 	row.add_child(queue_button)
+
+	# R6：政令 / 自动化入口（与探索面板互斥，均不触碰相机）。
+	var policy_button: Button = Button.new()
+	policy_button.text = "政令"
+	policy_button.tooltip_text = "打开政令面板（政体/政令卡/槽位/时代门控均由服务端判定）；相机角度与缩放保持不变"
+	policy_button.pressed.connect(func() -> void: open_policy_panel())
+	row.add_child(policy_button)
+	var automation_button: Button = Button.new()
+	automation_button.text = "自动"
+	automation_button.tooltip_text = "打开自动化面板（开关/自动项目/立即探索/集结/回防）；相机角度与缩放保持不变"
+	automation_button.pressed.connect(func() -> void: open_automation_panel())
+	row.add_child(automation_button)
 
 	end_turn_button = Button.new()
 	end_turn_button.text = "结束回合"
@@ -2199,3 +2237,550 @@ func _build_sidebar() -> void:
 func _refresh_status() -> void:
 	if status_label != null:
 		status_label.text = Session.status
+
+
+# ---------------------------------------------------------------------------
+# R6：探索 / 政令 / 自动化（三面板互斥；只读 view 与回包，客户端零规则）
+# ---------------------------------------------------------------------------
+# 三面板都只做「展示 + 发命令」：成功率、槽位、时代门控、阈值一律来自服务端
+# `queryJiYuanInfo` / `queryMiJingInfo` / `queryPolicyOptions` / `queryAutomationState` 回包。
+# 任何面板开关与操作都**不触碰相机**（不调 frame_once / 不改 transform / 不改 size）。
+
+const R6_PANEL_WIDTH: float = 440.0
+const R6_PANEL_HEIGHT: float = 392.0
+
+var explore_panel: CanvasLayer = null
+var explore_title_label: Label = null
+var explore_info_label: Label = null
+var explore_list: VBoxContainer = null
+var explore_status_label: Label = null
+var explore_open: bool = false
+var explore_node_id: String = ""
+var explore_info: Dictionary = {}
+var explore_selected_ids: Array[String] = []
+
+var policy_panel: CanvasLayer = null
+var policy_title_label: Label = null
+var policy_info_label: Label = null
+var policy_list: VBoxContainer = null
+var policy_status_label: Label = null
+var policy_open: bool = false
+var policy_options: Dictionary = {}
+
+var automation_panel: CanvasLayer = null
+var automation_title_label: Label = null
+var automation_info_label: Label = null
+var automation_list: VBoxContainer = null
+var automation_status_label: Label = null
+var automation_open: bool = false
+var automation_state: Dictionary = {}
+
+## 客户端本地设置（`setSetting` 只确认，值留在这里）。
+var local_settings: Dictionary = {}
+
+
+## 三面板共用骨架（左侧竖排，互斥显示）。
+func _make_r6_panel(node_name: String, title_text: String) -> Array:
+	var layer: CanvasLayer = CanvasLayer.new()
+	layer.name = node_name
+	layer.layer = 3
+	add_child(layer)
+	var panel: PanelContainer = PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left = 8.0
+	panel.offset_right = 8.0 + R6_PANEL_WIDTH
+	panel.offset_top = TOPBAR_HEIGHT + 8.0
+	panel.offset_bottom = TOPBAR_HEIGHT + 8.0 + R6_PANEL_HEIGHT
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.965, 0.957, 0.925, 0.94)
+	style.border_color = Color("b6ad8b")
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	layer.add_child(panel)
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+	var title: Label = Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color("294e48"))
+	column.add_child(title)
+	var info: Label = Label.new()
+	info.add_theme_font_size_override("font_size", 13)
+	info.add_theme_color_override("font_color", Color("3c4b45"))
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(info)
+	column.add_child(HSeparator.new())
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 120)
+	column.add_child(scroll)
+	var list: VBoxContainer = VBoxContainer.new()
+	list.add_theme_constant_override("separation", 3)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	var status: Label = Label.new()
+	status.add_theme_font_size_override("font_size", 12)
+	status.add_theme_color_override("font_color", Color("7a5a2c"))
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(status)
+	layer.visible = false
+	return [layer, title, info, list, status]
+
+
+## 清空按钮列表。`VBoxContainer` 没有 `clear()`，按本项目既有写法逐个摘除再释放；
+## `remove_child` 是同步的，所以紧接着 `get_child_count()` 立刻归零（验收用例依赖这点）。
+func _clear_r6_list(list: VBoxContainer) -> void:
+	if list == null:
+		return
+	for child: Node in list.get_children():
+		list.remove_child(child)
+		child.queue_free()
+
+
+func _build_explore_panel() -> void:
+	var parts: Array = _make_r6_panel("ExplorePanel", "探索")
+	explore_panel = parts[0] as CanvasLayer
+	explore_title_label = parts[1] as Label
+	explore_info_label = parts[2] as Label
+	explore_list = parts[3] as VBoxContainer
+	explore_status_label = parts[4] as Label
+
+
+func _build_policy_panel() -> void:
+	var parts: Array = _make_r6_panel("PolicyPanel", "政令")
+	policy_panel = parts[0] as CanvasLayer
+	policy_title_label = parts[1] as Label
+	policy_info_label = parts[2] as Label
+	policy_list = parts[3] as VBoxContainer
+	policy_status_label = parts[4] as Label
+
+
+func _build_automation_panel() -> void:
+	var parts: Array = _make_r6_panel("AutomationPanel", "自动化")
+	automation_panel = parts[0] as CanvasLayer
+	automation_title_label = parts[1] as Label
+	automation_info_label = parts[2] as Label
+	automation_list = parts[3] as VBoxContainer
+	automation_status_label = parts[4] as Label
+
+
+## 关闭三面板（`keep` 指定的那个保留），供互斥显示用。
+func _close_r6_panels(keep: CanvasLayer = null) -> void:
+	if explore_panel != keep:
+		explore_open = false
+	if policy_panel != keep:
+		policy_open = false
+	if automation_panel != keep:
+		automation_open = false
+	_sync_r6_visibility()
+
+
+func _sync_r6_visibility() -> void:
+	if explore_panel != null:
+		explore_panel.visible = explore_open
+	if policy_panel != null:
+		policy_panel.visible = policy_open
+	if automation_panel != null:
+		automation_panel.visible = automation_open
+
+
+# --- 探索 ---
+
+## 地块上的节点 id（`view.tiles[tile].nodeId`；无节点回空串）。
+func _node_id_at(tile_id: String) -> String:
+	var tile: Dictionary = Session.current_view.get("tiles", {}).get(tile_id, {})
+	var node_id: Variant = tile.get("nodeId")
+	return "" if node_id == null else str(node_id)
+
+
+## 节点类型（`view.nodes[nodeId].type`；未下发回空串）。
+func node_type_of(node_id: String) -> String:
+	var node: Dictionary = Session.current_view.get("nodes", {}).get(node_id, {})
+	return str(node.get("type", ""))
+
+
+func open_explore_panel(node_id: String) -> void:
+	explore_node_id = node_id
+	explore_open = true
+	explore_info = {}
+	explore_selected_ids.clear()
+	_close_r6_panels(explore_panel)
+	explore_status_label.text = "已选中节点 %s" % node_id
+	_refresh_explore_info()
+	_render_explore_panel()
+
+
+func close_explore_panel() -> void:
+	explore_open = false
+	explore_node_id = ""
+	explore_info = {}
+	explore_selected_ids.clear()
+	_sync_r6_visibility()
+	_render_explore_panel()
+
+
+## 按节点类型重拉只读信息（机缘 / 秘境各一条命令）。
+func _refresh_explore_info() -> void:
+	if explore_node_id.is_empty():
+		return
+	if node_type_of(explore_node_id) == Enums.NodeType.MI_JING:
+		Session.request_query_mi_jing_info(explore_node_id)
+	else:
+		Session.request_query_ji_yuan_info(explore_node_id)
+
+
+func _on_ji_yuan_info_received(result: Dictionary) -> void:
+	if str(result.get("nodeId", "")) != explore_node_id:
+		return
+	explore_info = result
+	_render_explore_panel()
+
+
+func _on_mi_jing_info_received(result: Dictionary) -> void:
+	if str(result.get("nodeId", "")) != explore_node_id:
+		return
+	explore_info = result
+	_render_explore_panel()
+
+
+## 探索面板纯读缓存 + 弟子列表（弟子来自 view，客户端不算任何成功率）。
+func _render_explore_panel() -> void:
+	_sync_r6_visibility()
+	if explore_info_label == null:
+		return
+	if not explore_open:
+		explore_info_label.text = ""
+		_clear_r6_list(explore_list)
+		return
+	var info: Dictionary = explore_info.get("info", {})
+	var kind: String = str(explore_info.get("kind", ""))
+	var lines: PackedStringArray = PackedStringArray()
+	if info.is_empty():
+		lines.append("（等待服务端节点信息…）")
+	else:
+		lines.append("%s · 等级 %d" % [str(info.get("name", "")), int(info.get("level", 0))])
+		lines.append("冷却 %d 回合" % int(info.get("cooldown", 0)))
+		lines.append("奖励预览 %s" % str(info.get("rewardPreview", "")))
+		if kind == "jiYuan":
+			lines.append("需修为 %d 级 · 单人" % int(info.get("requiredRealmLevel", 0)))
+		else:
+			lines.append("耗灵石 %d · 最多 %d 人" % [int(info.get("cost", 0)), int(info.get("maxParticipants", 0))])
+	explore_info_label.text = "\n".join(lines)
+	_clear_r6_list(explore_list)
+	var disciples: Array = _own_disciples()
+	if kind == "miJing":
+		for disciple: Dictionary in disciples:
+			var disciple_id: String = str(disciple.get("id", ""))
+			var picked: bool = explore_selected_ids.has(disciple_id)
+			var toggle: Button = Button.new()
+			toggle.name = "Pick_" + disciple_id
+			toggle.text = ("☑ " if picked else "☐ ") + str(disciple.get("name", disciple_id))
+			toggle.pressed.connect(func() -> void: _toggle_explore_pick(disciple_id))
+			explore_list.add_child(toggle)
+		var start: Button = Button.new()
+		start.name = "ExploreMiJing"
+		start.text = "开始探索（已选 %d 人）" % explore_selected_ids.size()
+		start.disabled = explore_selected_ids.is_empty()
+		start.pressed.connect(func() -> void:
+			Session.request_explore_mi_jing(explore_selected_ids.duplicate(), explore_node_id))
+		explore_list.add_child(start)
+	else:
+		for disciple: Dictionary in disciples:
+			var disciple_id: String = str(disciple.get("id", ""))
+			var send: Button = Button.new()
+			send.name = "Send_" + disciple_id
+			send.text = "派 %s 探机缘" % str(disciple.get("name", disciple_id))
+			send.pressed.connect(func() -> void: Session.request_send_to_ji_yuan(disciple_id, explore_node_id))
+			explore_list.add_child(send)
+	var close: Button = Button.new()
+	close.name = "CloseExplore"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_explore_panel())
+	explore_list.add_child(close)
+
+
+func _toggle_explore_pick(disciple_id: String) -> void:
+	if explore_selected_ids.has(disciple_id):
+		explore_selected_ids.erase(disciple_id)
+	else:
+		explore_selected_ids.append(disciple_id)
+	_render_explore_panel()
+
+
+## 己方弟子（`view.sects[player].disciples[]`，按 id 升序保证渲染稳定）。
+func _own_disciples() -> Array:
+	var out: Array = []
+	for sect: Dictionary in Session.current_view.get("sects", []):
+		if not bool(sect.get("player", false)):
+			continue
+		for disciple: Dictionary in sect.get("disciples", []):
+			out.append(disciple)
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a.get("id", "")) < str(b.get("id", "")))
+	return out
+
+
+# --- 政令 ---
+
+func open_policy_panel() -> void:
+	policy_open = true
+	_close_r6_panels(policy_panel)
+	policy_status_label.text = ""
+	Session.request_query_policy_options(player_sect_id())
+	_render_policy_panel()
+
+
+func close_policy_panel() -> void:
+	policy_open = false
+	_sync_r6_visibility()
+	_render_policy_panel()
+
+
+func _on_policy_options_received(result: Dictionary) -> void:
+	policy_options = result
+	_render_policy_panel()
+
+
+func _render_policy_panel() -> void:
+	_sync_r6_visibility()
+	if policy_info_label == null:
+		return
+	if not policy_open:
+		policy_info_label.text = ""
+		_clear_r6_list(policy_list)
+		return
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("政体 %s · 时代序号 %d" % [str(policy_options.get("governmentName", "?")), int(policy_options.get("eraIndex", 0))])
+	var cooldown: int = int(policy_options.get("switchCooldownLeft", 0))
+	lines.append("切换冷却 %s" % ("%d 回合" % cooldown if cooldown > 0 else "就绪"))
+	var effects: Dictionary = policy_options.get("effects", {})
+	var effect_parts: PackedStringArray = PackedStringArray()
+	for key: String in effects.keys():
+		var value: float = float(effects[key])
+		if is_zero_approx(value):
+			continue
+		effect_parts.append("%s%+.2f" % [key, value])
+	lines.append("效果合计 %s" % ("、".join(effect_parts) if not effect_parts.is_empty() else "无"))
+	policy_info_label.text = "\n".join(lines)
+	_clear_r6_list(policy_list)
+	for entry: Variant in policy_options.get("governments", []):
+		var gov: Dictionary = entry
+		var button: Button = Button.new()
+		button.name = "Gov_" + str(gov.get("id", ""))
+		button.text = ("● " if bool(gov.get("current", false)) else "○ ") + str(gov.get("name", "")) + " · " + str(gov.get("effectsText", ""))
+		button.disabled = bool(gov.get("current", false)) or not bool(gov.get("allowed", false))
+		button.tooltip_text = str(gov.get("blocker", ""))
+		var gov_id: String = str(gov.get("id", ""))
+		button.pressed.connect(func() -> void: Session.request_switch_government(player_sect_id(), gov_id))
+		policy_list.add_child(button)
+	policy_list.add_child(HSeparator.new())
+	for entry: Variant in policy_options.get("cards", []):
+		var card: Dictionary = entry
+		var button: Button = Button.new()
+		button.name = "Card_" + str(card.get("id", ""))
+		var prefix: String = "✕ " if bool(card.get("enacted", false)) else "＋ "
+		button.text = prefix + str(card.get("name", "")) + "（%s）· %s" % [str(card.get("categoryLabel", "")), str(card.get("effectsText", ""))]
+		button.disabled = not bool(card.get("enacted", false)) and not bool(card.get("allowed", false))
+		button.tooltip_text = str(card.get("blocker", ""))
+		var card_id: String = str(card.get("id", ""))
+		var enacted: bool = bool(card.get("enacted", false))
+		button.pressed.connect(func() -> void:
+			if enacted:
+				Session.request_revoke_policy(player_sect_id(), card_id)
+			else:
+				Session.request_enact_policy(player_sect_id(), card_id))
+		policy_list.add_child(button)
+	var close: Button = Button.new()
+	close.name = "ClosePolicy"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_policy_panel())
+	policy_list.add_child(close)
+
+
+# --- 自动化 ---
+
+func open_automation_panel() -> void:
+	automation_open = true
+	_close_r6_panels(automation_panel)
+	automation_status_label.text = ""
+	Session.request_query_automation_state(player_sect_id())
+	_render_automation_panel()
+
+
+func close_automation_panel() -> void:
+	automation_open = false
+	_sync_r6_visibility()
+	_render_automation_panel()
+
+
+func _on_automation_state_received(result: Dictionary) -> void:
+	automation_state = result
+	_render_automation_panel()
+
+
+func _render_automation_panel() -> void:
+	_sync_r6_visibility()
+	if automation_info_label == null:
+		return
+	if not automation_open:
+		automation_info_label.text = ""
+		_clear_r6_list(automation_list)
+		return
+	automation_info_label.text = str(automation_state.get("summary", "（等待服务端状态…）"))
+	_clear_r6_list(automation_list)
+	var toggles: Array = [
+		["improve", "自动改良", bool(automation_state.get("autoImprove", false))],
+		["repair", "自动修缮", bool(automation_state.get("autoRepair", false))],
+		["road", "自动修路", bool(automation_state.get("autoRoad", false))],
+		["explore", "自动探索", bool(automation_state.get("autoExplore", false))],
+	]
+	for entry: Variant in toggles:
+		var row: Array = entry
+		var key: String = str(row[0])
+		var on: bool = bool(row[2])
+		var button: Button = Button.new()
+		button.name = "Toggle_" + key
+		button.text = ("☑ " if on else "☐ ") + str(row[1])
+		button.pressed.connect(func() -> void: Session.request_set_automation_toggle(player_sect_id(), key, not on))
+		automation_list.add_child(button)
+	for entry: Variant in automation_state.get("peaks", []):
+		var peak: Dictionary = entry
+		var on: bool = bool(peak.get("autoProject", false))
+		var button: Button = Button.new()
+		button.name = "Peak_" + str(peak.get("peakId", ""))
+		button.text = ("☑ " if on else "☐ ") + str(peak.get("name", "")) + " 自动项目"
+		var peak_id: String = str(peak.get("peakId", ""))
+		button.pressed.connect(func() -> void: Session.request_set_peak_auto_project(peak_id, not on))
+		automation_list.add_child(button)
+	automation_list.add_child(HSeparator.new())
+	var all_on: Button = Button.new()
+	all_on.name = "AllAutoProjectOn"
+	all_on.text = "全部峰自动项目：开"
+	all_on.pressed.connect(func() -> void: Session.request_set_all_auto_project(player_sect_id(), true))
+	automation_list.add_child(all_on)
+	var all_off: Button = Button.new()
+	all_off.name = "AllAutoProjectOff"
+	all_off.text = "全部峰自动项目：关"
+	all_off.pressed.connect(func() -> void: Session.request_set_all_auto_project(player_sect_id(), false))
+	automation_list.add_child(all_off)
+	var explore_now: Button = Button.new()
+	explore_now.name = "ExploreNow"
+	explore_now.text = "立即探索"
+	explore_now.pressed.connect(func() -> void: Session.request_explore_now(player_sect_id()))
+	automation_list.add_child(explore_now)
+	var rally: Button = Button.new()
+	rally.name = "Rally"
+	rally.text = "一键集结"
+	rally.pressed.connect(func() -> void: Session.request_rally(player_sect_id()))
+	automation_list.add_child(rally)
+	var defend: Button = Button.new()
+	defend.name = "ReturnToDefense"
+	defend.text = "一键回防"
+	defend.pressed.connect(func() -> void: Session.request_return_to_defense(player_sect_id()))
+	automation_list.add_child(defend)
+	var fast: Button = Button.new()
+	fast.name = "FastSettlement"
+	fast.text = "快速结算：%s" % ("开" if bool(local_settings.get("fastSettlement", false)) else "关")
+	fast.pressed.connect(func() -> void: _toggle_local_setting("fastSettlement"))
+	automation_list.add_child(fast)
+	var close: Button = Button.new()
+	close.name = "CloseAutomation"
+	close.text = "关闭"
+	close.pressed.connect(func() -> void: close_automation_panel())
+	automation_list.add_child(close)
+
+
+## 本地设置：先本地生效，再让服务端确认（服务端 `applied:false`，不回 view）。
+func _toggle_local_setting(key: String) -> void:
+	var value: bool = not bool(local_settings.get(key, false))
+	local_settings[key] = value
+	Session.request_set_setting(key, value)
+	_render_automation_panel()
+
+
+func settings_value(key: String) -> Variant:
+	return local_settings.get(key, null)
+
+
+# --- 回包汇总 ---
+
+## R6 写命令回包：把 message 落到对应面板，并重拉该面板的只读数据。
+func _on_r6_result_received(command: String, result: Dictionary) -> void:
+	var message: String = str(result.get("message", ""))
+	if not bool(result.get("success", true)):
+		message = "✗ " + message
+	match command:
+		Commands.SEND_TO_JI_YUAN, Commands.EXPLORE_MI_JING:
+			if explore_status_label != null:
+				explore_status_label.text = message
+			_refresh_explore_info()
+		Commands.SWITCH_GOVERNMENT, Commands.ENACT_POLICY, Commands.REVOKE_POLICY:
+			if policy_status_label != null:
+				policy_status_label.text = message
+			Session.request_query_policy_options(player_sect_id())
+		Commands.SET_AUTOMATION_TOGGLE, Commands.SET_PEAK_AUTO_PROJECT, Commands.SET_ALL_AUTO_PROJECT, Commands.EXPLORE_NOW, Commands.RALLY, Commands.RETURN_TO_DEFENSE:
+			if automation_status_label != null:
+				automation_status_label.text = message
+			Session.request_query_automation_state(player_sect_id())
+		Commands.SET_SETTING:
+			if automation_status_label != null:
+				automation_status_label.text = "本地设置已生效：" + str(result.get("key", ""))
+		_:
+			pass
+
+
+# --- 供自动验收断言（R6）---
+
+func explore_panel_visible() -> bool:
+	return explore_open
+
+func explore_info_text() -> String:
+	return explore_info_label.text if explore_info_label != null else ""
+
+func explore_feedback_text() -> String:
+	return explore_status_label.text if explore_status_label != null else ""
+
+func explore_button_count() -> int:
+	return explore_list.get_child_count() if explore_list != null else 0
+
+func policy_panel_visible() -> bool:
+	return policy_open
+
+func policy_info_text() -> String:
+	return policy_info_label.text if policy_info_label != null else ""
+
+func policy_feedback_text() -> String:
+	return policy_status_label.text if policy_status_label != null else ""
+
+func policy_button_count() -> int:
+	return policy_list.get_child_count() if policy_list != null else 0
+
+func automation_panel_visible() -> bool:
+	return automation_open
+
+func automation_info_text() -> String:
+	return automation_info_label.text if automation_info_label != null else ""
+
+func automation_feedback_text() -> String:
+	return automation_status_label.text if automation_status_label != null else ""
+
+func automation_button_count() -> int:
+	return automation_list.get_child_count() if automation_list != null else 0
+
+## 按按钮名找到按钮状态（`Toggle_<key>` / `Peak_<peakId>` / `Card_<cardId>` / `Gov_<govId>`）。
+func r6_button_state(button_name: String) -> Dictionary:
+	for list: VBoxContainer in [explore_list, policy_list, automation_list]:
+		if list == null:
+			continue
+		var button: Button = list.get_node_or_null(NodePath(button_name)) as Button
+		if button != null:
+			return {"disabled": button.disabled, "text": button.text, "tooltip": button.tooltip_text}
+	return {}

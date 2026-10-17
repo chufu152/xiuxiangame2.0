@@ -47,6 +47,9 @@ var reclassCooldown: int = 0
 var garrisonNodeId: String = ""
 ## R5 新增：被俘前的原宗门 id（`captureChanceOnLoss` 命中时记账）。
 var capturedFromSectId: String = ""
+## R6 新增：正在执行探索任务的节点 id（机缘/秘境；任务结束清空）。
+## 对齐 `queryDiscipleDetail.missionNodeId`；驻守用 `garrisonNodeId`，两者互斥。
+var missionNodeId: String = ""
 
 func to_dict() -> Dictionary:
 	return {"id": id, "name": name, "sectId": sectId, "tileId": tileId, "realm": realm, "position": position, "rootGrade": rootGrade, "spiritRoots": spiritRoots.duplicate(), "unitClass": unitClass, "movePoints": movePoints, "maxMovePoints": maxMovePoints, "attacksRemaining": attacksRemaining, "turnsInSect": turnsInSect, "assignedPeakId": assignedPeakId, "bloodLine": bloodLine, "generation": generation, "directLine": directLine, "heartDevil": heartDevil, "injured": injured, "cultivationProgress": cultivationProgress, "builderCharges": builderCharges, "battleXp": battleXp, "battleLevel": battleLevel, "promotionPoints": promotionPoints, "promotions": promotions.duplicate(), "reclassCooldown": reclassCooldown, "garrisonNodeId": garrisonNodeId}

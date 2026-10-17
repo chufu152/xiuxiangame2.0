@@ -103,6 +103,8 @@
 
 「回 view」= 成功响应是否携带全量快照。「状态」= 已实现 / 待实现（R*）。
 
+> 截至 R6 已实现 **55 条 + `ping`**（`CommandDispatcher.implemented_commands()` 共 56 项）；待实现 14 条，全部属 R7。
+
 ### 会话与存档（13）
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
@@ -141,8 +143,8 @@
 | `queryDiscipleDetail` | 单位 | R5 | 否 | 是 | 已实现（R5） |
 | `foundSpiritPeak` | 单位 | R3 | 是 | 否 | 已实现（R3） |
 | `appointBuilder` | 单位 | R3 | 是 | 否 | 已实现（R3） |
-| `rally` | 单位 | R6 | 是 | 否 | 待实现（R6） |
-| `returnToDefense` | 单位 | R6 | 是 | 否 | 待实现（R6） |
+| `rally` | 单位 | R6 | 是 | 否 | 已实现（R6） |
+| `returnToDefense` | 单位 | R6 | 是 | 否 | 已实现（R6） |
 | `tribulate` | 单位 | R7 | 是 | 否 | 待实现（R7） |
 | `appointFengZhu` | 单位 | R7 | 是 | 否 | 待实现（R7） |
 | `appointZhangLao` | 单位 | R7 | 是 | 否 | 待实现（R7） |
@@ -175,30 +177,30 @@
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `queryJiYuanInfo` | 探索 | R6 | 否 | 是 | 待实现（R6） |
-| `sendToJiYuan` | 探索 | R6 | 是 | 否 | 待实现（R6） |
-| `queryMiJingInfo` | 探索 | R6 | 否 | 是 | 待实现（R6） |
-| `exploreMiJing` | 探索 | R6 | 是 | 否 | 待实现（R6） |
+| `queryJiYuanInfo` | 探索 | R6 | 否 | 是 | 已实现（R6） |
+| `sendToJiYuan` | 探索 | R6 | 是 | 否 | 已实现（R6） |
+| `queryMiJingInfo` | 探索 | R6 | 否 | 是 | 已实现（R6） |
+| `exploreMiJing` | 探索 | R6 | 是 | 否 | 已实现（R6） |
 
 ### 政令（4）
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `switchGovernment` | 政令 | R6 | 是 | 否 | 待实现（R6） |
-| `enactPolicy` | 政令 | R6 | 是 | 否 | 待实现（R6） |
-| `revokePolicy` | 政令 | R6 | 是 | 否 | 待实现（R6） |
-| `queryPolicyOptions` | 政令 | R6 | 否 | 是 | 待实现（R6） |
+| `switchGovernment` | 政令 | R6 | 是 | 否 | 已实现（R6） |
+| `enactPolicy` | 政令 | R6 | 是 | 否 | 已实现（R6） |
+| `revokePolicy` | 政令 | R6 | 是 | 否 | 已实现（R6） |
+| `queryPolicyOptions` | 政令 | R6 | 否 | 是 | 已实现（R6） |
 
 ### 自动化 / 设置（6）
 
 | 命令名 | 分组 | 里程碑 | 回 view | 只读 | 状态 |
 |---|---|---|---|---|---|
-| `setAutomationToggle` | 自动化 | R6 | 是 | 否 | 待实现（R6） |
-| `setPeakAutoProject` | 自动化 | R6 | 是 | 否 | 待实现（R6） |
-| `setAllAutoProject` | 自动化 | R6 | 是 | 否 | 待实现（R6） |
-| `exploreNow` | 自动化 | R6 | 是 | 否 | 待实现（R6） |
-| `queryAutomationState` | 自动化 | R6 | 否 | 是 | 待实现（R6） |
-| `setSetting` | 自动化 | R6 | 否 | 是 | 待实现（R6） |
+| `setAutomationToggle` | 自动化 | R6 | 是 | 否 | 已实现（R6） |
+| `setPeakAutoProject` | 自动化 | R6 | 是 | 否 | 已实现（R6） |
+| `setAllAutoProject` | 自动化 | R6 | 是 | 否 | 已实现（R6） |
+| `exploreNow` | 自动化 | R6 | 是 | 否 | 已实现（R6） |
+| `queryAutomationState` | 自动化 | R6 | 否 | 是 | 已实现（R6） |
+| `setSetting` | 自动化 | R6 | 否 | 是 | 已实现（R6） |
 
 ### 待抉择（2）
 
@@ -708,14 +710,15 @@
 | 字段 | 类型 | 必填 | 默认/缺省 | 含义 | 出处 |
 |---|---|---|---|---|---|
 | `sectId` | string | 是 | — | 宗门 id | 1.0 `PROTOCOL.md` §11.5 |
-| `tileId` | string | 否 | — | 集结目标地块 id | 同上 |
+| `tileId` | string | 否 | — | 集结目标地块 id；缺省取本宗都城地块 | 同上 |
 
-- **result**：`{success:true, message}`（文案型命令）。
+- **result**：`{success:true, message}`（文案型命令；**不含** `movedIds` 等明细，与 1.0 一致）。
+  > 2.0 差异（§11.1 #27）：待集结弟子数 > `automation.rallyMaxDisciples` 时**直接返回 `success:false`** 并在 `message` 写明上限；1.0 是静默截断到上限后照常返回成功。
 - **view**：是。
-- **events**：集结事件。
+- **events**：集结事件（`[自动]` 前缀）。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2；2.0 PRD §7（R6 含「集结/回防」）。
 
 ### `returnToDefense`
@@ -728,11 +731,12 @@
 | `sectId` | string | 是 | — | 宗门 id | 1.0 `PROTOCOL.md` §11.5 |
 
 - **result**：`{success:true, message}`（文案型命令）。
+  > 2.0 差异（§11.1 #27）：与 `rally` 同一上限规则——待回防弟子数 > `automation.rallyMaxDisciples` 时**直接失败**，不静默截断。
 - **view**：是。
-- **events**：回防事件。
+- **events**：回防事件（`[自动]` 前缀）。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §2；2.0 PRD §7（R6 含「集结/回防」）。
 
 ### `tribulate`
@@ -1153,12 +1157,16 @@
 |---|---|---|---|---|---|
 | `nodeId` | string | 是 | — | 节点 id | 1.0 `PROTOCOL.md` §11.5 |
 
-- **result**：`{nodeId, kind:"jiYuan", found, info:NodeInfo}`（`NodeInfo` 形状见 §11 待办 #2）。
+- **result**：`{nodeId, kind:"jiYuan", found, info}`；节点不存在或类型不符时 `found=false`、`info=null`。
+  `NodeInfo`（§11.2 #2 已回填，1.0 `entity/NodeInfo.java` 九字段原样落地）：
+  `{nodeId, name, type, level, requiredRealmLevel, cooldown, cost, maxParticipants, rewardPreview}`。
+  机缘取 `requiredRealmLevel = level × explore.jiYuanThresholdPerNodeLevel`、`cost=0`、`maxParticipants=1`；
+  `rewardPreview` 为中文预览串（如 `天晶x(2+灵根品级x1) + 道统点xN`）。
 - **view**：否（只读）。
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §4。
 
 ### `sendToJiYuan`
@@ -1171,12 +1179,15 @@
 | `discipleId` | string | 是 | — | 弟子 id | 1.0 `PROTOCOL.md` §11.5 |
 | `nodeId` | string | 是 | — | 节点 id | 同上 |
 
-- **result**：`ExploreResult`（字段形状见 §11 待办 #1）。
+- **result**：`ExploreResult`（§11.2 #1 已回填，1.0 `ExploreResult.java` 六字段）：
+  `{success, message, rewards[], casualties[], injured[], cooldown}`。
+  `rewards[]` 元素为 `Reward`：`{type, amount, materialId}`，`type` ∈ `SPIRIT_POWER` / `SPIRIT_STONES` / `RARE_MATERIAL` / `DAO_POINT`（机缘产出 `DAO_POINT` + `RARE_MATERIAL`）。
+  `casualties[]` / `injured[]` 为弟子 id 字符串数组；`cooldown` 为本次探索后该节点的剩余冷却回合数（成败均计）。
 - **view**：是。
-- **events**：探索事件。
+- **events**：探索事件（含死亡/受伤/心魔）。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §4。
 
 ### `queryMiJingInfo`
@@ -1188,12 +1199,13 @@
 |---|---|---|---|---|---|
 | `nodeId` | string | 是 | — | 节点 id | 1.0 `PROTOCOL.md` §11.5 |
 
-- **result**：`{nodeId, kind:"miJing", found, info:NodeInfo}`（`NodeInfo` 形状见 §11 待办 #2）。
+- **result**：`{nodeId, kind:"miJing", found, info}`；`found=false` 时 `info=null`。`NodeInfo` 同 `queryJiYuanInfo`；
+  秘境取 `cost = explore.miJingCost`、`maxParticipants = explore.miJingMaxParticipants`、`requiredRealmLevel=0`。
 - **view**：否（只读）。
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §4。
 
 ### `exploreMiJing`
@@ -1206,12 +1218,13 @@
 | `discipleIds` | string[] | 是 | — | 弟子 id 列表 | 1.0 `PROTOCOL.md` §11.5 |
 | `nodeId` | string | 是 | — | 节点 id | 同上 |
 
-- **result**：`ExploreResult`（字段形状见 §11 待办 #1）。
+- **result**：`ExploreResult`，字段同 `sendToJiYuan`；秘境「丰厚」产出 `RARE_MATERIAL` + `SPIRIT_STONES` + `DAO_POINT`。
+  业务失败（冷却中 / 类型不符 / 空列表 / 超人数 / 跨宗门 / 弟子未站在节点格 / 灵石不足）一律 `success:false` + 中文 `message`，协议层仍 `ok:true`。
 - **view**：是。
 - **events**：探索事件（含伤亡）。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §4。
 
 ---
@@ -1228,12 +1241,13 @@
 | `sectId` | string | 是 | — | 宗门 id | 1.0 `PROTOCOL.md` §11.5 |
 | `governmentId` | string | 是 | — | 政体 id（3 政体） | 同上 |
 
-- **result**：`{success:true, message}`（1.0 `COMMAND_MAP.md` 记作 `PolicyResult`，形状未给，见 §11 待办 #1）。
+- **result**：`{success:true, message}`（1.0 `COMMAND_MAP.md` 记作 `PolicyResult`；§11.2 #1 已回填，实际恰为 `{success, message}` 两字段）。
+  > 切换成功后 `Sect.lastPolicySwitchTurn = 当前回合`，冷却 `policy.governments[].switchCooldownTurns`；新政权体槽位少于已颁卡数时**自动废止溢出的卡**并在 `message` 逐条写明（`PolicyRules.trim_policies_to_slots`）。
 - **view**：是。
 - **events**：政体切换事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §5；2.0 PRD §7（R6）。
 
 ### `enactPolicy`
@@ -1251,7 +1265,7 @@
 - **events**：政令颁布事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §5（参数名记作 `policyId`，见 §11 冲突 #5）。
 
 ### `revokePolicy`
@@ -1269,7 +1283,7 @@
 - **events**：政令废除事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §5（参数名记作 `policyId`，见 §11 冲突 #5）。
 
 ### `queryPolicyOptions`
@@ -1283,11 +1297,12 @@
 
 - **result**：`{sectId, enabled, found, governmentId, governmentName, switchCooldownLeft, eraIndex, effects{}, lines[], governments[{id,name,description,current,allowed,blocker,slots{},effectsText}…], cards[{id,name,category,categoryLabel,description,unlockEra,enacted,allowed,blocker,usedSlots,effectsText}…]}`。
   > 2.0 按 PRD §5.2 #4 删除 2 张外交卡，`category=diplomacy` 不再出现；`loyalty` 效果改落 `stability`。
+  > `effects{}` 与 `governments[].slots{}` 的内部形状见 §11.2 #4（已回填）。`cards[]` **不含** `unlockDaoKey`——道法门控只在服务端 `PolicyRules.card_block_reason` 内判定，`blocker` 给中文原因，避免泄露未推演道法 id。
 - **view**：否（只读）。
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §5；PRD §5.2 #4。
 
 ---
@@ -1310,7 +1325,7 @@
 - **events**：自动化开关事件。
 - **errorCode**：`BAD_PARAMS`（key 非法）、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §7。
 
 ### `setPeakAutoProject`
@@ -1328,7 +1343,7 @@
 - **events**：自动化开关事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §7。
 
 ### `setAllAutoProject`
@@ -1346,7 +1361,7 @@
 - **events**：自动化开关事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §7。
 
 ### `exploreNow`
@@ -1363,7 +1378,7 @@
 - **events**：探索事件。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §7。
 
 ### `queryAutomationState`
@@ -1380,7 +1395,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`、`NO_GAME`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5；`COMMAND_MAP.md` §7。
 
 ### `setSetting`
@@ -1398,7 +1413,7 @@
 - **events**：`[]`。
 - **errorCode**：`BAD_PARAMS`。
 - **里程碑**：R6。
-- **状态**：待实现（R6）。
+- **状态**：已实现（R6）。
 - **出处**：1.0 `PROTOCOL.md` §11.5、`COMMAND_MAP.md` §7、`COMMAND_MAP.md` §11.2 #5；PRD §6.7（标注「客户端本地，不回 view」）。
 
 ---
@@ -1517,15 +1532,17 @@
 | 23 | 道统成就「初探秘境」的判定语义 | 1.0 以「已探索地块中存在秘境节点」计数（`sect.exploredTiles` 含秘境节点所在格即算达成） | 该口径在 2.0 会**开局即成立**：出生点视野内常含秘境节点，导致第 1 回合白送 30 道点、且成就永久失效（R4 客户端端到端实测暴露，见 `R4_CLIENT_FAIL: 开局无任何 AVAILABLE 道法`）。故 2.0 改为**成功探索秘境次数** `Sect.miJingExploredTotal`（内部记账，不下发 view）：`exploreMiJing` 成功才递增，R5 落地该命令时回填；R4 期间恒为 `0`，成就不可触发。`ownLingMai`/`recruited`/`enemyDefeated` 三个成就的计数口径不受影响 | PRD §4.9「道统成就 boost（一次性道点奖励）」；2.0 代码 `DaoRules._boost_progress` |
 | 24 | 三流派特性的落地口径 | 1.0 `GameConfig` 声明了 `faction.zongMen.*` / `jiaZu.*` / `guoJia.*` 全套字段，但**业务代码零引用**（`grep` 全仓仅命中 `GameConfig.java` 的 getter/setter）——即 1.0 从未实现流派特性 | 2.0 按 PRD §1.1 原文落地其中**口径明确**的 6 项，统一由 `FactionRules` 出口：① `zongMen.buildSpeedBonus` 营造工期 ×(1−0.3) 下限 1（「营造 +30%」）；② `zongMen.subPeakCostReduction` 4 种 `*_FEN_FENG` 造价 ×0.8（「副峰花费 −20%」）；③ `zongMen.uniqueBuildingDefenseBonus` 护山剑阵落成防御 +25（「落成防御 +25」）；④ `jiaZu.peakBuildCostPenalty` 建筑造价 ×1.5（「建峰花费 +50%」）；⑤ `jiaZu.bloodLineSpeedBonus` 血脉弟子修炼 ×1.4（「血脉修炼 +40%」）；⑥ `jiaZu.zuCiCultivationBonus` 本宗有祖祠时血脉弟子再 ×1.25（「祖祠修炼 +25%」）。**`zongMen.buildSpeedBonus` 与 `jiaZu.peakBuildCostPenalty` 互斥**（一宗一流派，用 if/elif 不累乘）；**开峰造价不叠乘**——`spiritPeak.foundCost` 表已内建流派差异（宗门 500 / 家族 800 / 国家 350），故 `jiaZu.foundCostPenalty`、`guoJia.foundCostReduction` 属**冗余键**，若再乘一次会双重计费 | PRD §1.1、§4.3 L348；2.0 代码 `FactionRules`、`CityAction`、`CityRules.can_build`、`DiscipleRules.cultivation_speed` |
 | 25 | 地形防御 / 高台 / 河流三处「1.0 有实现但键名口径不同」的判定 | 1.0 各有一份实现，但都建立在**中文地形名**之上：① `CombatCalculator` 查 `terrainDefenseBonus{平原,险地}`（中文键）；② 高台加成判「攻方站在 `danger` 格」这一布尔；③ 河流减益判「地形名 ∈ `riverTerrains`」 | 2.0 的地形 id 是**英文枚举**（`FLAT/HILL/MOUNTAIN`、`SPIRIT_FOREST/MIRE`），1.0 的中文表**无法复用**，故三处一律改为读 2.0 自己的分层配置，并各自登记为语义差异：① **地形防御** = `map.relief[].defenseBonus` + `map.features[].defenseBonus` 累加，`danger` 格再取 `max(累加值, warfare.terrainDefenseBonus.danger)`（`UnitRules.terrain_defense_bonus`）；② **高台** 改判**海拔比较**（`map.relief[].height`：`FLAT` 1.0 / `HILL` 1.7 / `MOUNTAIN` 3.0），攻方海拔严格高于守方才加成（`UnitRules.high_ground_bonus`），不再是「站险地即加成」；③ **河流减益** 判**边**而非地形：读 `HexTile.riverEdges` 并经 `MoveRules.crosses_river` 判「攻方与守方之间是否隔河」（`UnitRules.river_penalty`）。三处均为 `CombatResolver._build_matchup` 的唯一来源，`preview()` 与 `attack()` 共用，故「预览=实战」结构性成立（R5 裁决三） | 2.0 `data/gameConfig.json` `map.relief`/`map.features`/`warfare.terrainDefenseBonus`；2.0 代码 `UnitRules`、`CombatResolver`、`MoveRules.crosses_river` |
+| 26 | 探索/集结的随机源 | 1.0 `ExploreAction` 用 `MISSION_SEQ`（静态 `AtomicLong`）+ XOR 播种造伪随机 | 2.0 **全部改走 `GameState.rng`**（`RngService.next_float` / `chance`），与移动/战斗同一确定性源；同种子 + 同命令序列结果逐字节一致（`R6Test._test_determinism` 实证） | 确定性铁律（PRD §6.6）；2.0 `ExploreRules`、`AutomationRules` |
+| 27 | `rally` / `returnToDefense` 超限行为 | 1.0 静默截断到 `rallyMaxDisciples` 后返回成功 | 2.0 **直接返回 `success:false`** 并在 `message` 写明上限，让玩家知道有一批人没动；命令 result 仍为 `{success, message}`（§11.2 #1） | PRD §7 R6「集结/回防」；避免「以为全军出动实则漏人」的静默行为 |
 
 ### 11.2 待办（`TODO(需核对)`：权威源未给出形状，禁止臆造）
 
 | # | 项 | 现状 | 需要什么 |
 |---|---|---|---|
-| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | **`TrainingResult` 已回填（R5）**：1.0 `TrainingResult.java` 实际字段恰为 `{success, message, unitClass}`，故 `reclass`/`promote` 的 result 按此三字段落地（`unitClass` 返回**改后**的兵种）。其余三个仍 `TODO(需核对)` |
-| 2 | `NodeInfo`（`queryJiYuanInfo`/`queryMiJingInfo` 的 `info`） | 1.0 仅给类型名 | `TODO(需核对)`：同上 |
+| 1 | `TrainingResult` / `AppointmentResult` / `ExploreResult` / `PolicyResult` 的字段形状 | 1.0 `PROTOCOL.md` §11 只给出类型名，未列字段；`COMMAND_MAP.md` 亦未展开 | **`TrainingResult` 已回填（R5）**：1.0 `TrainingResult.java` 实际字段恰为 `{success, message, unitClass}`，故 `reclass`/`promote` 的 result 按此三字段落地（`unitClass` 返回**改后**的兵种）。**`ExploreResult` / `PolicyResult` 已回填（R6）**：1.0 `ExploreResult.java` 恰为 `{success, message, rewards:List<Reward>, casualties:List<String>, injured:List<String>, cooldown:int}`，`Reward` 为 `{type, amount, materialId}`（`type` ∈ `SPIRIT_POWER`/`SPIRIT_STONES`/`RARE_MATERIAL`/`DAO_POINT`）；1.0 `PolicyAction.PolicyResult` 恰为 `{success, message}`。仅 `AppointmentResult` 仍 `TODO(需核对)`（属 R7 任命） |
+| 2 | `NodeInfo`（`queryJiYuanInfo`/`queryMiJingInfo` 的 `info`） | 1.0 仅给类型名 | **已回填（R6）**：1.0 `entity/NodeInfo.java` 九字段 `{nodeId, name, type, level, requiredRealmLevel, cooldown, cost, maxParticipants, rewardPreview}`，2.0 原样落地；未用到的字段留默认（机缘 `cost`=0 / `maxParticipants`=1，秘境 `requiredRealmLevel`=0）。`name` 取自 `GameNode.name`（`MapGenerator` 按 `NodeType.NAMES` + 序号取名），不下发进 `view.nodes[]` |
 | 3 | `queryVictoryProgress.routes[].goals` 内部形状 | 1.0 只给到 `goals` 一层 | `TODO(需核对)` |
-| 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | `TODO(需核对)` |
+| 4 | `queryPolicyOptions.effects{}` / `governments[].slots{}` 内部形状 | 1.0 只给到一层 | **已回填（R6）**：`effects{}` = `{outputBonus, spiritPowerBonus, cultivationBonus, combatBonus, stabilityPerTurn, prestigePerTurn}`（前四项为**百分比小数**，后两项为**每回合增量**；合计只经 `PolicyRules.effect_sum` 一个出口，`policy.enabled=false` 时全零）；`governments[].slots{}` = `{economy, military, culture}` 三个整数槽位，**读自 `policy.governments[].slots` 配置**而非硬编码（R6 裁决四） |
 | 5 | 地形 blocker 的归属 | PRD §6.7 末注：山岳不可建城/不可通行、雾泽、缺水由 `querySpiritPeakBlocker` / `queryBuildOptions` / `queryMoveRange` 返回 | `TODO(需核对)`：`querySpiritPeakBlocker` **不在 69 条命令清单内**（PRD §6.7 未登记），需确认它是否为新增命令或应并入 `queryBuildOptions`；本文**不新增命令**，故仅在 `foundSpiritPeak`/`queryMoveRange` 的说明中引用该语义 |
 | 6 | `awaitInput.options` 的 `routeId`/`description` 之外是否另有字段 | PRD §6.3 给出 `routeId`/`description` | 已按 PRD §6.3 落地，无 TODO |
 | 7 | `ImprovementRules.apply_pillage()` 的接线点 | 配置含 `pillageChanceOnMove` 0.35 / `pillageChanceOnAttack` 1.0；R3 已实现掠夺判定函数本身 | **攻击路径已接线（R5）**：`CombatResolver.resolve_attack` 在 `attackerWon` 时对目标格调用 `ImprovementRules.apply_pillage(state, config, tile, 1.0, "battle")`（战火打残改良、产出停摆待修缮）。**移动路径仍未接线**（`pillageChanceOnMove` 0.35 未被读取）：1.0 在移动途中按概率掠夺，2.0 R2 的移动规则已验证稳定，故 R5 不改动移动路径，留待 R6 探索/劫掠一并回填 |
@@ -1616,7 +1633,9 @@
 | `tileSnapshots` / `nodeSnapshots` / `peakSnapshots` / `improvementSnapshots` | `Sect` | 迷雾「记忆态」内部缓存；客户端只需 `visibleTiles`/`exploredTiles` |
 | `projectQueue` | `SpiritPeak` | 项目队列（建造/建区/洞府/加固）；R4 `queryProjectQueue` 才下发，R3 仅内部推进 |
 | `builderCharges` 之外的 `Improvement.charges` | `Improvement` | 预留字段（R3 恒 `0`）；`Improvement.to_dict` 仍照发，客户端忽略 |
-| `policyCarry` / `lastPolicySwitchTurn` / `lastEventTurn` | `Sect` | 结算中间态与冷却记账（R6 落地） |
+| `policyCarry` / `lastPolicySwitchTurn` / `lastEventTurn` | `Sect` | 结算中间态与冷却记账（R6 落地）。`policyCarry["stabilityBonus"]` 是「政令安定」的整数累积，`PolicyRules.process_settlement` 在 `EconomyRules.apply_settlement` **之后**叠加到各峰 `stability` 上——因为 2.0 的 `stability` 是每回合派生的值，不能像 1.0 那样直接累加 |
+| `governmentId` / `enactedPolicies` / `automationToggles` / `autoProjectByPeak` | `Sect` | 政体、已颁政令卡、四项自动化开关、逐峰自动项目（R6 落地）；仅由 `queryPolicyOptions` / `queryAutomationState` 按需下发，`view.sects[]` 不含 |
+| `missionNodeId` | `Disciple` | 探索任务节点（机缘/秘境，R6 落地）；与 `garrisonNodeId` **互斥**。仅在 `queryDiscipleDetail` 以 `missionNodeId` + `missionNodeName` 下发，`view.disciples[]` 不含 |
 | `lastReproduceTurn` | `Disciple` | 繁衍冷却记账（R4 落地） |
 | `realmLevel` / `breakthroughPending` / `tribulating` | `Disciple` | 境界等级由 `realm` 派生、突破候选与渡劫中间态；`view.disciples[]` 的 `realm` 已足够表达（R4 落地） |
 | `researchQueue` | `Sect` | 研究队列（道法研究）；R4 `queryProjectQueue.researchQueue[]` 才下发 |

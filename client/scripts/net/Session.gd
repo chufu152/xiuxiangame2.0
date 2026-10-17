@@ -42,6 +42,18 @@ signal disciple_detail_received(result: Dictionary)
 ## 任一 R5 命令（含写命令）的结果回包，供世界层做战斗提示/面板刷新（成功与业务失败都发）。
 signal r5_result_received(command: String, result: Dictionary)
 
+# --- R6 探索/政令/自动化（只读命令把 result 交给世界层；写命令复用 view_changed）---
+## `queryJiYuanInfo` 结果（`{nodeId, kind, found, info:NodeInfo}`）。
+signal ji_yuan_info_received(result: Dictionary)
+## `queryMiJingInfo` 结果（`{nodeId, kind, found, info:NodeInfo}`）。
+signal mi_jing_info_received(result: Dictionary)
+## `queryPolicyOptions` 结果（政体/政令列表 + 效果文案 + 槽位占用）。
+signal policy_options_received(result: Dictionary)
+## `queryAutomationState` 结果（4 个开关 + 逐峰自动项目）。
+signal automation_state_received(result: Dictionary)
+## 任一 R6 命令（含写命令）的结果回包，供世界层做提示/面板刷新（成功与业务失败都发）。
+signal r6_result_received(command: String, result: Dictionary)
+
 ## 拉起服务端后的就绪总超时。实测冷启动 2.18s / 6.49s / 19s 波动极大，故取 40s 留足余量。
 const SERVER_READY_TIMEOUT_SEC: float = 40.0
 ## 就绪轮询间隔：每 0.5s 尝试连接一次。
@@ -262,6 +274,93 @@ func request_promote(disciple_id: String, promotion_id: String) -> String:
 func request_query_disciple_detail(disciple_id: String) -> String:
 	return _request(Commands.QUERY_DISCIPLE_DETAIL, {"discipleId": disciple_id})
 
+
+# ---------------------------------------------------------------------------
+# R6：探索 / 政令 / 自动化 / 设置 / 集结回防（16 条）
+# ---------------------------------------------------------------------------
+
+## 一键集结到指定地块（`tile_id` 为空则集结到己方主峰地块）。
+func request_rally(sect_id: String, tile_id: String = "") -> String:
+	var params: Dictionary = {"sectId": sect_id}
+	if not tile_id.is_empty():
+		params["tileId"] = tile_id
+	return _request(Commands.RALLY, params)
+
+
+## 全军回防（返回己方灵峰）。
+func request_return_to_defense(sect_id: String) -> String:
+	return _request(Commands.RETURN_TO_DEFENSE, {"sectId": sect_id})
+
+
+## 查询机缘节点信息（只读）→ `ji_yuan_info_received`。
+func request_query_ji_yuan_info(node_id: String) -> String:
+	return _request(Commands.QUERY_JI_YUAN_INFO, {"nodeId": node_id})
+
+
+## 派弟子探机缘（单人）。
+func request_send_to_ji_yuan(disciple_id: String, node_id: String) -> String:
+	return _request(Commands.SEND_TO_JI_YUAN, {"discipleId": disciple_id, "nodeId": node_id})
+
+
+## 查询秘境节点信息（只读）→ `mi_jing_info_received`。
+func request_query_mi_jing_info(node_id: String) -> String:
+	return _request(Commands.QUERY_MI_JING_INFO, {"nodeId": node_id})
+
+
+## 派多名弟子探秘境（≤ `explore.miJingMaxParticipants`）。
+func request_explore_mi_jing(disciple_ids: Array[String], node_id: String) -> String:
+	return _request(Commands.EXPLORE_MI_JING, {"discipleIds": disciple_ids, "nodeId": node_id})
+
+
+## 切换政体。
+func request_switch_government(sect_id: String, government_id: String) -> String:
+	return _request(Commands.SWITCH_GOVERNMENT, {"sectId": sect_id, "governmentId": government_id})
+
+
+## 颁行政令卡（参数名 `cardId`）。
+func request_enact_policy(sect_id: String, card_id: String) -> String:
+	return _request(Commands.ENACT_POLICY, {"sectId": sect_id, "cardId": card_id})
+
+
+## 废除已颁政令卡。
+func request_revoke_policy(sect_id: String, card_id: String) -> String:
+	return _request(Commands.REVOKE_POLICY, {"sectId": sect_id, "cardId": card_id})
+
+
+## 政令面板数据（只读）→ `policy_options_received`。
+func request_query_policy_options(sect_id: String) -> String:
+	return _request(Commands.QUERY_POLICY_OPTIONS, {"sectId": sect_id})
+
+
+## 自动化开关（`key` ∈ improve/repair/road/explore）。
+func request_set_automation_toggle(sect_id: String, key: String, on: bool) -> String:
+	return _request(Commands.SET_AUTOMATION_TOGGLE, {"sectId": sect_id, "key": key, "on": on})
+
+
+## 单峰自动项目开关。
+func request_set_peak_auto_project(peak_id: String, on: bool) -> String:
+	return _request(Commands.SET_PEAK_AUTO_PROJECT, {"peakId": peak_id, "on": on})
+
+
+## 全峰自动项目开关。
+func request_set_all_auto_project(sect_id: String, on: bool) -> String:
+	return _request(Commands.SET_ALL_AUTO_PROJECT, {"sectId": sect_id, "on": on})
+
+
+## 立即探索一次。
+func request_explore_now(sect_id: String) -> String:
+	return _request(Commands.EXPLORE_NOW, {"sectId": sect_id})
+
+
+## 自动化状态（只读）→ `automation_state_received`。
+func request_query_automation_state(sect_id: String) -> String:
+	return _request(Commands.QUERY_AUTOMATION_STATE, {"sectId": sect_id})
+
+
+## 客户端本地设置：服务端只确认（`applied:false`），值留在前端。
+func request_set_setting(key: String, value: Variant) -> String:
+	return _request(Commands.SET_SETTING, {"key": key, "value": value})
+
 ## 「结束回合」顺序封装：**先 finishTurn，收到响应后再 beginPlayerTurn**
 ## （与 1.0 GUI 手动结束回合一致）。期间 busy；最终以 beginPlayerTurn 的 view 渲染。
 func request_end_turn_sequence() -> String:
@@ -331,6 +430,8 @@ func _handle_response(response: Dictionary) -> void:
 			r4_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if _is_r5_command(command):
 			r5_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
+		if _is_r6_command(command):
+			r6_result_received.emit(command, {"success": false, "message": str(response.get("message", ""))})
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -345,6 +446,8 @@ func _handle_response(response: Dictionary) -> void:
 			r4_result_received.emit(command, result)
 		if _is_r5_command(command):
 			r5_result_received.emit(command, result)
+		if _is_r6_command(command):
+			r6_result_received.emit(command, result)
 		if command == Commands.FINISH_TURN or command == Commands.BEGIN_PLAYER_TURN:
 			_abort_end_turn_sequence()
 		return
@@ -376,12 +479,22 @@ func _handle_response(response: Dictionary) -> void:
 		teleport_options_received.emit(result)
 	elif command == Commands.QUERY_DISCIPLE_DETAIL:
 		disciple_detail_received.emit(result)
+	elif command == Commands.QUERY_JI_YUAN_INFO:
+		ji_yuan_info_received.emit(result)
+	elif command == Commands.QUERY_MI_JING_INFO:
+		mi_jing_info_received.emit(result)
+	elif command == Commands.QUERY_POLICY_OPTIONS:
+		policy_options_received.emit(result)
+	elif command == Commands.QUERY_AUTOMATION_STATE:
+		automation_state_received.emit(result)
 	if _is_r3_command(command):
 		r3_result_received.emit(command, result)
 	if _is_r4_command(command):
 		r4_result_received.emit(command, result)
 	if _is_r5_command(command):
 		r5_result_received.emit(command, result)
+	if _is_r6_command(command):
+		r6_result_received.emit(command, result)
 	_set_status("已同步服务端 view")
 	_advance_end_turn_sequence(command)
 
@@ -413,6 +526,19 @@ func _is_r5_command(command: String) -> bool:
 		Commands.QUERY_TELEPORT_OPTIONS, Commands.ASSIGN_GARRISON,
 		Commands.WITHDRAW_GARRISON, Commands.RECLASS, Commands.PROMOTE,
 		Commands.QUERY_DISCIPLE_DETAIL,
+	]
+
+
+## 是否为 R6 探索/政令/自动化命令（16 条）。
+func _is_r6_command(command: String) -> bool:
+	return command in [
+		Commands.RALLY, Commands.RETURN_TO_DEFENSE,
+		Commands.QUERY_JI_YUAN_INFO, Commands.SEND_TO_JI_YUAN,
+		Commands.QUERY_MI_JING_INFO, Commands.EXPLORE_MI_JING,
+		Commands.SWITCH_GOVERNMENT, Commands.ENACT_POLICY, Commands.REVOKE_POLICY,
+		Commands.QUERY_POLICY_OPTIONS, Commands.SET_AUTOMATION_TOGGLE,
+		Commands.SET_PEAK_AUTO_PROJECT, Commands.SET_ALL_AUTO_PROJECT,
+		Commands.EXPLORE_NOW, Commands.QUERY_AUTOMATION_STATE, Commands.SET_SETTING,
 	]
 
 

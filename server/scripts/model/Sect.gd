@@ -41,6 +41,24 @@ var lastRecruitmentTurn: int = 0
 ## R5 新增（**内部记账，不下发 view**）：本回合已用传送次数（`TURN_START` 清零）。
 ## 可传送次数 = `teleport.capacityBase` + 在守自有灵脉节点数 × `capacityPerOwnLingMaiNode`（封顶 `capacityMax`）。
 var teleportsUsedThisTurn: int = 0
+## R6 新增：当前政体 id（`policy.governments[].id`）。空串 = 未立政体，
+## `PolicyRules.government_of` 回退配置首政体（宗门共治），与 1.0 `PolicyService.governmentOf` 一致。
+var governmentId: String = ""
+## R6 新增：已颁行政令卡 id（`policy.cards[].id`，颁行顺序；`enactPolicy` 追加、`revokePolicy` 移除）。
+## 槽位占用按 `category` 统计，超槽位时由 `trim_policies_to_slots` 按颁行顺序裁剪。
+var enactedPolicies: Array[String] = []
+## R6 新增（**内部记账，不下发 view**，见 PROTOCOL §12.5）：政令小数累积账户。
+## `stability`/`prestige` 存每回合 `perTurn` 累加的余数（向零截断落地，避免整数丢失）；
+## `stabilityBonus` 存已落地的安定整数叠加值（`SETTLEMENT` 时叠加到各峰 `stability`）。
+var policyCarry: Dictionary = {}
+## R6 新增（**内部记账，不下发 view**）：最近一次切换政体的回合（`policy.switchCooldownTurns` 冷却）。
+## 0 = 从未切换，`switch_cooldown_left` 视作无冷却。
+var lastPolicySwitchTurn: int = 0
+## R6 新增：自动化开关（`improve`/`repair`/`road`/`explore` -> bool）。
+## 缺键 = 跟随 `automation.defaultAuto*`，见 `AutomationRules.toggle_of`。
+var automationToggles: Dictionary = {}
+## R6 新增：逐峰自动项目开关（peakId -> bool）。缺键 = 跟随 `automation.defaultAutoProject`。
+var autoProjectByPeak: Dictionary = {}
 
 func public_info() -> Dictionary:
 	return {"id": id, "name": name, "factionType": factionType, "player": player}

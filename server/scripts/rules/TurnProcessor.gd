@@ -51,10 +51,10 @@ func next_turn(state: GameState) -> Array[String]:
 # 各阶段
 # ---------------------------------------------------------------------------
 
-## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零）：
+## TURN_START（R2 实做 + R3 回填道路刷新 + R4 回填修炼 + R5 回填传送次数清零 + R6 回填自动化）：
 ## 重算视野 → 刷新道路网 → 传送次数清零 → 每名弟子重置出手/转职冷却、按公式恢复移动力
-## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼。
-## **不做**：宗主外出（R7）、自动化（R6）。
+## （含本宗道路起点加成与兵种/晋升机动）、宗门停留回合 +1 → 伤愈 → 修炼 → **玩家宗门自动化**。
+## **不做**：宗主外出（R7）。
 func _run_turn_start(state: GameState) -> void:
 	VisionCalculator.recalculate(state, _config)
 	# R3 回填：道路网等级刷新（R2 留的 TODO）。
@@ -77,6 +77,8 @@ func _run_turn_start(state: GameState) -> void:
 			if DiscipleRules.heal_tick(state, _config, disciple):
 				state.eventLog.append("[修炼] %s 伤愈" % disciple.name)
 			DiscipleRules.advance_cultivation(state, _config, disciple)
+	# R6 回填：玩家宗门自动化（R2 留的 TODO）。必须放在移动力恢复之后——自动工序要移动建造者/弟子。
+	AutomationRules.run_turn(state, _config)
 
 
 ## SPIRIT_PEAK（R3 实做 + R4 回填研究队列 + R5 回填围城断供）：
@@ -99,11 +101,18 @@ func _run_spirit_peak(state: GameState) -> void:
 				state.eventLog.append("[围城] %s 补给恢复, 城防折减清零" % peak.name)
 
 
-## SETTLEMENT（R3 实做 + R4 回填道统/心魔 + R5 回填视野重算）：节点冷却 → 人口结算 →
-## 经济结算（唯一入口 `EconomyRules.apply_settlement`）→ 道统成就 boost → 心魔结算 → 视野重算。
-## **留空**：政令（R6）。
+## SETTLEMENT（R3 实做 + R4 回填道统/心魔 + R5 回填视野重算 + R6 回填政令结算）：节点冷却 →
+## 人口结算 → 经济结算（唯一入口 `EconomyRules.apply_settlement`，内含节点冷却 −1 与气运产出）→
+## **政令结算** → 道统成就 boost → 心魔结算 → 视野重算。
+##
+## 节点冷却 −1（R3 已落 `EconomyRules.apply_settlement` 首步）与 `qiYun` 每回合产出（R3 已落
+## `EconomyRules.peak_output`/`_apply_economy`）在 R6 复核后确认**已存在**，故不重复回填，
+## 只在 R6 验收里显式断言二者仍生效（避免「以为没做」而二次叠加）。
 func _run_settlement(state: GameState) -> void:
 	EconomyRules.apply_settlement(state, _config)
+	# R6 回填：政令结算（R3 留的政令 TODO）。必须紧跟经济结算——安定是派生值，
+	# 政令的安定叠加要在 `settle_city` 重算之后落地（见 `PolicyRules.process_settlement`）。
+	PolicyRules.process_settlement(state, _config)
 	# R4 回填：道统成就 boost（一次性道点奖励，替代 1.0「顿悟」）。
 	for sect: Sect in state.sects:
 		DaoRules.check_boosts(state, _config, sect)
@@ -113,7 +122,6 @@ func _run_settlement(state: GameState) -> void:
 	# 此处再兜一次是因为结算期还会改视野源（弟子陨落/叛逃移除、被俘改换门庭），
 	# 保证「回合结束时各宗视野与实体分布自洽」。`recalculate` 幂等，重复调用无副作用。
 	VisionCalculator.recalculate(state, _config)
-	# TODO(R6): 政令结算。
 
 
 ## 心魔结算：逐弟子推进；叛逃者从宗门移除（投中立，R7 前不建立中立势力实体）。

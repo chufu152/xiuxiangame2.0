@@ -260,6 +260,9 @@ static func _add_node(state: GameState, tile: HexTile, type: String, config: Dic
 	node.id = "node_" + tile.id
 	node.tileId = tile.id
 	node.type = type
+	# R6：显示名 = 类型名 + 全图序号（1.0 `GameEngine` `setName(type.getDisplayName() + idCounter)` 同义）。
+	# 序号取「已有节点数 + 1」，生成顺序确定 → 同种子逐字一致。
+	node.name = "%s%d" % [str(Enums.NodeType.NAMES.get(type, type)), state.nodes.size() + 1]
 	node.level = int(config["map"]["setup"]["nodeLevel"])
 	match type:
 		Enums.NodeType.LING_TIAN: node.output = float(config["economy"]["lingTianBaseOutput"])
