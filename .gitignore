@@ -8,6 +8,8 @@
 # ===== 导出产物（保留目录，不提交产物）=====
 /exports/*
 !/exports/.gitkeep
+# R9 W3 起 tools/export.ps1 的产物目录
+/dist/
 /export_presets.cfg.bak
 
 # ===== 本地存档（服务端运行时生成，不提交）=====

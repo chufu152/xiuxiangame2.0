@@ -7,55 +7,60 @@
     + R6 探索（机缘/秘境）/政令（政体/卡牌）/自动化（开关/立即探索/集结回防）
     + R7 任命/血脉/渡劫飞升/反应式 AI/胜负与评分/存档读档/胜利择一
     + R8 表现与 UI 打磨（69 命令全入口 / 水墨转场 / 昼夜粒子 / 小地图 / 设置 / 引导）
+    + R9 皮肤化与导出（默认皮肤 75 个资源 / 导出态路径解析 / Windows 独立产物）
     （对应 docs/prompts/*.md「自动验收」）。
 
 .DESCRIPTION
     依次执行：
-      [0/24] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7 + R8）
-      [1/24] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
-      [2/24] 两个工程 --import 无解析错误并生成 class_name 缓存
-      [3/24] 配置缺失时服务端非零退出（负向用例）
-      [4/24] console 版 --headless 启动服务端并监听 127.0.0.1:9527
-      [5/24] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
-      [6/24] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
-      [7/24] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
+      [0/25] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7 + R8）
+      [1/25] shared/ 目录联接：幂等 + 内容贯通（临时文件在另一处可见）
+      [2/25] 两个工程 --import 无解析错误并生成 class_name 缓存
+      [3/25] 配置缺失时服务端非零退出（负向用例）
+      [4/25] console 版 --headless 启动服务端并监听 127.0.0.1:9527
+      [5/25] 运行 res://tests/SmokeTest.tscn，断言 SMOKE_PASS 且退出码 0（R0 协议回归）
+      [6/25] 清理本脚本拉起的 Godot 进程，断言 tasklist 无残留
+      [7/25] 服务端 R1 验收：res://tests/R1Test.tscn 打印 R1_PASS、退出码 0，
             且同种子双跑导出的权威地图 outputs/r1_authority_a|b.json 逐字一致（SHA256 相同）
-      [8/24] 服务端 R2 验收：res://tests/R2Test.tscn 打印 R2_PASS、退出码 0
+      [8/25] 服务端 R2 验收：res://tests/R2Test.tscn 打印 R2_PASS、退出码 0
             （回合状态机 + 地形叠加移动成本 + BFS 可达 + 移动后视野刷新 + 确定性）
-      [9/24] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
+      [9/25] 客户端 R1 验收：res://tests/R1ClientTest.tscn 无头全绿；
             再加 --integration 端到端（真实拉起 headless 服务端 + newGame 300 格 view + getState 往返）
-      [10/24] 客户端 R2 验收：res://tests/R2ClientTest.tscn 无头全绿；
+      [10/25] 客户端 R2 验收：res://tests/R2ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点选弟子 → 移动高亮 → moveDisciple → 结束回合 → 相机不重置）
-      [11/24] 服务端 R3 验收：res://tests/R3Test.tscn 打印 R3_PASS、退出码 0
+      [11/25] 服务端 R3 验收：res://tests/R3Test.tscn 打印 R3_PASS、退出码 0
             （开峰 + 建筑 10 种 + 区域/邻接 + 劳力 + 改良地形限制 + 经济结算/赤字 + 道路减耗 + 气运扩张 + 确定性）
-      [12/24] 客户端 R3 验收：res://tests/R3ClientTest.tscn 无头全绿；
+      [12/25] 客户端 R3 验收：res://tests/R3ClientTest.tscn 无头全绿；
             再加 --integration 端到端（选中灵峰 → 城市面板 → 建造山门 → 指派劳力 → 相机不重置）
-      [13/24] 服务端 R4 验收：res://tests/R4Test.tscn 打印 R4_PASS、退出码 0
+      [13/25] 服务端 R4 验收：res://tests/R4Test.tscn 打印 R4_PASS、退出码 0
             （21 道法树前置/时代/流派/血脉门控 + 研究队列 + 修炼/突破/渡劫 + 收徒 + 项目队列取消/加速 + 成就 boost + 确定性）
-      [14/24] 客户端 R4 验收：res://tests/R4ClientTest.tscn 无头全绿；
+      [14/25] 客户端 R4 验收：res://tests/R4ClientTest.tscn 无头全绿；
             再加 --integration 端到端（道统树三态 → 研究道法 → 队列两列不混 → 加速 → 收徒 → 取消 → 相机不重置）
-      [15/24] 服务端 R5 验收：res://tests/R5Test.tscn 打印 R5_PASS、退出码 0
+      [15/25] 服务端 R5 验收：res://tests/R5Test.tscn 打印 R5_PASS、退出码 0
             （十兵种/相克/地形防御/高台/河流/城防 + 攻击预览与结算一致 + ZOC/占格阻挡 + 传送 + 驻守 + 转职晋升 + 批量移动 + 确定性）
-      [16/24] 客户端 R5 验收：res://tests/R5ClientTest.tscn 无头全绿；
+      [16/25] 客户端 R5 验收：res://tests/R5ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点选三段串行链 → 十兵种转职三态 → 攻击预览 blockedReason →
             attack/reclass/promote/retreat 业务失败提示 → 传送未开启 → Shift 多选 batchMove → 两层高亮独立 → 相机不重置）
-      [17/24] 服务端 R6 验收：res://tests/R6Test.tscn 打印 R6_PASS、退出码 0
+      [17/25] 服务端 R6 验收：res://tests/R6Test.tscn 打印 R6_PASS、退出码 0
             （机缘成功率/失败三分支 + 秘境成本/人数/富矿与灾祸 + 政体切换冷却 + 卡牌槽位/时代/道法门控 + 政令安定叠加
              + 自动化预算与建造者扣次 + 集结超限拒绝 + setSetting 不下发 view + 回合回填 + 确定性）
-      [18/24] 客户端 R6 验收：res://tests/R6ClientTest.tscn 无头全绿；
+      [18/25] 客户端 R6 验收：res://tests/R6ClientTest.tscn 无头全绿；
             再加 --integration 端到端（点节点格开探索面板 → 派弟子 → 政令面板颁卡 → 自动化开关/立即探索/集结 → 本地设置 → 相机不重置）
-      [19/24] 服务端 R7 验收：res://tests/R7Test.tscn 打印 R7_PASS、退出码 0
+      [19/25] 服务端 R7 验收：res://tests/R7Test.tscn 打印 R7_PASS、退出码 0
             （任命名额/境界门控/峰主长老宗主加成 + 联姻繁衍冷却与品级抖动 + 渡劫成功率/心魔/陨落
              + AI 反应式行动与视野刷新 + 三流派胜负/失败清算 + 评分公式/240 回合强制结算
              + 待抉择 awaitInput/resolveChoice + 存档 {slot,saved} 与读档 view 逐字一致 + 确定性双跑 SHA256）
-      [20/24] 客户端 R7 验收：res://tests/R7ClientTest.tscn 无头全绿；
+      [20/25] 客户端 R7 验收：res://tests/R7ClientTest.tscn 无头全绿；
             再加 --integration 端到端（胜利进度面板 → 存读档往返 → awaitInput 弹窗 → resolveChoice →
             结局屏 → 事件栏 → 相机不重置）
-      [21/24] 客户端 R8 验收：res://tests/R8ClientTest.tscn 无头全绿；
+      [21/25] 客户端 R8 验收：res://tests/R8ClientTest.tscn 无头全绿；
             再加 --integration 端到端（hello 70 条 → 装饰层按真 view 生成 → 小地图只平移 →
             泼墨/存读档/结束回合/getState 全序列相机不重置 → setSetting 不进 view → 资源栏 13 项）
-      [22/24] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
-      [23/24] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
+      [22/25] Windows 导出冒烟（R9 W3）：客户端 R9 无头验收（开发态/导出态两套根目录
+            口径 + 缺 exe 时报错可诊断）→ 预设文件断言 → tools/export.ps1 产出
+            dist\xiuxian\{Xiuxian.exe,XiuxianServer.exe} → 导出态服务端 --headless 监听
+            （未安装 4.4.1 导出模板或指定 -SkipExport 时打印 SKIP，跳过实际导出）
+      [23/25] 扫描仓库确认无 .java 文件（零 Java 约束）+ 最终残留进程断言
+      [24/25] 协议契约校验：docs/PROTOCOL_2.0.md 覆盖 69 条 + ping（tools/check_protocol.ps1）
 
     退出码：0 = 全绿；1 = 存在失败项。
 
@@ -72,6 +77,9 @@
 .PARAMETER SkipImport
     跳过工程导入（缓存已存在时可加速）。
 
+.PARAMETER SkipExport
+    跳过 [22/25] 的实际导出（预设文件与产物路径断言仍会执行）。
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
     （本机执行策略为 Restricted，必须用 -ExecutionPolicy Bypass；仓库不提供 .cmd 包装）
@@ -79,7 +87,8 @@
 [CmdletBinding()]
 param(
     [int]$Port = 9527,
-    [switch]$SkipImport
+    [switch]$SkipImport,
+    [switch]$SkipExport
 )
 
 $ErrorActionPreference = 'Stop'
@@ -265,7 +274,7 @@ try {
     Write-Host "临时目录：$workDir"
 
     # ---------------------------------------------------------------- 0. 环境
-    Write-Host "`n[0/24] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7 + R8）" -ForegroundColor Cyan
+    Write-Host "`n[0/25] 环境与交付物清单（R0 + R1 + R3 + R4 + R5 + R6 + R7 + R8）" -ForegroundColor Cyan
     $godotExe = $null
     try { $godotExe = Resolve-GodotConsole }
     catch { Assert-Check $false '定位 Godot 控制台版可执行文件' $_.Exception.Message }
@@ -365,18 +374,24 @@ try {
         'assets\manifest.json', 'assets\README.md'
     )
     $expectedFiles += $r8Files
+    $r9Files = @(
+        'client\export_presets.cfg', 'server\export_presets.cfg',
+        'tools\export.ps1',
+        'client\tests\R9ClientTest.gd', 'client\tests\R9ClientTest.tscn'
+    )
+    $expectedFiles += $r9Files
     $missing = @()
     foreach ($rel in $expectedFiles) {
         if (-not (Test-Path (Join-Path $root $rel))) { $missing += $rel }
     }
     Assert-Check ($missing.Count -eq 0) `
-        "R0+R1+R3+R4+R5+R6+R7+R8 交付物清单齐全（R0 $($r0Files.Count) + R1 $($r1Files.Count) + R3 $($r3Files.Count) + R4 $($r4Files.Count) + R5 $($r5Files.Count) + R6 $($r6Files.Count) + R7 $($r7Files.Count) + R8 $($r8Files.Count) 个文件）" `
+        "R0+R1+R3+R4+R5+R6+R7+R8+R9 交付物清单齐全（R0 $($r0Files.Count) + R1 $($r1Files.Count) + R3 $($r3Files.Count) + R4 $($r4Files.Count) + R5 $($r5Files.Count) + R6 $($r6Files.Count) + R7 $($r7Files.Count) + R8 $($r8Files.Count) + R9 $($r9Files.Count) 个文件）" `
         ("缺失：`n" + ($missing -join "`n"))
 
     if (-not $godotExe) { throw '未定位到 Godot 可执行文件，后续步骤无法进行。' }
 
     # ------------------------------------------- 1. shared 目录联接（幂等 + 贯通）
-    Write-Host "`n[1/24] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
+    Write-Host "`n[1/25] shared/ 目录联接（幂等 + 内容贯通）" -ForegroundColor Cyan
     $setupScript = Join-Path $PSScriptRoot 'setup_shared.ps1'
 
     $firstOk = $true; $firstErr = ''
@@ -425,7 +440,7 @@ try {
     Assert-Check (-not (Test-Path $probeTop)) '临时探测文件已清理'
 
     # --------------------------------------------------------- 2. 工程导入
-    Write-Host "`n[2/24] 工程导入与 GDScript 解析" -ForegroundColor Cyan
+    Write-Host "`n[2/25] 工程导入与 GDScript 解析" -ForegroundColor Cyan
     if ($SkipImport) {
         Write-Host '  （-SkipImport：跳过导入步骤）' -ForegroundColor DarkGray
     }
@@ -446,7 +461,7 @@ try {
     }
 
     # --------------------------------------------- 3. 配置失败路径（负向用例）
-    Write-Host "`n[3/24] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
+    Write-Host "`n[3/25] 配置缺失时非零退出（负向用例）" -ForegroundColor Cyan
     $missingConfig = Join-Path $workDir 'not-exists.json'
     $badResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$missingConfig") `
@@ -456,7 +471,7 @@ try {
     Assert-Check ($badCombined -match 'config_load_failed|配置加载失败') '配置缺失时输出可诊断的失败原因' $badCombined.Trim()
 
     # ------------------------------------------------- 4. 启动 headless 服务端
-    Write-Host "`n[4/24] headless 服务端启动并监听" -ForegroundColor Cyan
+    Write-Host "`n[4/25] headless 服务端启动并监听" -ForegroundColor Cyan
     $serverInfo = New-GodotStartInfo -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, '--', "--port=$Port", "--data=$dataPath") -CaptureOutput
     $serverProcess = [System.Diagnostics.Process]::Start($serverInfo)
@@ -474,7 +489,7 @@ try {
     Assert-Check (-not $serverProcess.HasExited) '服务端进程持续运行（未提前退出）'
 
     # ------------------------------------------------ 5. 无头自测（SmokeTest）
-    Write-Host "`n[5/24] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
+    Write-Host "`n[5/25] 无头自测（res://tests/SmokeTest.tscn，R0 协议回归）" -ForegroundColor Cyan
     if ($ready) {
         $smokeResult = Invoke-GodotCapture -Executable $godotExe `
             -Arguments @('--headless', '--path', $serverPath, 'res://tests/SmokeTest.tscn', '--', "--port=$Port") `
@@ -499,7 +514,7 @@ catch {
 }
 finally {
     # ------------------------------------------------------- 6. 清理与残留
-    Write-Host "`n[6/24] 进程清理（R0 服务端）" -ForegroundColor Cyan
+    Write-Host "`n[6/25] 进程清理（R0 服务端）" -ForegroundColor Cyan
 
     if ($serverProcess) {
         try { $serverProcess.Refresh() } catch { }
@@ -530,7 +545,7 @@ finally {
 }
 
 # ------------------------------------------- 7. 服务端 R1 验收（R1Test）
-Write-Host "`n[7/24] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[7/25] 服务端 R1 验收（res://tests/R1Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r1Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R1Test.tscn') `
@@ -561,7 +576,7 @@ else {
 }
 
 # ------------------------------------------- 8. 服务端 R2 验收（回合 + 移动 + 视野）
-Write-Host "`n[8/24] 服务端 R2 验收（res://tests/R2Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[8/25] 服务端 R2 验收（res://tests/R2Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r2Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R2Test.tscn') `
@@ -577,7 +592,7 @@ else {
 }
 
 # ------------------------------------------- 9. 客户端 R1 验收（无头 + 端到端）
-Write-Host "`n[9/24] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[9/25] 客户端 R1 验收（res://tests/R1ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $clientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R1ClientTest.tscn') `
@@ -616,7 +631,7 @@ else {
 }
 
 # ------------------------------ 10. 客户端 R2 验收（点选 → 高亮 → 移动 → 结束回合）
-Write-Host "`n[10/24] 客户端 R2 验收（res://tests/R2ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[10/25] 客户端 R2 验收（res://tests/R2ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r2ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R2ClientTest.tscn') `
@@ -654,7 +669,7 @@ else {
 }
 
 # ------------------------------ 11. 服务端 R3 验收（经济 + 城市 + 建筑/区域/劳力/改良/道路）
-Write-Host "`n[11/24] 服务端 R3 验收（res://tests/R3Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[11/25] 服务端 R3 验收（res://tests/R3Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r3Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R3Test.tscn') `
@@ -670,7 +685,7 @@ else {
 }
 
 # ------------------------------ 12. 客户端 R3 验收（选中灵峰 → 城市面板 → 建造 → 指派劳力）
-Write-Host "`n[12/24] 客户端 R3 验收（res://tests/R3ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[12/25] 客户端 R3 验收（res://tests/R3ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r3ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R3ClientTest.tscn') `
@@ -707,7 +722,7 @@ else {
 }
 
 # ------------------------------ 13. 服务端 R4 验收（道统树 + 修炼/突破/渡劫 + 项目队列 + 收徒）
-Write-Host "`n[13/24] 服务端 R4 验收（res://tests/R4Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[13/25] 服务端 R4 验收（res://tests/R4Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r4Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R4Test.tscn') `
@@ -723,7 +738,7 @@ else {
 }
 
 # ------------------------------ 14. 客户端 R4 验收（道统树 → 研究 → 队列 → 加速 → 收徒 → 取消）
-Write-Host "`n[14/24] 客户端 R4 验收（res://tests/R4ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[14/25] 客户端 R4 验收（res://tests/R4ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r4ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R4ClientTest.tscn') `
@@ -762,7 +777,7 @@ else {
 }
 
 # ------------------------------ 15. 服务端 R5 验收（十兵种 + 战斗结算 + ZOC + 传送 + 转职晋升）
-Write-Host "`n[15/24] 服务端 R5 验收（res://tests/R5Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[15/25] 服务端 R5 验收（res://tests/R5Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r5Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R5Test.tscn') `
@@ -778,7 +793,7 @@ else {
 }
 
 # ------------------------------ 16. 客户端 R5 验收（攻击预览 → 转职晋升 → 批量移动）
-Write-Host "`n[16/24] 客户端 R5 验收（res://tests/R5ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[16/25] 客户端 R5 验收（res://tests/R5ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r5ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R5ClientTest.tscn') `
@@ -819,7 +834,7 @@ else {
 }
 
 # ------------------------------ 17. 服务端 R6 验收（探索 / 政令 / 自动化）
-Write-Host "`n[17/24] 服务端 R6 验收（res://tests/R6Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[17/25] 服务端 R6 验收（res://tests/R6Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r6Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R6Test.tscn') `
@@ -841,7 +856,7 @@ else {
 }
 
 # ------------------------------ 18. 客户端 R6 验收（探索面板 → 政令面板 → 自动化面板）
-Write-Host "`n[18/24] 客户端 R6 验收（res://tests/R6ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[18/25] 客户端 R6 验收（res://tests/R6ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r6ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R6ClientTest.tscn') `
@@ -884,7 +899,7 @@ else {
 }
 
 # ------------------------------ 19. 服务端 R7 验收（任命 / 渡劫 / AI / 胜负 / 存档）
-Write-Host "`n[19/24] 服务端 R7 验收（res://tests/R7Test.tscn）" -ForegroundColor Cyan
+Write-Host "`n[19/25] 服务端 R7 验收（res://tests/R7Test.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r7Result = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $serverPath, 'res://tests/R7Test.tscn') `
@@ -905,7 +920,7 @@ else {
 }
 
 # ------------------------------ 20. 客户端 R7 验收（胜负面板 / 存读档 / awaitInput / 结局屏）
-Write-Host "`n[20/24] 客户端 R7 验收（res://tests/R7ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[20/25] 客户端 R7 验收（res://tests/R7ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r7ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R7ClientTest.tscn') `
@@ -952,7 +967,7 @@ else {
 }
 
 # ------------------------------------------------------ 21. 客户端 R8 表现与 UI 打磨
-Write-Host "`n[21/24] 客户端 R8 验收（res://tests/R8ClientTest.tscn）" -ForegroundColor Cyan
+Write-Host "`n[21/25] 客户端 R8 验收（res://tests/R8ClientTest.tscn）" -ForegroundColor Cyan
 if ($godotExe) {
     $r8ClientResult = Invoke-GodotCapture -Executable $godotExe `
         -Arguments @('--headless', '--path', $clientPath, 'res://tests/R8ClientTest.tscn') `
@@ -1043,8 +1058,135 @@ else {
     Assert-Check $false '运行客户端 R8 验收（未定位到 Godot，已跳过）'
 }
 
-# ------------------------------------------------------ 22. 仓库扫描与最终残留
-Write-Host "`n[22/24] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
+# ------------------------------------------------------ 22. Windows 导出冒烟（R9 W3）
+Write-Host "`n[22/25] Windows 导出冒烟（预设 + 产物 + 导出态服务端）" -ForegroundColor Cyan
+
+# 22.0 导出态路径解析（纯客户端单元，不依赖导出产物）
+$r9ClientResult = Invoke-GodotCapture -Executable $godotExe `
+    -Arguments @('--headless', '--path', $clientPath, 'res://tests/R9ClientTest.tscn') `
+    -TimeoutMs 300000
+$r9ClientCombined = ($r9ClientResult.StdOut + "`n" + $r9ClientResult.StdErr)
+Assert-Check ($r9ClientCombined -match 'R9_CLIENT_RESULT=OK') '客户端 R9 无头验收全绿（R9_CLIENT_RESULT=OK）' `
+    ((Select-GodotProblems -Text $r9ClientCombined) -join "`n")
+Assert-Check ($r9ClientResult.ExitCode -eq 0) '客户端 R9 无头验收退出码为 0' "退出码：$($r9ClientResult.ExitCode)"
+Assert-Check ($r9ClientCombined -notmatch 'R9_CLIENT_FAIL') '客户端 R9 无头验收未出现 R9_CLIENT_FAIL'
+Assert-Check ($r9ClientCombined -match 'R9_CLIENT_PASS: 导出态 repo_root\(\) 不是 res:// 的上一级') `
+    '客户端 R9：导出态 repo_root() 不落在 res:// 的上一级（钉住老写法的坑）'
+Assert-Check ($r9ClientCombined -match 'R9_CLIENT_PASS: 导出态服务端可执行文件名与导出预设一致') `
+    '客户端 R9：Launcher.SERVER_EXE_NAME 与 server/export_presets.cfg 产物名一致'
+
+# 22.1 预设文件
+$clientPreset = Join-Path $clientPath 'export_presets.cfg'
+$serverPreset = Join-Path $serverPath 'export_presets.cfg'
+Assert-Check (Test-Path -PathType Leaf $clientPreset) '客户端导出预设存在（client/export_presets.cfg）' "缺失：$clientPreset"
+Assert-Check (Test-Path -PathType Leaf $serverPreset) '服务端导出预设存在（server/export_presets.cfg）' "缺失：$serverPreset"
+
+$clientPresetText = ''
+$serverPresetText = ''
+if (Test-Path -PathType Leaf $clientPreset) { $clientPresetText = Get-Content -Path $clientPreset -Raw }
+if (Test-Path -PathType Leaf $serverPreset) { $serverPresetText = Get-Content -Path $serverPreset -Raw }
+
+Assert-Check ($clientPresetText -match 'name="Windows Desktop"') '客户端预设声明 Windows Desktop'
+Assert-Check ($serverPresetText -match 'name="Windows Desktop"') '服务端预设声明 Windows Desktop'
+Assert-Check ($clientPresetText -match 'Xiuxian\.exe') '客户端产物名为 Xiuxian.exe'
+# 与 client/scripts/net/Launcher.gd 的 SERVER_EXE_NAME 必须一致，否则导出态拉不起服务端。
+Assert-Check ($serverPresetText -match 'XiuxianServer\.exe') '服务端产物名为 XiuxianServer.exe（与 Launcher.SERVER_EXE_NAME 一致）'
+
+$exportScript = Join-Path $PSScriptRoot 'export.ps1'
+$exportedRoot = Join-Path $root 'dist\xiuxian'
+$exportedServerExe = Join-Path $exportedRoot 'XiuxianServer.exe'
+$exportedClientExe = Join-Path $exportedRoot 'Xiuxian.exe'
+$exportedData = Join-Path $exportedRoot 'data\gameConfig.json'
+
+$templateDir = Join-Path $env:APPDATA 'Godot\export_templates\4.4.1.stable'
+$hasExportTemplate = Test-Path -PathType Leaf (Join-Path $templateDir 'windows_release_x86_64.exe')
+
+if (-not $hasExportTemplate) {
+    Write-Host '  [SKIP] 未安装 Godot 4.4.1 导出模板，跳过实际导出（预设与产物名断言已通过）' -ForegroundColor Yellow
+}
+elseif ($SkipExport) {
+    Write-Host '  [SKIP] 已指定 -SkipExport，跳过实际导出' -ForegroundColor Yellow
+}
+else {
+    Assert-Check (Test-Path -PathType Leaf $exportScript) '导出脚本存在（tools/export.ps1）' "缺失：$exportScript"
+
+    # export.ps1 末尾有 exit，必须放子进程执行，否则会把自检一起带走。
+    $exportInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $exportInfo.FileName = 'powershell.exe'
+    $exportInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$exportScript`""
+    $exportInfo.UseShellExecute = $false
+    $exportInfo.CreateNoWindow = $true
+    $exportInfo.RedirectStandardOutput = $true
+    $exportInfo.RedirectStandardError = $true
+    # 不设 StandardOutputEncoding：子进程是 powershell.exe，按控制台编码（CP936）写管道。
+    $exportProcess = [System.Diagnostics.Process]::Start($exportInfo)
+    $exportOutTask = $exportProcess.StandardOutput.ReadToEndAsync()
+    $exportErrTask = $exportProcess.StandardError.ReadToEndAsync()
+    if (-not $exportProcess.WaitForExit(900000)) {
+        try { $exportProcess.Kill() } catch { }
+        [void]$exportProcess.WaitForExit(5000)
+    }
+    $exportOut = ''
+    $exportErr = ''
+    if ($exportOutTask.Wait(15000)) { try { $exportOut = $exportOutTask.Result } catch { } }
+    if ($exportErrTask.Wait(15000)) { try { $exportErr = $exportErrTask.Result } catch { } }
+    $exportCombined = ($exportOut + "`n" + $exportErr)
+
+    Assert-Check ($exportProcess.ExitCode -eq 0) 'tools/export.ps1 退出码为 0' `
+        (($exportCombined -split "`r?`n" | Where-Object { $_ -match 'FAIL|错误|失败|error|Error' } | Select-Object -First 20) -join "`n")
+    Assert-Check ($exportCombined -match 'EXPORT_RESULT=OK') '导出脚本打印 EXPORT_RESULT=OK' `
+        (($exportCombined -split "`r?`n" | Select-Object -Last 15) -join "`n")
+
+    Assert-Check (Test-Path -PathType Leaf $exportedClientExe) '产物含客户端可执行文件 Xiuxian.exe'
+    Assert-Check (Test-Path -PathType Leaf $exportedServerExe) '产物含服务端可执行文件 XiuxianServer.exe'
+    Assert-Check (Test-Path -PathType Leaf $exportedData) '产物含 data\gameConfig.json'
+    Assert-Check (Test-Path -PathType Leaf (Join-Path $exportedRoot 'assets\manifest.json')) '产物含 assets\manifest.json'
+    $exportedArtCount = 0
+    $exportedArtDir = Join-Path $exportedRoot 'assets\art\default'
+    if (Test-Path $exportedArtDir) {
+        # 只数真实资源（.glb/.png）；分组目录里的 .gitkeep 不计入。
+        $exportedArtCount = (Get-ChildItem -Path $exportedArtDir -Recurse -File |
+            Where-Object { $_.Extension -in @('.glb', '.png') }).Count
+    }
+    Assert-Check ($exportedArtCount -ge 74) "产物含 assets\art\default 全部模型/贴图（≥74，实际 $exportedArtCount）"
+
+    # 导出态服务端：不带 --path、直接跑 exe，验证「导出后可独立运行」。
+    $exportPort = 19641
+    $exportedProcess = $null
+    if (Test-Path -PathType Leaf $exportedServerExe) {
+        $exportStartInfo = New-GodotStartInfo -Executable $exportedServerExe `
+            -Arguments @('--headless', "--port=$exportPort", "--data=$exportedData") -CaptureOutput
+        try {
+            $exportedProcess = [System.Diagnostics.Process]::Start($exportStartInfo)
+        }
+        catch {
+            $exportedProcess = $null
+        }
+    }
+    Assert-Check ($null -ne $exportedProcess) '导出态服务端可被拉起（XiuxianServer.exe 启动成功）'
+
+    $exportListening = $false
+    if ($null -ne $exportedProcess) {
+        for ($attempt = 0; $attempt -lt 120; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            if ($exportedProcess.HasExited) { break }
+            if (Test-TcpPort -Port $exportPort -TimeoutMs 300) { $exportListening = $true; break }
+        }
+    }
+    Assert-Check $exportListening "导出态服务端监听 127.0.0.1:$exportPort（独立运行，无需 --path）"
+
+    if ($null -ne $exportedProcess) {
+        try {
+            if (-not $exportedProcess.HasExited) { $exportedProcess.Kill() }
+            [void]$exportedProcess.WaitForExit(5000)
+        }
+        catch { }
+        try { $exportedProcess.Dispose() } catch { }
+    }
+}
+
+# ------------------------------------------------------ 23. 仓库扫描与最终残留
+Write-Host "`n[23/25] 仓库扫描：零 Java + 最终残留" -ForegroundColor Cyan
 $javaFiles = @()
 try {
     $javaFiles = Get-ChildItem -Path $root -Recurse -File -Filter '*.java' -ErrorAction SilentlyContinue |
@@ -1061,8 +1203,8 @@ Assert-Check ($finalServer.Count -eq 0) 'R1 验收结束后无残留 godot 服�
 Assert-Check ($finalClient.Count -eq 0) 'R1 验收结束后无残留 godot 客户端进程' `
     (($finalClient | ForEach-Object { "pid=$($_.ProcessId) $($_.CommandLine)" }) -join "`n")
 
-# ---------------------------------------------- 22. 协议契约（PROTOCOL_2.0）
-Write-Host "`n[23/24] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
+# ---------------------------------------------- 24. 协议契约（PROTOCOL_2.0）
+Write-Host "`n[24/25] 协议契约校验（docs/PROTOCOL_2.0.md）" -ForegroundColor Cyan
 $protocolScript = Join-Path $PSScriptRoot 'check_protocol.ps1'
 if (Test-Path -PathType Leaf $protocolScript) {
     # 必须放到子进程执行：脚本内的 exit 会终止当前会话，直接 & 调用会把自检一起带走。

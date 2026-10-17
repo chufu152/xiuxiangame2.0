@@ -10,7 +10,11 @@ const DATA_RELATIVE_PATH: String = "data/gameConfig.json"
 
 ## 默认配置路径：工程目录的上一级（仓库根）下的 data/gameConfig.json。
 ## 可用启动参数 `--data=<绝对路径>` 覆盖。
+## **导出态**（`OS.has_feature("template")`）：`res://` 指向可执行文件所在目录，
+## 此时默认取**同目录**下的 data/gameConfig.json（导出脚本会把配置拷到那里）。
 static func default_path() -> String:
+	if OS.has_feature("template"):
+		return OS.get_executable_path().get_base_dir().path_join(DATA_RELATIVE_PATH)
 	var project_dir: String = ProjectSettings.globalize_path("res://").trim_suffix("/")
 	var repo_root: String = project_dir.get_base_dir()
 	return repo_root.path_join(DATA_RELATIVE_PATH)

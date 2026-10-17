@@ -61,7 +61,7 @@ R0 ✅   ┃ R1 ✅   ┃ R1.5 ✅ ┃ R2 ✅   ┃ R3 ✅   ┃ R4 ✅   ┃ R5
 | 客户端·网络 | `net/{NetClient,Launcher,Session}.gd` | ✅ 自动连接、hello 展示、子进程拉起与回收；**R2 起**：拉起后 0.5s 轮询等待就绪（40s 超时）、`moveRange`/`moveResult` 信号、`requestEndTurnSequence`；**R3 新增**：15 条 `request_*` 包装 + 6 个信号（`buildOptions`/`districtSites`/`assignableTiles`/`cityDetail`/`improvementOptions`/`r3Result`）；**R4 新增**：5 条 `request_*` 包装 + 2 个信号（`projectQueue`/`r4Result`）+ `_is_r4_command`；**R5 新增**：12 条 `request_*` 包装 + 5 个信号（`attackPreview`/`attackable`/`teleportOptions`/`discipleDetail`/`r5Result`）+ `_is_r5_command`；**R6 新增**：16 条 `request_*` 包装 + 5 个信号（`ji_yuan_info_received`/`mi_jing_info_received`/`policy_options_received`/`automation_state_received`/`r6_result_received`）+ `_is_r6_command`；**点选弟子改为三段串行链**（`queryMoveRange` → `queryAttackable` → `queryDiscipleDetail`），因 `_request` 是单请求语义、并发会被静默丢弃；**R7 新增**：14 条 `request_*` 包装 + 6 个信号（`victory_progress_received`/`victory_choice_received`/`saves_received`/`await_input`/`events_received`/`r7_result_received`）+ `_is_r7_command`；`NetClient.server_message` 分流 `awaitInput`（它不带 `id`/`ok`/`view`，走不到 `_handle_response`）；`loadGame` 与 `newGame` 同样触发 `game_started`；**R8 新增**：`request_next_turn()`（`nextTurn` 此前服务端已实现、客户端无入口，R8「70 条全入口」才暴露） |
 | 配置 | `data/gameConfig.json` | ✅ 2144 行，26 个顶层块；2.0 地形块（`baseTerrains`/`relief`/`features`/`river`/`nodeSpawnByTerrain`）已落地；6 个裁剪块确认不存在；**R3 只读复用** `spiritPeak`/`economy`/`building`/`city`/`improvement`/`road`/`resources`/`qiYun` |
 | 协议契约 | `docs/PROTOCOL_2.0.md` + `tools/check_protocol.ps1` | ✅ 69 条 + `ping` 全覆盖，分组 13/22/18/4/4/6/2；**R7 起 69 条 + `ping` 全部标「已实现」**（`implemented_commands()` 共 70 项；**无「待实现」**）；`TODO(需核对)` 降至 **7 处**（R7 回填 §11.2 #1 `AppointmentResult` 与 #3 `goals` 9 键，§3 `tribulate`/`appoint*` 的 result 展开；**R9 W0 后为 3 处，见 §4.11**）；校验脚本 **38/38** 全绿（新增「已实现 = 70」全量断言与 `awaitInput` 转正断言）、69 分组点数不变 |
-| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **24 阶段**（`[0/24]`–`[23/24]`），含 R0–R8 全量断言 + 协议契约校验（**179/179** 全绿） |
+| 工具 | `tools/{setup_shared,run_dev,check}.ps1`、`tools/check_protocol.ps1` | ✅ `check.ps1` 已扩为 **25 阶段**（`[0/25]`–`[24/25]`），含 R0–R9 全量断言 + 导出冒烟 + 协议契约校验（**200/200** 全绿） |
 
 ### 1.3 遗留缺口（进入 R5 前需知悉，不阻塞 R5）
 
@@ -639,6 +639,83 @@ R9 开工先做纯清账，**只改 1 处服务端字段裁剪 + 3 份文档**�
 ASSETVERIFY_OK covered=75 warned=0
 ```
 `R8_CLIENT_RESULT=OK checks=44 failures=0`（含「最小包 75 个 ID 均未触发 WARN」「未覆盖 ID 仍回退占位并 WARN 一次（2 个）」）；`tools/check.ps1` **179/179 `CHECK_RESULT=OK`**，`check_protocol.ps1` 仍 **38/38**。剩余 2 条 WARN 恰为 `font.body` / `font.title`，符合「继续走回退占位」裁决。
+
+### 4.13 R9 W3：Windows 导出（导出可独立运行）
+
+目标：双击 `Xiuxian.exe` 就能玩，**不依赖 Godot 编辑器**。产物目录 `dist/xiuxian/`：
+
+```
+Xiuxian.exe          客户端（GUI 子系统，无控制台窗口）
+Xiuxian.pck
+XiuxianServer.exe    服务端（--headless 运行，自带 PCK）
+XiuxianServer.pck
+data/gameConfig.json 权威配置
+assets/              manifest.json + art/ + audio/
+```
+
+**一、导出态与开发态的根目录口径（本 W 唯一的真 bug 风险点）**
+
+| 态 | `res://` 指向 | 正确根目录 |
+|---|---|---|
+| 开发态（编辑器 / `--path client`） | `<repo>/client` | `res://` 的上一级 = 仓库根 |
+| 导出态（PCK 打包） | **可执行文件所在目录** | 就是 `res://` 本身，**不能再取上一级** |
+
+`Launcher.repo_root()` 因此改为：
+
+```gdscript
+static func repo_root() -> String:
+    if is_exported():
+        return OS.get_executable_path().get_base_dir()
+    return ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir()
+```
+
+这一处同时决定 `assets/`（`AssetLibrary.asset_root`）与 `data/`（`default_data_path`）的定位，
+写错就表现为「导出后所有资源都回退占位、配置也读不到」。
+
+**二、`Launcher` 的导出态启动分支**
+
+| 项 | 开发态 | 导出态 |
+|---|---|---|
+| 可执行文件 | `GODOT_CONSOLE_EXE` / `tools/godot_path.txt` / 固定路径 | `<产物目录>/XiuxianServer.exe`（`SERVER_EXE_NAME` 常量） |
+| 参数 | `--headless --path <repo>/server -- --port= --data=` | `--headless --port= --data=`（无 `--path`，PCK 已内嵌） |
+| 失败提示 | 「找不到 Godot 控制台版可执行文件…」 | 「找不到服务端可执行文件：<绝对路径>（导出产物需把 XiuxianServer.exe 放在同一目录）」 |
+
+`server_project_dir()` 在导出态退化为服务端可执行文件路径（导出态没有「工程目录」概念）。
+
+**三、新增文件**
+
+| 文件 | 作用 |
+|---|---|
+| `client/export_presets.cfg` | Windows Desktop 预设，`export_path=../dist/xiuxian/Xiuxian.exe`，`exclude_filter="tests/*, tools/*"`（开发工具不进包） |
+| `server/export_presets.cfg` | 同上，产物 `XiuxianServer.exe` |
+| `tools/export.ps1` | 一键：校验模板 → 双工程 `--import` → `--export-release` → 拷 `data/`+`assets/` → 断言产物（含 `art/default` 的 `.glb`+`.png` ≥ 74，`.gitkeep` 不计） |
+| `client/tests/R9ClientTest.gd/.tscn` | 17 条断言，强制切态验证两套根目录口径 |
+
+`server/scripts/config/ConfigLoader.gd` 的 `default_path()` 同步支持导出态（同目录 `data/`），
+避免不传 `--data` 时跑到产物目录的上一级。
+
+**四、`check.ps1` 24 → 25 阶段**
+
+新增 `[22/25] Windows 导出冒烟`，顺序为：
+1. `R9ClientTest` 无头全绿（含「导出态 `repo_root()` 不是 `res://` 的上一级」这条**回归钉子**，以及「`Launcher.SERVER_EXE_NAME` 与 `server/export_presets.cfg` 产物名一致」）；
+2. 两个 `export_presets.cfg` 存在、声明 `Windows Desktop`、产物名正确；
+3. 跑 `tools/export.ps1`（子进程执行，因其末尾有 `exit`），断言退出码 0 + `EXPORT_RESULT=OK`；
+4. 断言四个关键产物齐全 + `art/default` 模型贴图 ≥ 74；
+5. **真启动导出态服务端**：`XiuxianServer.exe --headless --port=19641 --data=<产物>/data/gameConfig.json`，轮询 TCP 直到监听成功（验证「导出后可独立运行」），随后强制回收。
+
+未安装 4.4.1 导出模板或传 `-SkipExport` 时打印 `[SKIP]`，跳过第 3–5 步（前两步仍执行）。
+
+**五、导出模板安装（本机已就位）**
+
+`%APPDATA%\Godot\export_templates\4.4.1.stable\` 需含 `windows_release_x86_64.exe` 等 35 个文件，
+来源 `Godot_v4.4.1-stable_export_templates.tpz`（1.12 GB）。`tools/export.ps1` 会先校验，
+缺失时直接报错并给出安装路径，不会静默产出半成品。
+
+**验收**
+- `R9_CLIENT_RESULT=OK checks=17 failures=0`
+- `EXPORT_RESULT=OK`：`Xiuxian.exe` 97.5 MB / `XiuxianServer.exe` 97.5 MB / `Xiuxian.pck` / `XiuxianServer.pck` / `data/gameConfig.json` / `assets/**`（74 个模型贴图 + 1 个 BGM）
+- 导出态服务端独立运行日志：`[Server] config ok: <产物>/data/gameConfig.json` + `server listening on 127.0.0.1:19641`
+- `tools/check.ps1` **200/200 `CHECK_RESULT=OK`**，`check_protocol.ps1` 仍 **38/38**
 
 ---
 
